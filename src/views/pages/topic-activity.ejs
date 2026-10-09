@@ -1,0 +1,13 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<p class="text-2"><%= isTopicLeader ? 'Every change in this topic. The log can’t be edited or deleted.' : 'Your own actions in this topic. Leaders see everyone’s.' %></p>
+<section class="card flush">
+  <% if (!log.length) { %><div class="empty">No activity yet.</div><% } %>
+  <div class="list">
+  <% log.forEach((a) => { %>
+    <div class="row" style="align-items:flex-start"><%- u.avatar(a.uid ? { id: a.uid, name: a.name, color: a.color } : null, 'sm', !!a.uid) %>
+      <span style="flex:1;min-width:0"><b style="font-weight:500"><%= a.name || 'CTENT' %></b> <span class="text-2"><%= a.detail %></span><br><span class="mono"><%= a.action %> · <%= u.fmtDateTime(a.created_at) %></span></span></div>
+  <% }) %>
+  </div>
+</section>
+<%- include('../partials/bottom') %>

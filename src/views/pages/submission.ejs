@@ -1,0 +1,53 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="cols">
+  <div class="wide">
+    <section class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="split"><span class="mono">Submission #<%= s.id %> · <%= s.milestone || 'No milestone' %></span><span class="right"><%- u.tag(s.status) %></span></div>
+      <h2 style="font-size:22px"><%= s.title %></h2>
+      <div class="split"><%- u.avatar({ id: s.author_id, name: s.author, color: s.author_color }, 'sm', true) %><span class="text-2">by <%= s.author %> · updated <%= u.ago(s.updated_at) %></span></div>
+      <% if (versions[0]) { %>
+        <div class="split" style="padding:12px;border-radius:10px;background:var(--surface-2)"><%- u.icon('file') %><span style="flex:1;min-width:0"><b style="font-weight:500"><%= versions[0].file_name || 'File removed' %></b><br><span class="hint">v<%= versions[0].version %> · <%= u.humanSize(versions[0].file_size) %></span></span>
+          <% if (versions[0].fid) { %><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= versions[0].fid %>?view=1" target="_blank" rel="noopener">Preview</a><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= versions[0].fid %>"><%- u.icon('download', 16) %>Download</a><% } %></div>
+      <% } %>
+    </section>
+    <% if (diff) { %>
+      <section class="card"><div class="card-head"><h2>What changed: v<%= versions[1].version %> → v<%= versions[0].version %></h2><span class="mono"><span style="color:var(--green)">+<%= diff.filter((d) => d[0] === '+').length %></span> · <span style="color:var(--red)">−<%= diff.filter((d) => d[0] === '-').length %></span> lines</span></div>
+        <pre style="margin:0;font:13px/1.6 var(--mono);overflow-x:auto;background:var(--surface-2);border-radius:8px;padding:12px"><% diff.forEach((d) => { %><div style="<%= d[0] === '+' ? 'background:var(--green-soft);color:var(--green)' : d[0] === '-' ? 'background:var(--red-soft);color:var(--red);text-decoration:line-through' : '' %>"><%= d[0] === '=' ? '  ' : d[0] + ' ' %><%= d[1] %></div><% }) %></pre>
+      </section>
+    <% } else if (preview) { %>
+      <section class="card"><div class="card-head"><h2>Preview</h2></div><pre style="margin:0;font:13px/1.6 var(--mono);overflow-x:auto;white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:12px"><%= preview.slice(0, 20000) %></pre></section>
+    <% } %>
+    <section class="card"><div class="card-head"><h2>Review history</h2></div>
+      <% if (!reviews.length) { %><div class="empty" style="padding:12px">No reviews yet.</div><% } %>
+      <% reviews.forEach((rv) => { const c = u.color(rv.decision === 'approved' ? 'green' : rv.decision === 'changes' ? 'red' : 'indigo'); %>
+        <div class="row" style="align-items:flex-start"><%- u.avatar({ id: rv.uid, name: rv.name, color: rv.color }, 'sm') %><span style="flex:1"><span class="split"><b><%= rv.name %></b><span class="tag" style="background:<%= c[1] %>;color:<%= c[0] %>"><%= rv.decision === 'approved' ? 'Approved' : rv.decision === 'changes' ? 'Changes requested' : 'Comment' %></span><span class="mono"><%= u.ago(rv.created_at) %></span></span><% if (rv.comment) { %><p style="margin-top:4px;white-space:pre-wrap"><%= rv.comment %></p><% } %></span></div>
+      <% }) %>
+    </section>
+  </div>
+  <div class="narrow">
+    <% if (canReview && s.status !== 'approved') { %>
+      <form method="post" action="/topics/<%= topic.id %>/submissions/<%= s.id %>/review" class="card" style="display:flex;flex-direction:column;gap:12px;border-top:4px solid var(--teal)">
+        <h2>Your review</h2>
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field"><label for="rc">Comment</label><textarea id="rc" name="comment" rows="4" placeholder="What’s good, what needs to change"></textarea></div>
+        <div class="split"><button class="btn btn-s" name="decision" value="changes">Request changes</button><button class="btn btn-p" name="decision" value="approved">Approve</button></div>
+        <button class="btn-link" name="decision" value="comment" style="align-self:flex-start">Just comment</button>
+      </form>
+    <% } %>
+    <% if ((isAuthor || isTopicLeader) && s.status !== 'approved' && topic.status !== 'archived') { %>
+      <form method="post" action="/topics/<%= topic.id %>/submissions/<%= s.id %>/version" enctype="multipart/form-data" class="card" style="display:flex;flex-direction:column;gap:12px">
+        <h2>Upload a new version</h2>
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field"><label for="vf">File</label><input id="vf" name="file" type="file" required><span class="hint">Up to <%= maxMb %> MB.</span></div>
+        <div class="field"><label for="vn">What changed</label><input id="vn" name="note" placeholder="e.g. Replaced Bhola with Patuakhali"></div>
+        <button class="btn btn-p"><%- u.icon('upload') %>Upload v<%= (versions[0] ? versions[0].version : 0) + 1 %></button>
+      </form>
+    <% } %>
+    <% if (s.status === 'approved') { %><div class="alert ok"><%- u.icon('check', 16) %>Approved and locked. Changes need a new submission.</div><% } %>
+    <section class="card"><div class="card-head"><h2>Versions</h2></div>
+      <% versions.forEach((v) => { %><div class="row"><span class="mono" style="color:var(--text);width:28px">v<%= v.version %></span><span style="flex:1;min-width:0;font-size:13px"><%= v.note || '—' %><br><span class="hint"><%= v.by %> · <%= u.ago(v.created_at) %></span></span><% if (v.fid) { %><a href="/topics/<%= topic.id %>/files/<%= v.fid %>" aria-label="Download version <%= v.version %>"><%- u.icon('download', 16) %></a><% } %></div><% }) %>
+    </section>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

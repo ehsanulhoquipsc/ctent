@@ -1,0 +1,30 @@
+<%- include('../partials/head') %>
+<body>
+<main class="auth">
+  <div class="auth-card">
+    <img class="logo" src="/static/img/logo.png" alt="CTENT — Conducting from Interior">
+    <div style="text-align:center"><h1>Sign in</h1><p class="text-2" style="margin-top:4px">Your research group’s workspace</p></div>
+    <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+    <form method="post" action="/login" style="display:flex;flex-direction:column;gap:14px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="next" value="<%= next %>">
+      <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required value="<%= email %>"></div>
+      <div class="field"><div class="split"><label for="password">Password</label><a class="right" href="/forgot" style="font-size:13px">Forgot password?</a></div><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-p" type="submit">Sign in</button>
+    </form>
+    <% if (demo.length) { %>
+      <div style="display:flex;align-items:center;gap:10px"><span style="flex:1;height:1px;background:var(--line)"></span><span class="mono">Or try a demo account</span><span style="flex:1;height:1px;background:var(--line)"></span></div>
+      <div class="demo-list">
+        <% demo.forEach((d) => { %>
+          <form method="post" action="/login/demo"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="id" value="<%= d.id %>">
+            <button type="submit" style="width:100%"><span><%= d.name %></span><span class="mono" style="color:<%= d.platform_role === 'admin' ? 'var(--pri-text)' : d.platform_role === 'leader' ? 'var(--teal)' : d.platform_role === 'guest' ? 'var(--violet)' : 'var(--indigo)' %>"><%= d.platform_role %></span></button>
+          </form>
+        <% }) %>
+      </div>
+      <p class="hint" style="text-align:center">Demo password for every account: <span class="kbd">demo1234</span>. Everyone trying the demo shares the same data.</p>
+    <% } %>
+  </div>
+</main>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

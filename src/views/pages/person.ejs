@@ -1,0 +1,27 @@
+<%- include('../partials/top', { crumb: 'People / ' + u.esc(p.name) }) %>
+<section class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:20px;padding:24px">
+  <%- u.avatar(p, 'lg') %>
+  <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:6px">
+    <div class="split"><h1><%= p.name %></h1><%- u.roleTag(p.platform_role) %><% if (p.status !== 'active') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">Suspended</span><% } %></div>
+    <span class="text-2"><%= p.title || '' %><%= p.title && p.institution ? ' · ' : '' %><%= p.institution || '' %></span>
+    <span class="hint"><%= canSeeContact ? p.email : 'Contact details are visible to people in a shared topic.' %> · joined <%= u.fmtDate(p.created_at, { month: 'short', year: 'numeric' }) %></span>
+  </div>
+  <% if (p.id === me.id) { %><a class="btn btn-s" href="/profile">Edit profile</a><% } %>
+</section>
+<div class="grid">
+  <div class="card stat"><span class="text-2">Open tasks</span><b><%= open %></b><span>across all topics</span></div>
+  <div class="card stat"><span class="text-2">Completed</span><b><%= done %></b><span>tasks done</span></div>
+  <div class="card stat"><span class="text-2">Shared topics</span><b><%= shared.length %></b><span>with you</span></div>
+  <div class="card stat"><span class="text-2">Availability</span><b><%= p.weekly_hours || 0 %> h</b><span>per week</span></div>
+</div>
+<div class="cols">
+  <section class="card wide" style="display:block"><div class="card-head"><h2>Expertise</h2><span class="mono">Self-rated 1–5</span></div>
+    <% if (!expertise.length) { %><div class="empty" style="padding:12px">No expertise added yet.</div><% } %>
+    <% expertise.forEach((e) => { %><div class="row"><span style="flex:0 0 220px"><%= e.name %> <span class="hint"><%= e.kind %></span></span><span class="bar" style="flex:1"><span style="width:<%= e.level * 20 %>%;background:<%= e.level >= 4 ? 'var(--pri)' : e.level === 3 ? 'var(--amber)' : 'var(--muted)' %>"></span></span><span class="mono" style="width:30px;text-align:right"><%= e.level %>/5</span></div><% }) %>
+  </section>
+  <section class="card narrow" style="display:block"><div class="card-head"><h2>Topics in common</h2></div>
+    <% if (!shared.length) { %><div class="empty" style="padding:12px">None.</div><% } %>
+    <% shared.forEach((t) => { %><a class="row" href="/topics/<%= t.id %>" style="text-decoration:none;color:var(--text)"><span class="dot" style="background:<%= u.color(t.color)[0] %>"></span><span style="flex:1;font-size:13px"><%= t.title %><br><span class="mono"><%= t.code %></span></span><%- u.roleTag(t.role) %></a><% }) %>
+  </section>
+</div>
+<%- include('../partials/bottom') %>

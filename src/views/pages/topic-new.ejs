@@ -1,0 +1,29 @@
+<%- include('../partials/top', { crumb: '<a href="/topics">Topics</a> / New topic' }) %>
+<div class="page-head"><div><h1>Create a research topic</h1><p>You’ll be the topic leader. You can invite people and plan parts next.</p></div></div>
+<% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+<form method="post" action="/topics/new" class="card" style="display:flex;flex-direction:column;gap:18px;max-width:880px">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="field"><label for="title">Topic title</label><input id="title" name="title" required minlength="4" maxlength="240" value="<%= v.title || '' %>" placeholder="e.g. How China’s Medog dam affects the geopolitics of Asia"></div>
+  <div class="field"><label for="description">Short description</label><textarea id="description" name="description" rows="3" maxlength="2000" placeholder="What question are you answering, and why does it matter?"><%= v.description || '' %></textarea></div>
+  <div class="form-grid">
+    <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= v.field || '' %>" placeholder="e.g. Geopolitics"></div>
+    <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= v.due_date || '' %>"></div>
+    <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility">
+      <option value="private"<%= v.visibility === 'private' ? ' selected' : '' %>>Private — invited people only</option>
+      <option value="institution"<%= v.visibility === 'institution' ? ' selected' : '' %>>Institution — others can ask to join</option>
+      <option value="open"<%= v.visibility === 'open' ? ' selected' : '' %>>Open — anyone signed in can ask to join</option>
+    </select></div>
+  </div>
+  <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px"><legend class="label" style="margin-bottom:8px">Start from a template</legend>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+      <% Object.entries(templates).forEach(([k, t]) => { %>
+        <label class="card" style="padding:14px;display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="radio" name="template" value="<%= k %>"<%= v.template === k ? ' checked' : '' %>><span><b style="font-weight:600"><%= t.name %></b><br><span class="hint"><%= t.parts.length ? t.parts.length + ' parts ready to assign' : 'Start empty' %></span></span></label>
+      <% }) %>
+    </div>
+  </fieldset>
+  <fieldset style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:8px">Colour</legend>
+    <div class="split"><% colors.forEach((c) => { %><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="color" value="<%= c %>"<%= v.color === c ? ' checked' : '' %>><span class="dot" style="width:16px;height:16px;border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= c %></label><% }) %></div>
+  </fieldset>
+  <div class="form-actions"><a class="btn btn-s" href="/topics">Cancel</a><button class="btn btn-p">Create topic</button></div>
+</form>
+<%- include('../partials/bottom') %>

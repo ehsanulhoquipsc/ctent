@@ -1,0 +1,33 @@
+<%- include('../partials/top', { crumb: 'My tasks' }) %>
+<div class="page-head"><div><h1>My tasks</h1><p>Everything assigned to you, across every topic.</p></div></div>
+<div class="chips">
+  <% [['open', 'Open'], ['done', 'Done'], ['all', 'All']].forEach(([k, l]) => { %><a class="chip<%= filter === k ? ' on' : '' %>" href="/tasks?show=<%= k %>"><%= l %></a><% }) %>
+</div>
+<section class="card flush">
+  <% if (!tasks.length) { %><div class="empty"><b>Nothing here</b><span>Tasks show up when a leader assigns you a part or a card on the board.</span></div><% } else { %>
+  <div class="scroll-x"><table class="table">
+    <thead><tr><th>Task</th><th>Topic</th><th>Status</th><th>Due</th><th><span class="sr">Change status</span></th></tr></thead>
+    <tbody>
+    <% tasks.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); %>
+      <tr>
+        <td><b style="font-weight:500"><%= t.title %></b><% if (t.priority === 'high') { %> <span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></td>
+        <td><a href="/topics/<%= t.topic_id %>/board" class="mono" style="text-decoration:none"><%= t.code %></a></td>
+        <td><%- u.tag(t.status) %></td>
+        <td style="color:<%= late ? 'var(--red)' : 'inherit' %>"><%= t.due_date ? u.fmtDate(t.due_date) : '—' %><%= late ? ' · overdue' : '' %></td>
+        <td style="text-align:right">
+          <form method="post" action="/topics/<%= t.topic_id %>/tasks/<%= t.id %>/move">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="/tasks?show=<%= filter %>">
+            <label class="sr" for="s<%= t.id %>">Status</label>
+            <select id="s<%= t.id %>" name="status" class="in" style="height:32px;width:auto" data-autosubmit>
+              <% [['todo', 'To do'], ['doing', 'In progress'], ['review', 'In review'], ['done', 'Done']].forEach(([k, l]) => { %><option value="<%= k %>"<%= t.status === k ? ' selected' : '' %>><%= l %></option><% }) %>
+            </select>
+            <noscript><button class="btn btn-s btn-sm">Save</button></noscript>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+<%- include('../partials/bottom') %>

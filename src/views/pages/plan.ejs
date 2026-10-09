@@ -1,0 +1,60 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="alert info"><%- u.icon('check', 16) %><span><%= isTopicLeader ? 'Split the topic into parts. Suggestions are ranked by each member’s expertise and current workload — nothing is assigned until you approve it.' : 'This is how the topic is split. The leader approves who owns each part.' %></span></div>
+<div class="cols">
+  <div class="wide">
+    <% if (!parts.length) { %><section class="card"><div class="empty"><b>No parts yet</b><span><%= isTopicLeader ? 'Add the first part on the right.' : 'The leader hasn’t split this topic yet.' %></span></div></section><% } %>
+    <% parts.forEach((p) => { %>
+      <section class="card" style="display:flex;flex-direction:column;gap:12px">
+        <div class="split"><h3 style="flex:1"><%= p.title %></h3><%- u.tag(p.status) %><% if (p.due_date) { %><span class="hint">Due <%= u.fmtDate(p.due_date) %></span><% } %></div>
+        <% if (p.description) { %><p class="text-2"><%= p.description %></p><% } %>
+        <% if (p.skills) { %><div class="split"><span class="mono">Needs</span><% p.skills.split(',').forEach((s) => { %><span class="skill"><%= s.trim() %></span><% }) %></div><% } %>
+        <% if (p.status === 'approved' && p.owner) { %>
+          <div class="split" style="padding:10px 12px;border-radius:10px;background:var(--green-soft)"><%- u.avatar(p.owner, 'sm', true) %><span style="flex:1"><b><%= p.owner.name %></b> owns this part · <%= p.tasks %> task<%= p.tasks === 1 ? '' : 's' %> on the board</span><a href="/topics/<%= topic.id %>/board?who=<%= p.owner.id %>" style="font-size:13px">View tasks</a></div>
+        <% } %>
+        <% if (isTopicLeader) { %>
+          <form method="post" action="/topics/<%= topic.id %>/plan/<%= p.id %>" style="display:flex;flex-direction:column;gap:8px">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <span class="label">Suggested owners</span>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <% p.suggestions.slice(0, 4).forEach((s, i) => { %>
+                <label class="split" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer">
+                  <input type="radio" name="user_id" value="<%= s.id %>"<%= (p.proposed_user_id ? p.proposed_user_id === s.id : i === 0 && s.score > 0) ? ' checked' : '' %>>
+                  <%- u.avatar(s, 'sm') %><span style="flex:1"><%= s.name %> <span class="hint">· <%= s.load %> open task<%= s.load === 1 ? '' : 's' %></span></span>
+                  <span class="bar" style="width:80px"><span style="width:<%= s.score %>%;background:<%= s.score >= 70 ? 'var(--green)' : s.score >= 40 ? 'var(--amber)' : 'var(--muted)' %>"></span></span><span class="mono" style="width:44px;text-align:right"><%= s.score %>%</span>
+                </label>
+              <% }) %>
+              <% if (p.suggestions.length > 4) { %>
+                <label class="split" style="font-size:13px"><span class="text-2">Someone else:</span><select class="in" name="user_id_other" style="width:auto;height:32px" data-other><option value="">—</option><% p.suggestions.slice(4).forEach((s) => { %><option value="<%= s.id %>"<%= p.proposed_user_id === s.id ? ' selected' : '' %>><%= s.name %> (<%= s.score %>%)</option><% }) %></select></label>
+              <% } %>
+            </div>
+            <div class="split">
+              <button class="btn btn-p btn-sm" name="action" value="approve"><%= p.status === 'approved' ? 'Change owner' : 'Approve owner' %></button>
+              <% if (p.status !== 'approved') { %><button class="btn btn-s btn-sm" name="action" value="propose">Save as proposal</button><% } %>
+              <button class="btn btn-d btn-sm right" name="action" value="delete" formnovalidate data-confirm-btn="Delete this part?">Delete part</button>
+            </div>
+          </form>
+        <% } else if (p.owner) { %>
+          <div class="split"><%- u.avatar(p.owner, 'sm') %><span><%= p.status === 'approved' ? 'Owner: ' : 'Proposed: ' %><b><%= p.owner.name %></b></span></div>
+        <% } %>
+      </section>
+    <% }) %>
+  </div>
+  <div class="narrow">
+    <% if (isTopicLeader) { %>
+    <form method="post" action="/topics/<%= topic.id %>/plan" class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Add a part</h2>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="ptitle">Title</label><input id="ptitle" name="title" required placeholder="e.g. Downstream water security"></div>
+      <div class="field"><label for="pdesc">What’s involved</label><textarea id="pdesc" name="description" rows="3"></textarea></div>
+      <div class="field"><label for="pskills">Skills needed</label><input id="pskills" name="skills" placeholder="Water security, Policy analysis"><span class="hint">Comma separated. Used to rank suggestions.</span></div>
+      <div class="field"><label for="pdue">Due date</label><input id="pdue" name="due_date" type="date"></div>
+      <button class="btn btn-p">Add part</button>
+    </form>
+    <% } %>
+    <section class="card"><h3 style="margin-bottom:10px">Team workload</h3>
+      <% people.forEach((m) => { const n = load[m.id] || 0; %><div class="row"><%- u.avatar(m, 'sm', true) %><span style="flex:1;font-size:13px"><%= m.name %></span><span class="bar" style="width:70px"><span style="width:<%= Math.min(100, n * 15) %>%;background:<%= n > 5 ? 'var(--red)' : n > 3 ? 'var(--amber)' : 'var(--green)' %>"></span></span><span class="mono" style="width:20px;text-align:right"><%= n %></span></div><% }) %>
+    </section>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

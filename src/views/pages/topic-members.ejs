@@ -1,0 +1,43 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="cols">
+  <section class="card flush wide" style="display:block">
+    <div class="scroll-x"><table class="table">
+      <thead><tr><th>Person</th><th>Role in topic</th><th>Open tasks</th><th>Joined</th><% if (isTopicLeader) { %><th><span class="sr">Actions</span></th><% } %></tr></thead>
+      <tbody>
+      <% members.forEach((m) => { %>
+        <tr>
+          <td><div class="split"><%- u.avatar(m, '', true) %><span><a href="/people/<%= m.id %>" style="color:var(--text);text-decoration:none;font-weight:500"><%= m.name %></a><br><span class="hint"><%= m.title || m.email %></span></span></div></td>
+          <td>
+            <% if (isTopicLeader && m.id !== me.id) { %>
+              <form method="post" action="/topics/<%= topic.id %>/members/<%= m.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="r<%= m.id %>">Role</label>
+                <select id="r<%= m.id %>" name="role" class="in" style="height:32px;width:auto" data-autosubmit><% ['leader', 'member', 'guest'].forEach((r) => { %><option value="<%= r %>"<%= m.role === r ? ' selected' : '' %>><%= r[0].toUpperCase() + r.slice(1) %></option><% }) %></select>
+                <noscript><button class="btn btn-s btn-sm">Save</button></noscript></form>
+            <% } else { %><%- u.roleTag(m.role) %><% } %>
+          </td>
+          <td><%= load[m.id] || 0 %></td>
+          <td class="hint"><%= u.fmtDate(m.joined_at, { day: 'numeric', month: 'short', year: 'numeric' }) %></td>
+          <% if (isTopicLeader) { %><td style="text-align:right">
+            <% if (m.id !== me.id) { %><form method="post" action="/topics/<%= topic.id %>/members/<%= m.id %>" data-confirm="Remove <%= m.name %> from <%= topic.code %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="remove"><button class="btn btn-d btn-sm">Remove</button></form><% } %>
+          </td><% } %>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table></div>
+  </section>
+  <div class="narrow">
+    <% if (isTopicLeader) { %>
+    <form method="post" action="/topics/<%= topic.id %>/members" class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Add someone</h2>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="user_id">Person</label><select id="user_id" name="user_id" required><option value="">Choose…</option><% others.forEach((o) => { %><option value="<%= o.id %>"><%= o.name %> — <%= o.email %><%= o.platform_role === 'guest' ? ' (guest)' : '' %></option><% }) %></select></div>
+      <div class="field"><label for="role">Role</label><select id="role" name="role"><option value="member">Member</option><option value="leader">Leader (co-lead)</option><option value="guest">Guest (read only)</option></select></div>
+      <button class="btn btn-p">Add to topic</button>
+      <span class="hint">Not on CTENT yet? An admin creates their account first.</span>
+    </form>
+    <% } %>
+    <section class="card"><h3 style="margin-bottom:8px">Roles in a topic</h3>
+      <p class="text-2" style="font-size:13px"><b>Leader</b> approves parts, reviews submissions and manages members. <b>Member</b> works on tasks, messages, files and submissions. <b>Guest</b> can only read the overview, submissions and files.</p></section>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

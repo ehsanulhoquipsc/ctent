@@ -1,0 +1,37 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="grid">
+  <div class="card stat"><span class="text-2">Progress</span><b><%= prog.pct %>%</b><div class="bar"><span style="width:<%= prog.pct %>%"></span></div></div>
+  <div class="card stat"><span class="text-2">Tasks done</span><b><%= prog.done %> / <%= prog.total %></b><span>on the board</span></div>
+  <div class="card stat"><span class="text-2">Members</span><b><%= memberCount %></b><span>incl. guests</span></div>
+  <div class="card stat"><span class="text-2">Submissions</span><b><%= subs.reduce((a, s) => a + Number(s.n), 0) %></b><span><%= (subs.find((s) => s.status === 'in_review') || { n: 0 }).n %> in review</span></div>
+</div>
+<div class="cols">
+  <div class="wide">
+    <section class="card"><h2 style="margin-bottom:8px">About this topic</h2><p class="text-2" style="white-space:pre-wrap"><%= topic.description || 'No description yet.' %></p>
+      <div class="split" style="margin-top:12px;font-size:13px;color:var(--text-2)"><span>Target end: <b style="color:var(--text)"><%= topic.due_date ? u.fmtDate(topic.due_date, { day: 'numeric', month: 'long', year: 'numeric' }) : 'not set' %></b></span></div>
+    </section>
+    <section class="card flush">
+      <div class="card-head" style="padding:18px 20px 4px"><h2>Parts & owners</h2><% if (!isGuest) { %><a href="/topics/<%= topic.id %>/plan" style="font-size:13px">Plan & assign →</a><% } %></div>
+      <div class="list">
+        <% if (!parts.length) { %><div class="empty">No parts yet.<% if (isTopicLeader) { %> <a href="/topics/<%= topic.id %>/plan">Split the topic into parts</a><% } %></div><% } %>
+        <% parts.forEach((p) => { %>
+          <div class="row"><span style="flex:1;min-width:0"><b style="font-weight:500"><%= p.title %></b><br><span class="hint"><%= p.skills || '' %></span></span>
+          <% if (p.owner && p.status === 'approved') { %><%- u.avatar({ id: p.owner_id, name: p.owner, color: p.owner_color }, 'sm', true) %><span style="font-size:13px"><%= p.owner %></span><% } %><%- u.tag(p.status) %></div>
+        <% }) %>
+      </div>
+    </section>
+  </div>
+  <div class="narrow">
+    <section class="card"><div class="card-head"><h2>Next meetings</h2></div>
+      <% if (!meetings.length) { %><div class="empty" style="padding:12px">None scheduled.</div><% } %>
+      <% meetings.forEach((m) => { %><div class="row"><span style="flex:1"><b style="font-weight:500"><%= m.title %></b><br><span class="hint"><%= u.fmtDateTime(m.starts_at) %> · <%= m.platform %></span></span><% if (m.link && !isGuest) { %><a class="btn btn-s btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %></div><% }) %>
+    </section>
+    <% if (!isGuest) { %>
+    <section class="card"><div class="card-head"><h2>Latest activity</h2><a href="/topics/<%= topic.id %>/activity" style="font-size:13px">All</a></div>
+      <% activity.forEach((a) => { %><div class="row" style="align-items:flex-start"><%- u.avatar(a.uid ? { id: a.uid, name: a.name, color: a.color } : null, 'sm') %><span style="flex:1;font-size:13px"><%= a.detail %><br><span class="mono"><%= u.ago(a.created_at) %></span></span></div><% }) %>
+    </section>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

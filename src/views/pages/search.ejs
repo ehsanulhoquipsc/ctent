@@ -1,0 +1,15 @@
+<%- include('../partials/top', { crumb: 'Search' }) %>
+<div class="page-head"><div><h1>Search</h1><p><%= q ? results.length + ' results for “' + q + '”' : 'Search topics, tasks, files, messages and people.' %></p></div></div>
+<form method="get" action="/search" class="field" style="max-width:640px"><label class="sr" for="q2">Search</label><input id="q2" name="q" value="<%= q %>" placeholder="e.g. sampling, Brahmaputra, Aisha" autofocus></form>
+<section class="card flush">
+  <% if (q && !results.length) { %><div class="empty"><b>No results</b><span>Try fewer words. Search only covers topics you’re a member of.</span></div><% } %>
+  <div class="list">
+  <% results.forEach((x) => { const c = u.color(x.c); %>
+    <a class="row" href="<%= x.href %>" style="text-decoration:none;color:var(--text)">
+      <span class="kind" style="background:<%= c[1] %>;color:<%= c[0] %>"><%= x.type.slice(0, 3).toUpperCase() %></span>
+      <span style="flex:1;min-width:0"><span class="split"><b><%= x.title %></b><span class="tag" style="background:<%= c[1] %>;color:<%= c[0] %>"><%= x.type %></span></span><span class="text-2" style="font-size:13px"><%= x.meta %></span></span>
+    </a>
+  <% }) %>
+  </div>
+</section>
+<%- include('../partials/bottom') %>

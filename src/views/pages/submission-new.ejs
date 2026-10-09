@@ -1,0 +1,12 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<form method="post" action="/topics/<%= topic.id %>/submissions" enctype="multipart/form-data" class="card" style="display:flex;flex-direction:column;gap:16px;max-width:760px">
+  <h2>Submit work for review</h2>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="field"><label for="st">Title</label><input id="st" name="title" required maxlength="240" placeholder="e.g. Sampling frame"></div>
+  <div class="field"><label for="sm">Milestone</label><input id="sm" name="milestone" placeholder="e.g. Data collection"></div>
+  <div class="field"><label for="sf">File</label><input id="sf" name="file" type="file" required><span class="hint">Up to <%= maxMb %> MB. Documents, data and images.</span></div>
+  <div class="field"><label for="sn">Note for the reviewer</label><textarea id="sn" name="note" rows="3"></textarea></div>
+  <div class="form-actions"><a class="btn btn-s" href="/topics/<%= topic.id %>/submissions">Cancel</a><button class="btn btn-p"><%- u.icon('upload') %>Submit</button></div>
+</form>
+<%- include('../partials/bottom') %>

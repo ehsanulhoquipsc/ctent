@@ -1,0 +1,39 @@
+<%- include('head') %>
+<%
+  const A = typeof active !== 'undefined' ? active : '';
+  const nav = (key, href, iconName, label, count, red) => '<a class="nav' + (A === key ? ' on' : '') + '" href="' + href + '"' + (A === key ? ' aria-current="page"' : '') + '>' + u.icon(iconName) + '<span>' + u.esc(label) + '</span>' + (count ? '<span class="badge' + (red ? ' red' : '') + '">' + count + '</span>' : '') + '</a>';
+%>
+<body>
+<a class="sr" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="side" id="side" aria-label="Main">
+    <a class="logo" href="/"><img src="/static/img/logo.png" alt="CTENT home"></a>
+    <%- nav('dashboard', '/', 'home', 'Dashboard') %>
+    <% if (typeof showActions !== 'undefined' && showActions) { %><%- nav('actions', '/actions', 'inbox', 'Action centre', actionCount, true) %><% } %>
+    <% const isGuestUser = me.platform_role === 'guest'; %>
+    <% if (!isGuestUser) { %><%- nav('messages', '/messages', 'chat', 'Messages') %><% } %>
+    <%- nav('topics', '/topics', 'folder', isGuestUser ? 'Shared with me' : isMemberOnly ? 'My topics' : (isAdmin ? 'All topics' : 'Research topics')) %>
+    <% if (!isGuestUser) { %><%- nav('tasks', '/tasks', 'board', 'My tasks') %><%- nav('meetings', '/meetings', 'video', 'Meetings') %><% } %>
+    <%- nav('notifications', '/notifications', 'bell', 'Notifications', unread) %>
+    <% if (pinned.length) { %><div class="sec mono">Your topics</div><% } %>
+    <% pinned.forEach((t) => { %><a class="pin" href="/topics/<%= t.id %>"><span class="dot" style="background:<%= u.color(t.color)[0] %>"></span><span><%= t.title %></span></a><% }) %>
+    <div style="flex:1;min-height:20px"></div>
+    <% if (isAdmin) { %><%- nav('admin', '/admin', 'shield', 'Admin console') %><% } %>
+    <%- nav('profile', '/profile', 'user', 'Profile & expertise') %>
+    <div class="me">
+      <%- u.avatar(me) %>
+      <div class="who"><b><%= me.name %></b><%- u.roleTag(me.platform_role) %></div>
+      <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" style="width:34px;height:34px;border:0" title="Sign out" aria-label="Sign out"><%- u.icon('out') %></button></form>
+    </div>
+  </nav>
+  <div class="main">
+    <header class="top">
+      <button class="icon-btn mobile-only" type="button" data-toggle-side aria-label="Open menu"><%- u.icon('menu') %></button>
+      <div class="crumb"><%- typeof crumb !== 'undefined' ? crumb : u.esc(title) %></div>
+      <form class="search" role="search" method="get" action="/search"><%- u.icon('search', 16) %><label class="sr" for="q">Search</label><input id="q" name="q" placeholder="Search topics, tasks, files, people" value="<%= typeof q !== 'undefined' ? q : '' %>"></form>
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch light or dark theme" title="Light / dark"><%- u.icon('moon') %></button>
+      <a class="icon-btn" href="/notifications" aria-label="Notifications (<%= unread %> unread)"><%- u.icon('bell') %><% if (unread) { %><span class="ping"><%= unread %></span><% } %></a>
+      <% if (typeof cta !== 'undefined' && cta) { %><a class="btn btn-p" href="<%= cta.href %>"><%- u.icon('plus') %><%= cta.label %></a><% } %>
+    </header>
+    <main id="main" class="<%= typeof mainClass !== 'undefined' && mainClass ? mainClass : 'content' %>">
+      <% if (flash) { %><div class="alert <%= flash.type === 'error' ? 'err' : 'ok' %>" role="status"><%= flash.text %></div><% } %>

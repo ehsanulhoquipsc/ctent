@@ -1,0 +1,16 @@
+<%- include('../partials/top', { crumb: 'Notifications' }) %>
+<div class="page-head"><div><h1>Notifications</h1><p><%= unread %> unread</p></div>
+  <form method="post" action="/notifications/read-all"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s"<%= unread ? '' : ' disabled' %>>Mark all as read</button></form>
+</div>
+<div class="chips"><a class="chip<%= show === 'all' ? ' on' : '' %>" href="/notifications">All</a><a class="chip<%= show === 'unread' ? ' on' : '' %>" href="/notifications?show=unread">Unread</a></div>
+<section class="card flush">
+  <% if (!list.length) { %><div class="empty"><b>No notifications</b></div><% } %>
+  <% const K = { review: 'teal', request: 'indigo', mention: 'indigo', task: 'green', meeting: 'amber', access: 'violet', message: 'indigo' }; list.forEach((n) => { const c = u.color(K[n.kind] || 'grey'); %>
+    <a class="notif<%= n.read_at ? '' : ' unread' %>" href="/notifications/<%= n.id %>/go">
+      <span class="kind" style="background:<%= c[1] %>;color:<%= c[0] %>"><%= n.kind.slice(0, 2).toUpperCase() %></span>
+      <span style="flex:1;min-width:0"><b style="font-weight:600"><%= n.title %></b><% if (n.body) { %><br><span class="text-2" style="font-size:13px"><%= n.body %></span><% } %><br><span class="mono"><%= u.ago(n.created_at) %></span></span>
+      <% if (!n.read_at) { %><span class="dot" style="background:var(--pri);border-radius:50%;margin-top:6px"></span><% } %>
+    </a>
+  <% }) %>
+</section>
+<%- include('../partials/bottom') %>

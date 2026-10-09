@@ -1,0 +1,45 @@
+<%- include('../partials/top', { crumb: 'Profile & expertise' }) %>
+<div class="page-head"><div><h1>Profile & expertise</h1><p>Leaders use your expertise to suggest who should own each part of a topic.</p></div><a class="btn btn-s" href="/people/<%= me.id %>">View public profile</a></div>
+<div class="cols">
+  <div class="wide">
+    <section class="card" id="expertise" style="display:flex;flex-direction:column;gap:12px">
+      <div class="card-head" style="margin:0"><h2>Your expertise</h2><span class="mono"><%= expertise.length %> entries</span></div>
+      <% if (!expertise.length) { %><div class="alert info">Add at least 3 fields or methods so you show up in suggestions.</div><% } %>
+      <% expertise.forEach((e) => { %>
+        <div class="row">
+          <span style="flex:1;min-width:0"><b style="font-weight:500"><%= e.name %></b> <span class="hint"><%= e.kind %></span></span>
+          <span class="bar" style="width:120px"><span style="width:<%= e.level * 20 %>%"></span></span><span class="mono" style="width:30px"><%= e.level %>/5</span>
+          <form method="post" action="/profile/expertise/<%= e.id %>/delete"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn-link" style="color:var(--muted)" aria-label="Remove <%= e.name %>">Remove</button></form>
+        </div>
+      <% }) %>
+      <form method="post" action="/profile/expertise" class="split" style="padding-top:12px;border-top:1px solid var(--line-2);align-items:flex-end">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field" style="flex:2 1 200px"><label for="en">Add your own field, method, region or language</label><input id="en" name="name" required maxlength="120" placeholder="e.g. Hydrology, Interviews, Bangladesh, Bengali" list="common"><datalist id="common"><% ['Water security', 'Climate migration', 'Survey design', 'Statistics', 'Interviews', 'GIS & remote sensing', 'Policy analysis', 'Literature review', 'Research ethics', 'Python', 'Fieldwork', 'Hydrology'].forEach((x) => { %><option value="<%= x %>"><% }) %></datalist></div>
+        <div class="field" style="flex:1 1 120px"><label for="ek">Type</label><select id="ek" name="kind"><option value="field">Field</option><option value="method">Method</option><option value="region">Region</option><option value="language">Language</option></select></div>
+        <div class="field" style="flex:1 1 110px"><label for="el">Level</label><select id="el" name="level"><option value="1">1 · Beginner</option><option value="2">2</option><option value="3" selected>3 · Solid</option><option value="4">4</option><option value="5">5 · Expert</option></select></div>
+        <button class="btn btn-p">Add</button>
+      </form>
+    </section>
+  </div>
+  <div class="narrow">
+    <form method="post" action="/profile" class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Details</h2>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="pn">Name</label><input id="pn" name="name" required value="<%= me.name %>"></div>
+      <div class="field"><label for="pt">Title</label><input id="pt" name="title" value="<%= me.title || '' %>" placeholder="e.g. PhD candidate"></div>
+      <div class="field"><label for="pi">Institution</label><input id="pi" name="institution" value="<%= me.institution || '' %>"></div>
+      <div class="field"><label for="ph">Hours per week for research</label><input id="ph" name="weekly_hours" type="number" min="0" max="60" value="<%= me.weekly_hours || 0 %>"></div>
+      <div class="field"><label for="pc">Avatar colour</label><select id="pc" name="color"><% colors.forEach((c) => { %><option value="<%= c %>"<%= me.color === c ? ' selected' : '' %>><%= c %></option><% }) %></select></div>
+      <button class="btn btn-p">Save details</button>
+    </form>
+    <form method="post" action="/profile/password" class="card" id="password" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Change password</h2>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="cur">Current password</label><input id="cur" name="current" type="password" required autocomplete="current-password"></div>
+      <div class="field"><label for="np">New password</label><input id="np" name="password" type="password" minlength="10" required autocomplete="new-password"></div>
+      <div class="field"><label for="np2">Repeat new password</label><input id="np2" name="password2" type="password" minlength="10" required autocomplete="new-password"></div>
+      <button class="btn btn-s">Change password</button>
+    </form>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

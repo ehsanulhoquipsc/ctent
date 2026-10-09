@@ -1,0 +1,58 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="split">
+  <div class="chips">
+    <a class="chip<%= !who ? ' on' : '' %>" href="?">Everyone</a>
+    <a class="chip<%= who === me.id ? ' on' : '' %>" href="?who=me">Only me</a>
+    <% people.filter((p) => p.id !== me.id).forEach((p) => { %><a class="chip<%= who === p.id ? ' on' : '' %>" href="?who=<%= p.id %>"><%- u.avatar(p, 'sm') %><%= p.name.replace(/^Dr\.\s*/, '').split(' ')[0] %></a><% }) %>
+  </div>
+  <% if (topic.status !== 'archived') { %><button class="btn btn-p right" type="button" data-open="newTask"><%- u.icon('plus') %>Add task</button><% } %>
+</div>
+<p class="hint">Drag cards between columns, or use the status menu on each card.</p>
+<div class="board" data-board>
+  <% const COLS = [['todo', 'To do', 'grey'], ['doing', 'In progress', 'indigo'], ['review', 'In review', 'amber'], ['done', 'Done', 'green']]; %>
+  <% COLS.forEach(([k, label, c]) => { const full = tasks.filter((t) => t.status === k); const list = k === 'done' && !showAllDone ? full.sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || ''))).slice(0, 6) : full; %>
+    <section class="col" data-col="<%= k %>" aria-label="<%= label %>">
+      <div class="col-head"><span class="dot" style="border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= label %><span class="mono" data-count style="margin-left:auto"><%= full.length %></span></div>
+      <div data-list style="display:flex;flex-direction:column;gap:10px;min-height:40px">
+      <% list.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); const mine = isTopicLeader || t.assignee_id === me.id || t.created_by === me.id || !t.assignee_id; %>
+        <article class="task" data-task data-move="/topics/<%= topic.id %>/tasks/<%= t.id %>/move"<%- mine ? '' : ' draggable="false"' %>>
+          <div class="split"><b style="font-weight:500;flex:1"><%= t.title %></b><% if (t.priority === 'high') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></div>
+          <% if (t.description) { %><span class="hint"><%= t.description.slice(0, 120) %></span><% } %>
+          <div class="meta">
+            <% if (t.assignee_id) { %><%- u.avatar({ id: t.assignee_id, name: t.who_name, color: t.who_color }, 'sm') %><span><%= t.who_name %></span><% } else { %><span class="tag" style="background:var(--amber-soft);color:var(--amber)">Unassigned</span><% } %>
+            <span class="right" style="color:<%= late ? 'var(--red)' : 'inherit' %>;font-weight:<%= late ? 600 : 400 %>"><%= t.due_date ? u.fmtDate(t.due_date) : '' %></span>
+          </div>
+          <% if (mine && topic.status !== 'archived') { %>
+          <div class="split">
+            <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>/move"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="st<%= t.id %>">Status</label>
+              <select id="st<%= t.id %>" name="status" data-autosubmit><% COLS.forEach(([k2, l2]) => { %><option value="<%= k2 %>"<%= k2 === t.status ? ' selected' : '' %>><%= l2 %></option><% }) %></select></form>
+            <% if (isTopicLeader || !t.assignee_id) { %>
+            <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="as<%= t.id %>">Assignee</label>
+              <select id="as<%= t.id %>" name="assignee_id" data-autosubmit><option value="">Unassigned</option><% people.filter((p) => isTopicLeader || p.id === me.id).forEach((p) => { %><option value="<%= p.id %>"<%= p.id === t.assignee_id ? ' selected' : '' %>><%= p.name %></option><% }) %></select></form>
+            <% } %>
+            <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>" class="right" data-confirm="Delete “<%= t.title %>”?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete"><button class="btn-link" style="color:var(--muted)" aria-label="Delete task">Delete</button></form>
+          </div>
+          <% } %>
+        </article>
+      <% }) %>
+      </div>
+      <% if (full.length > list.length) { %><a href="?<%= who ? 'who=' + who + '&' : '' %>done=all" style="font-size:13px;text-align:center">Show all <%= full.length %> done</a><% } %>
+    </section>
+  <% }) %>
+</div>
+<dialog id="newTask" aria-label="Add task">
+  <form method="post" action="/topics/<%= topic.id %>/tasks" class="dlg">
+    <div class="split"><h2 style="flex:1">Add a task</h2><button type="button" class="icon-btn" data-close aria-label="Close" style="border:0">×</button></div>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field"><label for="tt">Title</label><input id="tt" name="title" required></div>
+    <div class="field"><label for="td">Details</label><textarea id="td" name="description" rows="3"></textarea></div>
+    <div class="form-grid">
+      <div class="field"><label for="ta">Assignee</label><select id="ta" name="assignee_id"><option value="">Unassigned</option><% people.filter((p) => isTopicLeader || p.id === me.id).forEach((p) => { %><option value="<%= p.id %>"<%= p.id === me.id ? ' selected' : '' %>><%= p.name %></option><% }) %></select></div>
+      <div class="field"><label for="tdue">Due</label><input id="tdue" name="due_date" type="date"></div>
+      <div class="field"><label for="tp">Priority</label><select id="tp" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select></div>
+    </div>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-close>Cancel</button><button class="btn btn-p">Add task</button></div>
+  </form>
+</dialog>
+<%- include('../partials/bottom') %>

@@ -1,0 +1,44 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="cols">
+  <div class="wide">
+    <div class="chips">
+      <a class="chip<%= !folder ? ' on' : '' %>" href="?">All files</a>
+      <% folders.forEach((f) => { %><a class="chip<%= folder === f.folder ? ' on' : '' %>" href="?folder=<%= encodeURIComponent(f.folder) %>"><%- u.icon('folder', 14) %><%= f.folder %> <span class="mono"><%= f.n %></span></a><% }) %>
+    </div>
+    <section class="card flush">
+      <% if (!files.length) { %><div class="empty"><b>No files yet</b><span>Upload data, drafts, instruments or references.</span></div><% } else { %>
+      <div class="scroll-x"><table class="table">
+        <thead><tr><th>Name</th><th>Folder</th><th>Size</th><th>Uploaded</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+        <% files.forEach((f) => { %>
+          <tr>
+            <td><div class="split"><%- u.icon('file', 16) %><a href="/topics/<%= topic.id %>/files/<%= f.id %>?view=1" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:500"><%= f.name %></a></div></td>
+            <td class="hint"><%= f.folder %></td>
+            <td class="mono" style="text-transform:none"><%= u.humanSize(f.size) %></td>
+            <td class="hint"><%= f.by || '—' %> · <%= u.ago(f.created_at) %></td>
+            <td style="text-align:right;white-space:nowrap">
+              <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= f.id %>"><%- u.icon('download', 14) %>Download</a>
+              <% if (!isGuest && topic.status !== 'archived' && (isTopicLeader || f.uploaded_by === me.id)) { %><form method="post" action="/topics/<%= topic.id %>/files/<%= f.id %>/delete" style="display:inline" data-confirm="Delete <%= f.name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-d btn-sm">Delete</button></form><% } %>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+    </section>
+  </div>
+  <div class="narrow">
+    <% if (!isGuest && topic.status !== 'archived') { %>
+    <form method="post" action="/topics/<%= topic.id %>/files" enctype="multipart/form-data" class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Upload a file</h2>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="ff">File</label><input id="ff" name="file" type="file" required><span class="hint">Up to <%= maxMb %> MB.</span></div>
+      <div class="field"><label for="fo">Folder</label><input id="fo" name="folder" list="folders" value="<%= folder || 'General' %>"><datalist id="folders"><% folders.forEach((f) => { %><option value="<%= f.folder %>"><% }) %><option value="Data"><option value="Literature"><option value="Instruments"><option value="Ethics"></datalist></div>
+      <button class="btn btn-p"><%- u.icon('upload') %>Upload</button>
+    </form>
+    <% } %>
+    <section class="card"><h3>Storage</h3><p class="text-2" style="margin-top:6px"><%= u.humanSize(totalSize) %> used by this topic.</p></section>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

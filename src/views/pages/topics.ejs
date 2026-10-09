@@ -1,0 +1,35 @@
+<%- include('../partials/top', { crumb: 'Research topics' }) %>
+<div class="page-head">
+  <div><h1><%= isMemberOnly ? 'My topics' : (isAdmin ? 'All topics' : 'Research topics') %></h1><p><%= isMemberOnly ? 'Only the topics you’ve been added to.' : isAdmin ? 'Every topic on the platform.' : 'Topics you lead or belong to.' %></p></div>
+</div>
+<div class="chips"><a class="chip<%= show === 'current' ? ' on' : '' %>" href="/topics">Current</a><a class="chip<%= show === 'archived' ? ' on' : '' %>" href="/topics?show=archived">Archived</a></div>
+<% if (!topics.length) { %>
+  <section class="card"><div class="empty"><b><%= show === 'archived' ? 'No archived topics' : 'You’re not in any topics yet' %></b><span><%= canCreate ? 'Create a topic to start, or ask to join one below.' : 'A topic leader can add you, or you can ask to join one below.' %></span><% if (canCreate && show !== 'archived') { %><a class="btn btn-p" href="/topics/new">Create a topic</a><% } %></div></section>
+<% } %>
+<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">
+  <% topics.forEach((t) => { const c = u.color(t.color); %>
+    <a class="card" href="/topics/<%= t.id %>" style="text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:10px;border-top:4px solid <%= c[0] %>">
+      <div class="split"><span class="mono"><%= t.code %></span><%- u.tag(t.status) %><span class="right"><%- roleOf[t.id] ? u.roleTag(roleOf[t.id]) : (isAdmin ? u.roleTag('admin') : '') %></span></div>
+      <b style="font-size:16px;line-height:1.35"><%= t.title %></b>
+      <span class="text-2" style="font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"><%= t.description || 'No description yet.' %></span>
+      <div class="bar"><span style="width:<%= t.pct %>%;background:<%= c[0] %>"></span></div>
+      <div class="split" style="font-size:12px;color:var(--text-2)"><span><%= t.done %>/<%= t.total %> tasks · <%= countOf[t.id] || 0 %> members</span><span class="right"><%= t.due_date ? 'Due ' + u.fmtDate(t.due_date, { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span></div>
+    </a>
+  <% }) %>
+</div>
+<% if (joinable.length && show === 'current') { %>
+  <section class="card flush">
+    <div class="card-head" style="padding:18px 20px 4px"><h2>Other topics you can ask to join</h2></div>
+    <div class="list">
+    <% joinable.forEach((t) => { %>
+      <div class="row" style="flex-wrap:wrap">
+        <span class="dot" style="background:<%= u.color(t.color)[0] %>"></span>
+        <span style="flex:1 1 300px;min-width:0"><b style="font-weight:500"><%= t.title %></b><br><span class="mono"><%= t.code %> · <%= t.field || '' %></span></span>
+        <% if (pending.includes(t.id)) { %><span class="tag" style="background:var(--amber-soft);color:var(--amber)">Request pending</span><% } else { %>
+        <form method="post" action="/topics/<%= t.id %>/request" class="split"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="m<%= t.id %>">Message</label><input class="in" id="m<%= t.id %>" name="message" placeholder="Why you’d like to join (optional)" style="width:260px;height:32px"><button class="btn btn-s btn-sm">Ask to join</button></form><% } %>
+      </div>
+    <% }) %>
+    </div>
+  </section>
+<% } %>
+<%- include('../partials/bottom') %>

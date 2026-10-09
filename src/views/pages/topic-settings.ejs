@@ -1,0 +1,24 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<form method="post" action="/topics/<%= topic.id %>/settings" class="card" style="display:flex;flex-direction:column;gap:16px;max-width:880px">
+  <h2>General</h2>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="field"><label for="title">Topic title</label><input id="title" name="title" required value="<%= topic.title %>"></div>
+  <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="4"><%= topic.description || '' %></textarea></div>
+  <div class="form-grid">
+    <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= topic.field || '' %>"></div>
+    <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= topic.due_date || '' %>"></div>
+    <div class="field"><label for="status">Stage</label><select id="status" name="status"><% [['planning', 'Planning'], ['active', 'Active'], ['review', 'Final review']].forEach(([k, l]) => { %><option value="<%= k %>"<%= topic.status === k ? ' selected' : '' %>><%= l %></option><% }) %></select></div>
+    <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility"><% [['private', 'Private'], ['institution', 'Institution'], ['open', 'Open']].forEach(([k, l]) => { %><option value="<%= k %>"<%= topic.visibility === k ? ' selected' : '' %>><%= l %></option><% }) %></select></div>
+    <div class="field"><label for="color">Colour</label><select id="color" name="color"><% colors.forEach((c) => { %><option value="<%= c %>"<%= topic.color === c ? ' selected' : '' %>><%= c %></option><% }) %></select></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-p">Save settings</button></div>
+</form>
+<section class="card" style="max-width:880px;border-color:var(--red-soft);display:flex;flex-direction:column;gap:0">
+  <h2 style="color:var(--red);margin-bottom:6px">Danger zone</h2>
+  <div class="row" style="flex-wrap:wrap"><span style="flex:1 1 300px"><b style="font-weight:500"><%= topic.status === 'archived' ? 'Reopen topic' : 'Complete & archive' %></b><br><span class="hint"><%= topic.status === 'archived' ? 'Make the topic editable again.' : 'Makes the topic read-only. You can reopen it later.' %></span></span>
+    <form method="post" action="/topics/<%= topic.id %>/archive"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s"><%= topic.status === 'archived' ? 'Reopen' : 'Archive topic' %></button></form></div>
+  <div class="row" style="flex-wrap:wrap"><span style="flex:1 1 300px"><b style="font-weight:500">Delete topic</b><br><span class="hint">Permanently deletes tasks, messages, files and submissions. Type <b class="kbd" style="color:var(--red)"><%= topic.code %></b> to confirm.</span></span>
+    <form method="post" action="/topics/<%= topic.id %>/delete" class="split" data-confirm="Delete <%= topic.code %> permanently? This can’t be undone."><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="confirm">Topic code</label><input class="in" id="confirm" name="confirm" placeholder="<%= topic.code %>" style="width:150px"><button class="btn btn-d">Delete</button></form></div>
+</section>
+<%- include('../partials/bottom') %>

@@ -1,0 +1,24 @@
+<%- include('../partials/top', { crumb: 'Action centre' }) %>
+<div class="page-head"><div><h1>Action centre</h1><p>Everything waiting on your decision, in one queue. Urgent items first.</p></div><a class="btn btn-s" href="/notifications">All notifications</a></div>
+<div class="chips">
+  <% ['All', 'Approval', 'Review', 'Request', 'Overdue'].forEach((k) => { const n = k === 'All' ? all.length : all.filter((i) => i.type === k).length; %><a class="chip<%= type === k ? ' on' : '' %>" href="/actions<%= k === 'All' ? '' : '?type=' + k %>"><%= k === 'All' ? 'All' : k + (k === 'Overdue' ? '' : 's') %> <span class="mono"><%= n %></span></a><% }) %>
+</div>
+<section class="card flush">
+  <% if (!items.length) { %><div class="empty"><span class="kind" style="background:var(--green-soft);color:var(--green)"><%- u.icon('check') %></span><b>You’re all caught up</b><span>New approvals, reviews and requests appear here.</span></div><% } %>
+  <div class="list">
+  <% const T = { Approval: 'burgundy', Review: 'teal', Request: 'indigo', Overdue: 'red' }; items.forEach((i) => { const c = u.color(T[i.type]); %>
+    <div class="row" id="<%= i.requestId ? 'req-' + i.requestId : '' %>" style="flex-wrap:wrap">
+      <span class="kind" style="background:<%= c[1] %>;color:<%= c[0] %>"><%= i.type.slice(0, 2).toUpperCase() %></span>
+      <span style="flex:1 1 300px;min-width:0"><span class="split"><b><%= i.title %></b><span class="tag" style="background:<%= c[1] %>;color:<%= c[0] %>"><%= i.type %></span><% if (i.urgent) { %><span class="tag" style="background:var(--red-soft);color:var(--red)">Urgent</span><% } %></span><span class="text-2" style="font-size:13px"><%= i.detail %></span><br><span class="mono"><%= i.topic %></span></span>
+      <% if (i.requestId) { %>
+        <a class="btn btn-s btn-sm" href="<%= i.personHref %>">Profile</a>
+        <form method="post" action="/requests/<%= i.requestId %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="decision" value="declined"><button class="btn btn-s btn-sm">Decline</button></form>
+        <form method="post" action="/requests/<%= i.requestId %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="decision" value="accepted"><button class="btn btn-p btn-sm">Accept</button></form>
+      <% } else { %>
+        <a class="btn btn-p btn-sm" href="<%= i.href %>">Open</a>
+      <% } %>
+    </div>
+  <% }) %>
+  </div>
+</section>
+<%- include('../partials/bottom') %>

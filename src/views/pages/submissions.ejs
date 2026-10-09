@@ -1,0 +1,30 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<div class="split">
+  <div class="chips">
+    <% const n = (k) => Number((counts.find((c) => c.status === k) || { n: 0 }).n); const all = counts.reduce((a, c) => a + Number(c.n), 0); %>
+    <a class="chip<%= !status ? ' on' : '' %>" href="?">All <span class="mono"><%= all %></span></a>
+    <a class="chip<%= status === 'in_review' ? ' on' : '' %>" href="?status=in_review">In review <span class="mono"><%= n('in_review') %></span></a>
+    <a class="chip<%= status === 'changes' ? ' on' : '' %>" href="?status=changes">Changes requested <span class="mono"><%= n('changes') %></span></a>
+    <a class="chip<%= status === 'approved' ? ' on' : '' %>" href="?status=approved">Approved <span class="mono"><%= n('approved') %></span></a>
+  </div>
+</div>
+<section class="card flush">
+  <% if (!list.length) { %><div class="empty"><b>No submissions<%= status ? ' with this status' : ' yet' %></b><% if (!isGuest) { %><a class="btn btn-p" href="/topics/<%= topic.id %>/submissions/new">Submit work</a><% } %></div><% } else { %>
+  <div class="scroll-x"><table class="table">
+    <thead><tr><th>Submission</th><th>Version</th><th>By</th><th>Status</th><th>Updated</th></tr></thead>
+    <tbody>
+    <% list.forEach((s) => { %>
+      <tr>
+        <td><a href="/topics/<%= topic.id %>/submissions/<%= s.id %>" style="color:var(--text);font-weight:500;text-decoration:none"><%= s.title %></a><br><span class="hint"><%= s.milestone || '' %></span></td>
+        <td class="mono" style="color:var(--text)">v<%= vOf[s.id] || 1 %></td>
+        <td><div class="split"><%- u.avatar({ id: s.author_id, name: s.author, color: s.author_color }, 'sm') %><span style="font-size:13px"><%= s.author %></span></div></td>
+        <td><%- u.tag(s.status) %></td>
+        <td class="hint"><%= u.ago(s.updated_at) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+<%- include('../partials/bottom') %>

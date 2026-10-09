@@ -1,0 +1,35 @@
+<%
+  const base = '/topics/' + topic.id;
+  let G = [
+    ['Work', 'burgundy', [['Overview', base], ['Plan & assign', base + '/plan'], ['Board', base + '/board']]],
+    ['Discuss', 'indigo', [['Channels', base + '/channels'], ['Meetings', base + '/meetings'], ['Members', base + '/members']]],
+    ['Review', 'teal', [['Submissions', base + '/submissions']]],
+    ['Files', 'amber', [['Files', base + '/files']]],
+    ['Manage', 'violet', [['Activity', base + '/activity'], ['Settings', base + '/settings']]]
+  ];
+  if (isGuest) G = [['Work', 'burgundy', [['Overview', base]]], ['Review', 'teal', [['Submissions', base + '/submissions']]], ['Files', 'amber', [['Files', base + '/files']]]];
+  if (!isTopicLeader && !isGuest) G[4][2] = [['Activity', base + '/activity']];
+  const cur = G.find((g) => g[2].some((t) => t[0] === tab)) || G[0];
+  const c = u.color(topic.color);
+%>
+<div class="topic-head">
+  <div class="topic-title">
+    <div>
+      <span class="mono"><%= topic.code %> · <%= topic.field || 'Research' %> · <%= topic.visibility %></span>
+      <div class="split"><h1><%= topic.title %></h1><%- u.tag(topic.status) %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Guest · read only</span><% } %></div>
+    </div>
+    <div class="stack"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
+    <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/members">Invite</a><% } %>
+    <% if (!isGuest) { %><a class="btn btn-p" href="<%= base %>/submissions/new"><%- u.icon('upload') %>New submission</a><% } %>
+  </div>
+  <nav aria-label="Topic sections">
+    <div class="groups">
+      <% G.forEach((g) => { const on = g === cur; const gc = u.color(g[1]); %>
+        <a class="group<%= on ? ' on' : '' %>" href="<%= g[2][0][1] %>" style="<%= on ? 'border:1.5px solid ' + gc[0] + ';background:' + gc[1] + ';color:' + gc[0] : '' %>"><span class="dot" style="background:<%= gc[0] %>"></span><%= g[0] %></a>
+      <% }) %>
+    </div>
+    <div class="subs">
+      <% cur[2].forEach((t) => { %><a class="<%= t[0] === tab ? 'on' : '' %>" href="<%= t[1] %>"<%- t[0] === tab ? ' aria-current="page"' : '' %>><%= t[0] %></a><% }) %>
+    </div>
+  </nav>
+</div>

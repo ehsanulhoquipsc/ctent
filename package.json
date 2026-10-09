@@ -1,0 +1,35 @@
+{
+  "name": "ctent",
+  "version": "0.1.0",
+  "description": "CTENT \u2014 Conducting from Interior: a workspace for research groups to plan, discuss, submit and review work.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "reset-demo": "node src/reset-demo.js",
+    "test": "node --test test/app.test.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.2",
+    "ejs": "^7.0.1",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
+    "knex": "^3.3.0",
+    "morgan": "^1.12.1",
+    "multer": "^2.4.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.11.1"
+  }
+}

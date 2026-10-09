@@ -1,0 +1,19 @@
+<%- include('../partials/top', { crumb: 'Meetings' }) %>
+<div class="page-head"><div><h1>Meetings</h1><p>Across all your topics. To schedule one, open a topic → Discuss → Meetings.</p></div></div>
+<% const card = (m, past) => { %>
+  <div class="row" style="flex-wrap:wrap;align-items:flex-start">
+    <span class="kind" style="background:<%= past ? 'var(--line-2)' : 'var(--teal-soft)' %>;color:<%= past ? 'var(--muted)' : 'var(--teal)' %>"><%- u.icon('video', 16) %></span>
+    <span style="flex:1 1 300px;min-width:0"><b><%= m.title %></b><br><span class="text-2" style="font-size:13px"><%= u.fmtDateTime(m.starts_at) %> · <%= m.duration_min %> min · <%= m.platform || 'No link' %></span><br><a class="mono" style="text-decoration:none" href="/topics/<%= m.topic_id %>/meetings"><%= m.code %> · <%= m.topic_title %></a></span>
+    <% if (!past && m.link) { %><a class="btn btn-p btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
+    <a class="btn btn-s btn-sm" href="/topics/<%= m.topic_id %>/meetings#m<%= m.id %>"><%= past ? 'Minutes' : 'Details' %></a>
+  </div>
+<% } %>
+<section class="card"><div class="card-head"><h2>Upcoming</h2><span class="mono"><%= upcoming.length %></span></div>
+  <% if (!upcoming.length) { %><div class="empty" style="padding:16px">No upcoming meetings.</div><% } %>
+  <% upcoming.forEach((m) => card(m, false)) %>
+</section>
+<section class="card"><div class="card-head"><h2>Past</h2><span class="mono"><%= past.length %></span></div>
+  <% if (!past.length) { %><div class="empty" style="padding:16px">No past meetings.</div><% } %>
+  <% past.forEach((m) => card(m, true)) %>
+</section>
+<%- include('../partials/bottom') %>

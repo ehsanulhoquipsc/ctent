@@ -1,0 +1,57 @@
+<%- include('../partials/top', { crumb: 'Admin console' }) %>
+<div class="page-head"><div><div class="split"><h1>Admin console</h1><span class="tag" style="background:var(--pri);color:#fff">Full access</span></div><p>Every user, topic and change on this CTENT workspace. All actions here are logged.</p></div><a class="btn btn-s" href="/topics">All topics</a></div>
+<div class="grid">
+  <div class="card stat"><span class="text-2">Users</span><b><%= stats.users %></b><span><%= stats.active %> active</span></div>
+  <div class="card stat"><span class="text-2">Topics</span><b><%= stats.topics %></b><span><%= stats.archived %> archived</span></div>
+  <div class="card stat"><span class="text-2">Messages</span><b><%= stats.messages %></b><span>all channels</span></div>
+  <div class="card stat"><span class="text-2">File storage</span><b><%= u.humanSize(stats.files) %></b><span>in the database</span></div>
+</div>
+<% if (created) { %>
+  <div class="alert ok" role="status" style="flex-wrap:wrap"><%- u.icon('check', 16) %><span style="flex:1 1 300px"><b><%= created.reset ? 'Password reset for ' : 'Account created for ' %><%= created.name %>.</b> Send them these sign-in details privately — the password is shown only once:</span><span class="kbd" style="padding:4px 10px;background:var(--surface);border-radius:6px;color:var(--text)"><%= created.email %> · <%= created.password %></span></div>
+<% } %>
+<div class="cols" id="users">
+  <section class="card flush wide" style="display:block">
+    <div class="split" style="padding:16px 20px"><h2 style="flex:1">Users</h2>
+      <form method="get" action="/admin" class="split"><label class="sr" for="uq">Search users</label><input class="in" id="uq" name="q" value="<%= q %>" placeholder="Search name or email" style="width:220px;height:36px"></form></div>
+    <div class="scroll-x"><table class="table">
+      <thead><tr><th>User</th><th>Platform role</th><th>Topics</th><th>Last sign-in</th><th>Status</th><th><span class="sr">Actions</span></th></tr></thead>
+      <tbody>
+      <% users.forEach((x) => { %>
+        <tr>
+          <td><div class="split"><%- u.avatar(x, 'sm', true) %><span><b style="font-weight:500"><%= x.name %></b><br><span class="hint"><%= x.email %></span></span></div></td>
+          <td><% if (x.id === me.id) { %><%- u.roleTag(x.platform_role) %><% } else { %>
+            <form method="post" action="/admin/users/<%= x.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="role"><label class="sr" for="role<%= x.id %>">Role</label>
+              <select id="role<%= x.id %>" name="role" class="in" style="height:32px;width:auto" data-autosubmit><% ['admin', 'leader', 'member', 'guest'].forEach((r) => { %><option value="<%= r %>"<%= x.platform_role === r ? ' selected' : '' %>><%= r[0].toUpperCase() + r.slice(1) %></option><% }) %></select></form><% } %></td>
+          <td class="mono" style="color:var(--text)"><%= topicsOf[x.id] || 0 %></td>
+          <td class="hint"><%= x.last_login_at ? u.ago(x.last_login_at) : 'Never' %></td>
+          <td><span class="tag dotted" style="background:<%= x.status === 'active' ? 'var(--green-soft)' : 'var(--red-soft)' %>;color:<%= x.status === 'active' ? 'var(--green)' : 'var(--red)' %>"><%= x.status === 'active' ? 'Active' : 'Suspended' %></span></td>
+          <td style="text-align:right;white-space:nowrap">
+            <form method="post" action="/admin/users/<%= x.id %>" style="display:inline" data-confirm="Reset <%= x.name %>’s password? They’ll be signed out."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="reset"><button class="btn btn-s btn-sm">Reset password</button></form>
+            <% if (x.id !== me.id) { %><form method="post" action="/admin/users/<%= x.id %>" style="display:inline"<%- x.status === 'active' ? ' data-confirm="Suspend ' + u.esc(x.name) + '? They will be signed out."' : '' %>><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="status"><button class="btn <%= x.status === 'active' ? 'btn-d' : 'btn-s' %> btn-sm"><%= x.status === 'active' ? 'Suspend' : 'Restore' %></button></form><% } %>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table></div>
+  </section>
+  <div class="narrow">
+    <form method="post" action="/admin/users" class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Add a user</h2>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="nn">Full name</label><input id="nn" name="name" required></div>
+      <div class="field"><label for="ne">Email</label><input id="ne" name="email" type="email" required></div>
+      <div class="field"><label for="ni">Institution</label><input id="ni" name="institution"></div>
+      <div class="field"><label for="nr">Platform role</label><select id="nr" name="role"><option value="member">Member — works on topics they’re added to</option><option value="leader">Leader — can create and run topics</option><option value="guest">Guest — read-only reviewer</option><option value="admin">Admin — full access</option></select></div>
+      <button class="btn btn-p">Create account</button>
+      <span class="hint">A temporary password is generated and shown once. Email invites come with the email service.</span>
+    </form>
+    <section class="card"><h3 style="margin-bottom:8px">Access levels</h3><p class="text-2" style="font-size:13px"><b>Admin</b> sees and manages everything. <b>Leader</b> creates topics and runs the ones they lead. <b>Member</b> sees only topics they’re in. <b>Guest</b> reads only what they’re given.</p></section>
+  </div>
+</div>
+<section class="card flush" id="audit">
+  <div class="card-head" style="padding:18px 20px 4px"><h2>Audit log</h2><span class="mono">Latest 40</span></div>
+  <div class="list">
+    <% log.forEach((a) => { %><div class="row"><span class="mono" style="width:140px;flex:none;text-transform:none"><%= u.fmtDateTime(a.created_at) %></span><span style="flex:1;font-size:13px"><b style="font-weight:500"><%= a.name || 'System' %></b> <span class="text-2"><%= a.detail %></span></span><span class="mono"><%= a.code || 'platform' %></span></div><% }) %>
+  </div>
+</section>
+<%- include('../partials/bottom') %>

@@ -1,0 +1,68 @@
+<%- include('../partials/top', { crumb: channel ? (topic ? '<a href="/topics/' + topic.id + '">' + topic.code + '</a> / #' + u.esc(channel.name) : 'Rooms / ' + u.esc(channel.name)) : 'Messages' }) %>
+<div class="chat">
+  <nav class="chat-list" aria-label="Conversations">
+    <button class="btn btn-p btn-sm" type="button" data-open="newRoom" style="margin:0 6px 10px"><%- u.icon('plus', 16) %>New room</button>
+    <% let lastTopic = null; topicCh.forEach((c) => { if (c.topic_id !== lastTopic) { lastTopic = c.topic_id; %>
+      <div class="mono" style="padding:12px 10px 4px;display:flex;align-items:center;gap:6px"><span class="dot" style="background:<%= u.color(c.color)[0] %>"></span><%= c.code %></div>
+    <% } %>
+      <a class="nav<%= channel && channel.id === c.id ? ' on' : '' %>" href="/messages/<%= c.id %>"><span class="mono" style="text-transform:none">#</span><span><%= c.name %></span></a>
+    <% }) %>
+    <div class="mono" style="padding:16px 10px 4px">Rooms</div>
+    <% if (!rooms.length) { %><span class="hint" style="padding:0 10px">No rooms yet.</span><% } %>
+    <% rooms.forEach((c) => { %><a class="nav<%= channel && channel.id === c.id ? ' on' : '' %>" href="/messages/<%= c.id %>"><span class="mono" style="text-transform:none">◆</span><span><%= c.name %></span></a><% }) %>
+  </nav>
+  <section class="chat-main">
+    <% if (!channel) { %>
+      <div class="empty" style="margin:auto"><b>No conversations yet</b><span>Join a topic to see its channels, or start a room.</span><button class="btn btn-p" type="button" data-open="newRoom">New room</button></div>
+    <% } else { %>
+      <header class="chat-head">
+        <div style="flex:1;min-width:0"><b style="font-size:16px"><%= channel.kind === 'room' ? '◆ ' : '# ' %><%= channel.name %></b><br><span class="hint"><%= channel.purpose || (topic ? topic.title : 'Private room') %> · <%= members.length %> people</span></div>
+        <div class="stack"><% members.slice(0, 5).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
+        <% if (topic) { %>
+          <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/meetings"><%- u.icon('video', 16) %>Meet</a>
+          <button class="btn btn-s btn-sm" type="button" data-open="newChannel">+ Channel</button>
+        <% } else { %>
+          <form method="post" action="/messages/<%= channel.id %>/leave" data-confirm="Leave this room?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm">Leave room</button></form>
+        <% } %>
+      </header>
+      <div data-chat="/api/channels/<%= channel.id %>/messages" data-last="<%= last %>" style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <div class="chat-msgs" data-msgs aria-live="polite">
+          <% if (!msgs.length) { %><div class="empty" data-empty>No messages yet. Say hello 👋</div><% } %>
+          <% msgs.forEach((m) => { %><div class="msg" data-id="<%= m.id %>"><%- m.avatar %><div class="body"><div class="split"><b><%= m.name %></b><span class="mono"><%= m.time %></span></div><p><%= m.body %></p></div></div><% }) %>
+        </div>
+        <form class="chat-form">
+          <label class="sr" for="msg">Message</label>
+          <textarea id="msg" rows="1" placeholder="Message <%= channel.kind === 'room' ? channel.name : '#' + channel.name %> — type @name to mention, Enter to send"></textarea>
+          <button class="btn btn-p" aria-label="Send"><%- u.icon('send', 16) %>Send</button>
+        </form>
+      </div>
+    <% } %>
+  </section>
+</div>
+<dialog id="newRoom" aria-label="New room">
+  <form method="post" action="/messages/rooms" class="dlg">
+    <div class="split"><h2 style="flex:1">Create a room</h2><button type="button" class="icon-btn" data-close aria-label="Close" style="border:0">×</button></div>
+    <p class="text-2">Rooms are private group chats across topics — only the people you add can see them.</p>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field"><label for="rn">Room name</label><input id="rn" name="name" required maxlength="60" placeholder="e.g. writing-group"></div>
+    <div class="field"><label for="rp">Purpose</label><input id="rp" name="purpose" maxlength="240"></div>
+    <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Add people</legend>
+      <div style="max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:8px;padding:8px">
+        <% people.forEach((p) => { %><label class="split" style="font-size:14px;cursor:pointer"><input type="checkbox" name="members" value="<%= p.id %>"><%= p.name %></label><% }) %>
+      </div>
+    </fieldset>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-close>Cancel</button><button class="btn btn-p">Create room</button></div>
+  </form>
+</dialog>
+<% if (channel && topic) { %>
+<dialog id="newChannel" aria-label="New channel">
+  <form method="post" action="/topics/<%= topic.id %>/channels" class="dlg">
+    <div class="split"><h2 style="flex:1">New channel in <%= topic.code %></h2><button type="button" class="icon-btn" data-close aria-label="Close" style="border:0">×</button></div>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field"><label for="cn">Channel name</label><input id="cn" name="name" required maxlength="40" placeholder="e.g. literature"></div>
+    <div class="field"><label for="cp">Purpose</label><input id="cp" name="purpose" maxlength="240"></div>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-close>Cancel</button><button class="btn btn-p">Create channel</button></div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/bottom') %>

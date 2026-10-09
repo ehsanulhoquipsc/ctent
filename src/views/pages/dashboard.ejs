@@ -1,0 +1,86 @@
+<%- include('../partials/top', { crumb: 'Dashboard' }) %>
+<div class="page-head">
+  <div>
+    <h1>Good <%= hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening' %>, <%= me.name.replace(/^Dr\.\s*/, '').split(' ')[0] %></h1>
+    <p><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', timeZone: u.TZ }) %> · <%= stats.dueSoon %> of your tasks due this week<% if (stats.actions) { %> · <%= stats.actions %> items need you<% } %></p>
+  </div>
+  <% if (me.platform_role !== 'guest') { %><a class="btn btn-s" href="/meetings"><%- u.icon('video') %>Meetings</a>
+  <a class="btn btn-s" href="/tasks"><%- u.icon('board') %>My tasks</a><% } %>
+</div>
+
+<% if (actionTotal) { %>
+<a href="/actions" class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;text-decoration:none;color:var(--text);background:var(--pri-soft);border-color:transparent">
+  <span class="kind" style="background:var(--pri);color:#fff;font-size:14px"><%= actionTotal %></span>
+  <span style="flex:1 1 300px"><b style="font-size:15px"><%= actionTotal %> item<%= actionTotal > 1 ? 's' : '' %> need<%= actionTotal > 1 ? '' : 's' %> your action</b><br><span class="text-2"><%= actions.map((a) => a.title).slice(0, 2).join(' · ') %></span></span>
+  <b style="color:var(--pri-text)">Open Action centre →</b>
+</a>
+<% } %>
+
+<div class="grid">
+  <div class="card stat"><span class="text-2">Active topics</span><b><%= stats.topics %></b><span>you’re part of</span></div>
+  <div class="card stat"><span class="text-2">Due this week</span><b><%= stats.dueSoon %></b><span>tasks assigned to you</span></div>
+  <div class="card stat"><span class="text-2">Upcoming meetings</span><b><%= stats.meetings %></b><span>next 4 shown below</span></div>
+  <div class="card stat"><span class="text-2">Waiting on you</span><b><%= stats.actions %></b><span>approvals, reviews, requests</span></div>
+</div>
+
+<div class="cols">
+  <div class="wide">
+    <section class="card flush">
+      <div class="card-head" style="padding:18px 20px 0"><h2>My tasks</h2><a href="/tasks" style="font-size:13px">See all</a></div>
+      <div class="list">
+        <% if (!myTasks.length) { %><div class="empty"><b>No open tasks</b><span>When a leader approves you for a part, its tasks appear here.</span></div><% } %>
+        <% myTasks.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); %>
+          <a class="row" href="/topics/<%= t.topic_id %>/board" style="text-decoration:none;color:var(--text)">
+            <span class="dot" style="background:<%= t.priority === 'high' ? 'var(--red)' : t.priority === 'low' ? 'var(--muted)' : 'var(--indigo)' %>;border-radius:50%"></span>
+            <span style="flex:1;min-width:0"><b style="font-weight:500"><%= t.title %></b><br><span class="mono"><%= t.code %></span></span>
+            <%- u.tag(t.status) %>
+            <span class="nowrap" style="font-size:12px;color:<%= late ? 'var(--red)' : 'var(--text-2)' %>;font-weight:<%= late ? 600 : 400 %>"><%= t.due_date ? (late ? 'Overdue · ' : 'Due ') + u.fmtDate(t.due_date) : 'No date' %></span>
+          </a>
+        <% }) %>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Growth</h2><span class="mono">Tasks completed per week</span></div>
+      <div class="chart" role="img" aria-label="Tasks completed per week over the last 8 weeks">
+        <% weeks.forEach((w) => { %><div><span class="mono" style="text-transform:none"><%= w.n %></span><span class="b" style="height:<%= Math.max(3, Math.round(w.n / max * 120)) %>px"></span></div><% }) %>
+      </div>
+      <div class="chart-x" style="margin-top:6px"><% weeks.forEach((w) => { %><span><%= w.label %></span><% }) %></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Topic progress</h2><a href="/topics" style="font-size:13px">All topics</a></div>
+      <% if (!progress.length) { %><div class="empty">You’re not in any topics yet.</div><% } %>
+      <% progress.forEach((t) => { const c = u.color(t.color); %>
+        <a class="row" href="/topics/<%= t.id %>" style="text-decoration:none;color:var(--text)">
+          <span class="dot" style="background:<%= c[0] %>"></span>
+          <span style="flex:1 1 220px;min-width:0"><b style="font-weight:500"><%= t.title %></b><br><span class="mono"><%= t.code %> · <%= t.done %>/<%= t.total %> tasks</span></span>
+          <span class="bar" style="flex:0 1 180px;width:180px"><span style="width:<%= t.pct %>%;background:<%= c[0] %>"></span></span>
+          <b style="width:44px;text-align:right"><%= t.pct %>%</b>
+        </a>
+      <% }) %>
+    </section>
+  </div>
+
+  <div class="narrow">
+    <section class="card">
+      <div class="card-head"><h2>Upcoming meetings</h2></div>
+      <% if (!meetings.length) { %><div class="empty" style="padding:16px">No meetings scheduled.</div><% } %>
+      <% meetings.forEach((m) => { %>
+        <div class="row" style="align-items:flex-start">
+          <span class="kind" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('video', 16) %></span>
+          <span style="flex:1;min-width:0"><b style="font-weight:500"><%= m.title %></b><br><span class="text-2" style="font-size:12px"><%= u.fmtDateTime(m.starts_at) %> · <%= m.platform || 'Link' %> · <%= m.code %></span></span>
+          <% if (m.link) { %><a class="btn btn-s btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
+        </div>
+      <% }) %>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Recent activity</h2></div>
+      <% if (!activity.length) { %><div class="empty" style="padding:16px">Nothing yet.</div><% } %>
+      <% activity.forEach((a) => { %>
+        <div class="row" style="align-items:flex-start"><%- u.avatar(a.uid ? { id: a.uid, name: a.name, color: a.color } : null, 'sm') %><span style="flex:1;font-size:13px"><b style="font-weight:500"><%= a.name || 'CTENT' %></b> <span class="text-2"><%= a.detail %></span><br><span class="mono"><%= a.code %> · <%= u.ago(a.created_at) %></span></span></div>
+      <% }) %>
+    </section>
+  </div>
+</div>
+<%- include('../partials/bottom') %>
