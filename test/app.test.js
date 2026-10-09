@@ -226,3 +226,18 @@ test('every main page renders for a leader', async () => {
     assert.ok([200, 302].includes(res.status), p + ' returned ' + res.status);
   }
 });
+
+test('admin can clear workspace data; accounts are kept', async () => {
+  const admin = await agentFor('nadia@ctent.demo');
+  const users = Number((await db('users').count({ n: '*' }).first()).n);
+  const wrong = await admin.post('/admin/clear-content').type('form').send({ _csrf: admin.csrf, confirm: 'nope' });
+  assert.strictEqual(wrong.status, 302);
+  assert.ok(Number((await db('topics').count({ n: '*' }).first()).n) > 0, 'nothing cleared without CLEAR');
+  const leader = await agentFor('ehsan@ctent.demo');
+  assert.strictEqual((await leader.post('/admin/clear-content').type('form').send({ _csrf: leader.csrf, confirm: 'CLEAR' })).status, 403);
+  await admin.post('/admin/clear-content').type('form').send({ _csrf: admin.csrf, confirm: 'CLEAR' });
+  for (const t of ['topics', 'tasks', 'messages', 'files', 'submissions', 'notifications']) assert.strictEqual(Number((await db(t).count({ n: '*' }).first()).n), 0, t + ' cleared');
+  assert.strictEqual(Number((await db('users').count({ n: '*' }).first()).n), users, 'users kept');
+  // Empty workspace still renders
+  for (const p of ['/', '/topics', '/messages', '/meetings', '/tasks', '/actions', '/notifications', '/admin']) assert.strictEqual((await admin.get(p)).status === 200 || (await admin.get(p)).status === 302, true, p);
+});

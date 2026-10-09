@@ -6,6 +6,7 @@ const db = require('../db');
 const auth = require('../lib/auth');
 const { audit, notify } = require('../lib/events');
 const { now, COLOR_NAMES } = require('../lib/util');
+const { wipeContent } = require('../lib/wipe');
 
 const r = express.Router();
 r.use('/admin', auth.requireRole('admin'));
@@ -69,6 +70,15 @@ r.post('/admin/users/:id', async (req, res) => {
     req.session.newUser = { name: u.name, email: u.email, password: pw, reset: true };
   }
   res.redirect('/admin#users');
+});
+
+// Danger zone: clear every topic, message, file and notification. Accounts stay.
+r.post('/admin/clear-content', async (req, res) => {
+  if (String(req.body.confirm || '').trim() !== 'CLEAR') { req.flash('error', 'Type CLEAR to confirm.'); return res.redirect('/admin#danger'); }
+  await wipeContent(db);
+  await audit(req.user.id, null, 'workspace.cleared', 'Cleared all workspace data (accounts kept)');
+  req.flash('ok', 'All workspace data was cleared. User accounts were kept.');
+  res.redirect('/admin');
 });
 
 module.exports = r;

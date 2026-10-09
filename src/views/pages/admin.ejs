@@ -54,4 +54,9 @@
     <% log.forEach((a) => { %><div class="row"><span class="mono" style="width:140px;flex:none;text-transform:none"><%= u.fmtDateTime(a.created_at) %></span><span style="flex:1;font-size:13px"><b style="font-weight:500"><%= a.name || 'System' %></b> <span class="text-2"><%= a.detail %></span></span><span class="mono"><%= a.code || 'platform' %></span></div><% }) %>
   </div>
 </section>
+<section class="card" id="danger" style="border-color:var(--red-soft)">
+  <h2 style="color:var(--red);margin-bottom:6px">Danger zone</h2>
+  <div class="row" style="flex-wrap:wrap"><span style="flex:1 1 320px"><b style="font-weight:500">Clear workspace data</b><br><span class="hint">Deletes every topic, task, message, meeting, file, submission, notification and log entry. User accounts, roles and expertise are kept. This can’t be undone. Type <b class="kbd" style="color:var(--red)">CLEAR</b> to confirm.</span></span>
+    <form method="post" action="/admin/clear-content" class="split" data-confirm="Delete ALL workspace data? Accounts are kept. This can’t be undone."><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="clr">Type CLEAR</label><input class="in" id="clr" name="confirm" placeholder="CLEAR" style="width:120px"><button class="btn btn-d">Clear data</button></form></div>
+</section>
 <%- include('../partials/bottom') %>
