@@ -76,6 +76,8 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
 
 ## Deploy a live demo on Render (free)
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/ehsanulhoquipsc/ctent)
+
 1. Push this repository to GitHub. This step is already done if you're reading this on GitHub.
 2. Sign in at [render.com](https://render.com) with your GitHub account.
 3. Click **New + → Blueprint**, pick this repository, and click **Apply**.
