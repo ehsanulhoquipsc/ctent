@@ -10,7 +10,7 @@
     <tbody>
     <% tasks.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); %>
       <tr>
-        <td><b style="font-weight:500"><%= t.title %></b><% if (t.priority === 'high') { %> <span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></td>
+        <td><a class="task-link" href="/topics/<%= t.topic_id %>/tasks/<%= t.id %>" style="font-weight:500"><%= t.title %></a><% if (t.priority === 'high') { %> <span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></td>
         <td><a href="/topics/<%= t.topic_id %>/board" class="mono" style="text-decoration:none"><%= t.code %></a></td>
         <td><%- u.tag(t.status) %></td>
         <td style="color:<%= late ? 'var(--red)' : 'inherit' %>"><%= t.due_date ? u.fmtDate(t.due_date) : '—' %><%= late ? ' · overdue' : '' %></td>

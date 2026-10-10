@@ -6,18 +6,18 @@
     <a class="chip<%= who === me.id ? ' on' : '' %>" href="?who=me">Only me</a>
     <% people.filter((p) => p.id !== me.id).forEach((p) => { %><a class="chip<%= who === p.id ? ' on' : '' %>" href="?who=<%= p.id %>"><%- u.avatar(p, 'sm') %><%= p.name.replace(/^Dr\.\s*/, '').split(' ')[0] %></a><% }) %>
   </div>
-  <% if (topic.status !== 'archived') { %><button class="btn btn-p right" type="button" data-open="newTask"><%- u.icon('plus') %>Add task</button><% } %>
+  <% if (topic.status !== 'archived') { %><span class="split right"><button class="btn btn-s" type="button" data-open="newTask"><%- u.icon('plus') %>Quick add</button><% if (isTopicLeader) { %><a class="btn btn-p" href="/topics/<%= topic.id %>/tasks/new"><%- u.icon('plus') %>New task with brief</a><% } %></span><% } %>
 </div>
 <p class="hint">Drag cards between columns, or use the status menu on each card.</p>
 <div class="board" data-board>
   <% const COLS = [['todo', 'To do', 'grey'], ['doing', 'In progress', 'indigo'], ['review', 'In review', 'amber'], ['done', 'Done', 'green']]; %>
-  <% COLS.forEach(([k, label, c]) => { const full = tasks.filter((t) => t.status === k); const list = k === 'done' && !showAllDone ? full.sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || ''))).slice(0, 6) : full; %>
+  <% COLS.forEach(([k, label, c]) => { const full = tasks.filter((t) => t.status === k || (k === 'doing' && t.status === 'changes')); const list = k === 'done' && !showAllDone ? full.sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || ''))).slice(0, 6) : full; %>
     <section class="col" data-col="<%= k %>" aria-label="<%= label %>">
       <div class="col-head"><span class="dot" style="border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= label %><span class="mono" data-count style="margin-left:auto"><%= full.length %></span></div>
       <div data-list style="display:flex;flex-direction:column;gap:10px;min-height:40px">
       <% list.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); const mine = isTopicLeader || t.assignee_id === me.id || t.created_by === me.id || !t.assignee_id; %>
         <article class="task" data-task data-move="/topics/<%= topic.id %>/tasks/<%= t.id %>/move"<%- mine ? '' : ' draggable="false"' %>>
-          <div class="split"><b style="font-weight:500;flex:1"><%= t.title %></b><% if (t.priority === 'high') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></div>
+          <div class="split"><a class="task-link" href="/topics/<%= topic.id %>/tasks/<%= t.id %>" style="font-weight:500;flex:1"><%= t.title %></a><% if (t.status === 'changes') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">Changes</span><% } %><% if (t.blocked) { %><span class="tag" style="background:var(--red-soft);color:var(--red)">⚑ Blocked</span><% } %><% if (t.priority === 'high') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></div>
           <% if (t.description) { %><span class="hint"><%= t.description.slice(0, 120) %></span><% } %>
           <div class="meta">
             <% if (t.assignee_id) { %><%- u.avatar({ id: t.assignee_id, name: t.who_name, color: t.who_color }, 'sm') %><span><%= t.who_name %></span><% } else { %><span class="tag" style="background:var(--amber-soft);color:var(--amber)">Unassigned</span><% } %>

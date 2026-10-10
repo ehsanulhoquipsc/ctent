@@ -41,6 +41,12 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
   - CTENT ranks members by matching their expertise to the part and checking their current workload.
   - **The leader approves the owner. Nothing is assigned automatically.**
   - Approving a part creates the task and notifies the owner.
+- **Task workspace (new):**
+  - Leaders create a task with a **brief**: goal, what to hand in, "done when" points and starter files.
+  - A brief-quality score and a live preview show what the member will see.
+  - The member's task page always shows **one next step**, with a progress stepper (Assigned → Working → In review → Approved).
+  - Members keep their own step checklist, upload drafts as versions, post updates (including an "I'm blocked" alert), and use a chat for that task only.
+  - Leaders review by ticking each "done when" point. Approve only works when every point is met; anything unmet goes back as a change request automatically.
 - **Board:**
   - Kanban with To do, In progress, In review and Done.
   - Drag and drop, or use the status menu on each card.

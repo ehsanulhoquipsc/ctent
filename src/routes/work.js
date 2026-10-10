@@ -109,6 +109,12 @@ r.post('/topics/:tid/tasks/:id/move', auth.loadTopic('member'), writable, async 
   if (!task) return json ? res.status(404).json({ error: 'Not found' }) : auth.notFound(res);
   if (!(await canEditTask(req, task))) return json ? res.status(403).json({ error: 'Only the assignee or a leader can move this task.' }) : auth.forbidden(res, 'Only the assignee or a leader can move this task.');
   const status = STATUSES.includes(req.body.status) ? req.body.status : task.status;
+  const hasBrief = await db('task_criteria').where({ task_id: task.id }).first();
+  if (hasBrief && req.topicRole !== 'leader' && status !== task.status && (['review', 'done'].includes(status) || ['review', 'done'].includes(task.status))) {
+    const msg = 'This task has a brief — submit and review it on the task page.';
+    if (json) return res.status(409).json({ error: msg });
+    req.flash('error', msg); return res.redirect('/topics/' + t.id + '/tasks/' + task.id);
+  }
   if (status !== task.status) {
     await db('tasks').where({ id: task.id }).update({ status, completed_at: status === 'done' ? now() : null, updated_at: now() });
     const labels = { todo: 'To do', doing: 'In progress', review: 'In review', done: 'Done' };

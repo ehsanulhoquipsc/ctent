@@ -26,6 +26,16 @@ async function actionItems(user) {
       .select('join_requests.id', 'join_requests.message', 'join_requests.topic_id', 'join_requests.created_at', 'topics.code', 'users.name', 'users.id as uid');
     for (const r of reqs) items.push({ type: 'Request', title: r.name + ' asked to join', detail: r.message || 'No message.', topic: r.code, href: '/actions#req-' + r.id, urgent: false, at: r.created_at, requestId: r.id, personHref: '/people/' + r.uid });
   }
+  // Tasks with a brief waiting for this user's review, and blocked tasks they lead
+  const taskReviews = await db('tasks').join('topics', 'topics.id', 'tasks.topic_id').leftJoin('users', 'users.id', 'tasks.assignee_id')
+    .where('tasks.status', 'review').where((w) => { w.where('tasks.reviewer_id', user.id); if (led.length) w.orWhere((x) => x.whereNull('tasks.reviewer_id').whereIn('tasks.topic_id', led)); })
+    .whereNot('tasks.assignee_id', user.id).select('tasks.id', 'tasks.title', 'tasks.topic_id', 'tasks.submitted_at', 'topics.code', 'users.name as who');
+  for (const t of taskReviews) items.push({ type: 'Review', title: 'Review task “' + t.title + '”', detail: (t.who || 'Someone') + ' submitted it for review.', topic: t.code, href: '/topics/' + t.topic_id + '/tasks/' + t.id + '#review', urgent: false, at: t.submitted_at });
+  if (led.length) {
+    const blocked = await db('tasks').join('topics', 'topics.id', 'tasks.topic_id').leftJoin('users', 'users.id', 'tasks.assignee_id')
+      .whereIn('tasks.topic_id', led).where('tasks.blocked', true).whereIn('tasks.status', ['todo', 'doing', 'changes']).select('tasks.id', 'tasks.title', 'tasks.topic_id', 'topics.code', 'users.name as who');
+    for (const t of blocked) items.push({ type: 'Blocked', title: (t.who || 'Someone') + ' is blocked on “' + t.title + '”', detail: 'They asked for help. Open the task to see the update.', topic: t.code, href: '/topics/' + t.topic_id + '/tasks/' + t.id + '?tab=updates', urgent: true, at: null });
+  }
   const overdue = await db('tasks').join('topics', 'topics.id', 'tasks.topic_id').where('tasks.assignee_id', user.id).whereNot('tasks.status', 'done')
     .where('tasks.due_date', '<', todayStr(0)).select('tasks.id', 'tasks.title', 'tasks.topic_id', 'tasks.due_date', 'topics.code');
   for (const t of overdue) items.push({ type: 'Overdue', title: 'Overdue: ' + t.title, detail: 'Was due ' + t.due_date + '. Update it or move the date.', topic: t.code, href: '/topics/' + t.topic_id + '/board', urgent: true, at: t.due_date });

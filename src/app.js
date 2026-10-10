@@ -85,6 +85,7 @@ function createApp() {
   app.use(auth.requireUser);
   app.use(require('./routes/dashboard'));
   app.use(require('./routes/topics'));
+  app.use(require('./routes/tasks'));
   app.use(require('./routes/work'));
   app.use(require('./routes/messages'));
   app.use(require('./routes/review'));

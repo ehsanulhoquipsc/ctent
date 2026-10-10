@@ -30,7 +30,7 @@
       <div class="list">
         <% if (!myTasks.length) { %><div class="empty"><b>No open tasks</b><span>When a leader approves you for a part, its tasks appear here.</span></div><% } %>
         <% myTasks.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); %>
-          <a class="row" href="/topics/<%= t.topic_id %>/board" style="text-decoration:none;color:var(--text)">
+          <a class="row" href="/topics/<%= t.topic_id %>/tasks/<%= t.id %>" style="text-decoration:none;color:var(--text)">
             <span class="dot" style="background:<%= t.priority === 'high' ? 'var(--red)' : t.priority === 'low' ? 'var(--muted)' : 'var(--indigo)' %>;border-radius:50%"></span>
             <span style="flex:1;min-width:0"><b style="font-weight:500"><%= t.title %></b><br><span class="mono"><%= t.code %></span></span>
             <%- u.tag(t.status) %>

@@ -1,0 +1,153 @@
+<%- include('../partials/top') %>
+<%
+  const T = { indigo: ['var(--indigo)', 'var(--indigo-soft)'], burgundy: ['var(--pri-text)', 'var(--pri-soft)'], amber: ['var(--amber)', 'var(--amber-soft)'], green: ['var(--green)', 'var(--green-soft)'], red: ['var(--red)', 'var(--red-soft)'], teal: ['var(--teal)', 'var(--teal-soft)'], grey: ['var(--text-2)', 'var(--line-2)'] }[next.tone];
+  const S = { assigned: ['Not started', 'grey'], working: ['In progress', 'indigo'], submitted: ['Waiting for review', 'amber'], changes: ['Changes requested', 'red'], approved: ['Approved', 'green'] }[stage];
+  const sc = u.color(S[1]);
+  const late = u.isOverdue(task.due_date, task.status);
+  const daysLeft = task.due_date ? Math.round((new Date(task.due_date + 'T00:00:00') - new Date(u.todayStr(0) + 'T00:00:00')) / 86400000) : null;
+  const first = (p) => (p ? p.name.replace(/^Dr\.\s*/, '').split(' ')[0] : '—');
+  const KIND = { assigned: ['Assigned', 'grey'], started: ['Started', 'indigo'], update: ['Update', 'indigo'], blocked: ['Blocked', 'red'], submitted: ['Submitted', 'amber'], withdrawn: ['Withdrawn', 'grey'], changes: ['Changes requested', 'red'], approved: ['Approved', 'green'], nudge: ['Reminder', 'violet'] };
+  const VS = { draft: ['Draft', 'indigo'], in_review: ['In review', 'amber'], changes: ['Changes requested', 'red'], approved: ['Approved', 'green'], superseded: ['Superseded', 'grey'] };
+  const base = '/topics/' + topic.id + '/tasks/' + task.id;
+  const act = (a, label, cls, off) => '<form method="post" action="' + base + '/act"><input type="hidden" name="_csrf" value="' + csrf + '"><input type="hidden" name="action" value="' + a + '"><button class="btn ' + cls + '"' + (off ? ' disabled' : '') + '>' + u.esc(label) + '</button></form>';
+%>
+<a href="/topics/<%= topic.id %>/board" style="font-size:13px;font-weight:500;text-decoration:none">← Back to board · <%= topic.code %> <%= topic.title %></a>
+
+<section class="card" style="display:flex;flex-direction:column;gap:18px;padding:22px 24px">
+  <div class="split" style="align-items:flex-start;gap:16px">
+    <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:8px">
+      <div class="split"><span class="mono">T-<%= task.id %><%= part ? ' · Part: ' + part.title : '' %></span><span class="tag dotted" style="background:<%= sc[1] %>;color:<%= sc[0] %>"><%= S[0] %></span><% if (task.priority === 'high') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">High priority</span><% } %><% if (task.blocked && stage === 'working') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">⚑ Blocked</span><% } %></div>
+      <h1 style="font-size:26px"><%= task.title %></h1>
+      <div class="split" style="font-size:13px;color:var(--text-2)">
+        <% if (reviewer) { %><%- u.avatar(reviewer, 'sm', true) %>Assigned by <b style="color:var(--text)"><%= reviewer.name %></b><% } %>
+        <span aria-hidden="true">→</span>
+        <% if (assignee) { %><%- u.avatar(assignee, 'sm', true) %><b style="color:var(--text)"><%= assignee.name %></b><% } else { %><span class="tag" style="background:var(--amber-soft);color:var(--amber)">Unassigned</span><% } %>
+        <span class="hint">· created <%= u.fmtDate(task.created_at) %></span>
+      </div>
+    </div>
+    <% if (task.due_date) { %>
+    <div class="due <%= stage === 'approved' ? 'ok' : late ? 'late' : '' %>"><span class="mono" style="color:inherit">Due</span><b style="font-size:19px"><%= u.fmtDate(task.due_date, { weekday: 'short', day: 'numeric', month: 'short' }) %></b><span style="font-size:12px;font-weight:600"><%= stage === 'approved' ? 'Completed' : late ? Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft) === 1 ? '' : 's') + ' overdue' : daysLeft === 0 ? 'Due today' : daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ' left' %></span></div>
+    <% } %>
+  </div>
+  <ol class="stepper" aria-label="Task progress">
+    <% ['Assigned', stage === 'changes' ? 'Fixing changes' : 'Working', 'In review', 'Approved'].forEach((label, i) => { const past = i < order || stage === 'approved'; const cur = i === order && stage !== 'approved'; %>
+      <li class="<%= past ? 'past' : cur ? (stage === 'changes' ? 'cur red' : 'cur') : '' %>"><span class="dot"><%= past ? '✓' : i + 1 %></span><b><%= label %></b><% if (i === 1 && task.round > 1) { %><span class="hint">Round <%= task.round %></span><% } %></li>
+    <% }) %>
+  </ol>
+</section>
+
+<section class="next" style="background:<%= T[1] %>;border-color:<%= T[0] %>" aria-live="polite">
+  <span class="next-icon" style="color:<%= T[0] %>"><%= next.icon %></span>
+  <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:4px">
+    <span class="mono" style="color:<%= T[0] %>"><%= next.kicker %></span>
+    <b style="font-size:18px;line-height:1.35"><%= next.title %></b>
+    <span class="text-2"><%= next.text %></span>
+    <% if (stage === 'changes') { const last = updates.find((x) => x.kind === 'changes'); if (last) { %><div style="margin-top:6px;padding:10px 12px;border-radius:10px;background:var(--surface);font-size:14px;white-space:pre-wrap"><%= last.text %></div><% } } %>
+  </div>
+  <div class="split">
+    <% if (next.secondary) { %><%- act(next.secondary.action, next.secondary.label, 'btn-s') %><% } %>
+    <% if (next.primary) { %><%- act(next.primary.action, next.primary.label, 'btn-p', next.primary.off) %><% } %>
+    <% if (next.link) { %><a class="btn btn-p" href="<%= next.link.href %>"><%= next.link.label %></a><% } %>
+  </div>
+</section>
+
+<div class="cols" style="align-items:flex-start">
+  <aside class="narrow" style="flex:1 1 300px">
+    <section class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div class="split"><%- u.avatar(reviewer, 'sm') %><b style="flex:1">The brief</b></div>
+      <% if (task.goal) { %><div><div class="label" style="margin-bottom:4px">Goal</div><p class="text-2" style="white-space:pre-wrap"><%= task.goal %></p></div><% } %>
+      <% if (deliverable) { %><div><div class="label" style="margin-bottom:4px">Deliver</div><span class="tag" style="background:var(--indigo-soft);color:var(--indigo);font-size:13px"><%= deliverable[0] %> <%= deliverable[1] %></span></div><% } %>
+      <% if (task.description && !task.goal) { %><p class="text-2"><%= task.description %></p><% } %>
+      <% if (hasBrief) { %>
+        <div style="display:flex;flex-direction:column;gap:6px"><div class="label">Done when <span class="hint" style="font-weight:400">· <%= isR && stage === 'submitted' ? 'tick these in the review box' : isM ? first(reviewer) + ' checks these when you submit' : 'checked at review' %></span></div>
+          <% criteria.forEach((c) => { %><div class="crit<%= c.met ? ' met' : '' %>"><span class="box"><%= c.met ? '✓' : '' %></span><span><%= c.text %></span></div><% }) %>
+        </div>
+      <% } else if (!task.goal) { %><p class="hint">No brief was written for this task.</p><% } %>
+      <% if (resources.length) { %><div style="display:flex;flex-direction:column;gap:6px"><div class="label">Start with these</div><% resources.forEach((r) => { if (r.file_id) { %><a class="res" href="/topics/<%= topic.id %>/files/<%= r.file_id %>?view=1" target="_blank" rel="noopener"><%- u.icon('file', 16) %><span><b style="font-weight:500"><%= r.file_name || r.title %></b><br><span class="hint"><%= r.folder || 'Files' %></span></span></a><% } }) %></div><% } %>
+    </section>
+  </aside>
+
+  <section class="card flush" style="flex:2 1 500px;min-width:0" data-tabs>
+    <div class="tabs" role="tablist">
+      <% [['steps', isM ? 'My steps' : first(assignee) + '’s steps', steps.length ? done + '/' + steps.length : '0'], ['files', 'Work & files', versions.length], ['updates', 'Updates', updates.length]].forEach(([k, l, n]) => { %>
+        <a href="?tab=<%= k %>" role="tab" aria-selected="<%= tabSel === k %>" class="<%= tabSel === k ? 'on' : '' %>"><%= l %> <span class="cnt"><%= n %></span></a>
+      <% }) %>
+    </div>
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+    <% if (tabSel === 'steps') { %>
+      <% if (steps.length) { %><div class="split"><span class="bar" style="flex:1"><span style="width:<%= Math.round(done / steps.length * 100) %>%;background:<%= done === steps.length ? 'var(--green)' : 'var(--pri)' %>"></span></span><b style="font-size:13px"><%= done %> of <%= steps.length %> done</b></div><% } %>
+      <p class="hint"><%= isM ? (canEditSteps ? 'Your own plan. Tick steps as you go — ' + first(reviewer) + ' sees your progress without asking.' : 'Steps are locked while the task is in review.') : 'Only ' + first(assignee) + ' can change these. You see progress live.' %></p>
+      <% if (!steps.length) { %><div class="empty" style="padding:16px"><%= isM ? 'Break the work into a few steps to plan it.' : 'No steps yet.' %></div><% } %>
+      <% steps.forEach((s) => { %>
+        <div class="step<%= s.done ? ' done' : '' %>">
+          <% if (canEditSteps) { %>
+            <form method="post" action="<%= base %>/steps/<%= s.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="box" aria-label="<%= s.done ? 'Mark not done' : 'Mark done' %>: <%= s.text %>"><%= s.done ? '✓' : '' %></button></form>
+          <% } else { %><span class="box"><%= s.done ? '✓' : '' %></span><% } %>
+          <span style="flex:1"><%= s.text %></span>
+          <% if (canEditSteps) { %><form method="post" action="<%= base %>/steps/<%= s.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="remove"><button class="btn-link" style="color:var(--muted);font-size:18px" aria-label="Remove step">×</button></form><% } %>
+        </div>
+      <% }) %>
+      <% if (canEditSteps) { %><form method="post" action="<%= base %>/steps" class="split"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="ns">New step</label><input class="in" id="ns" name="text" maxlength="300" placeholder="Add a step, e.g. ‘Ask Rahul for Assam flood gauges’" style="flex:1" required><button class="btn btn-s">Add</button></form><% } %>
+    <% } else if (tabSel === 'files') { %>
+      <% if (canUpload) { %>
+        <form method="post" action="<%= base %>/versions" enctype="multipart/form-data" class="drop">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <span class="next-icon" style="width:44px;height:44px;font-size:18px;color:var(--pri-text);background:var(--pri-soft)">⤒</span>
+          <span style="flex:1 1 260px"><b>Upload <%= latest ? 'version ' + (latest.version + 1) : 'your draft' %></b><br><span class="hint">Each upload is a new version — nothing is overwritten. Up to <%= maxMb %> MB.</span></span>
+          <input type="file" name="file" required aria-label="Choose file"><button class="btn btn-p btn-sm">Upload</button>
+        </form>
+      <% } %>
+      <% if (!versions.length) { %><div class="empty" style="padding:16px"><%= isM ? (stage === 'assigned' ? 'Press Start working, then upload your draft here.' : 'No drafts yet. Your first upload is version 1.') : 'No drafts uploaded yet.' %></div><% } %>
+      <% versions.forEach((v) => { const vs = VS[v.state] || VS.draft; const vc = u.color(vs[1]); %>
+        <div class="row" style="border:1px solid var(--line-2);border-radius:10px;padding:12px">
+          <span class="kind" style="background:var(--teal-soft);color:var(--teal)">v<%= v.version %></span>
+          <span style="flex:1;min-width:0"><b style="font-weight:600"><%= v.file_name || 'File removed' %></b><br><span class="hint"><%= u.humanSize(v.file_size) %> · <%= u.ago(v.created_at) %></span></span>
+          <span class="tag" style="background:<%= vc[1] %>;color:<%= vc[0] %>"><%= vs[0] %></span>
+          <% if (v.file_id) { %><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= v.file_id %>?view=1" target="_blank" rel="noopener">Open</a><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= v.file_id %>" aria-label="Download v<%= v.version %>"><%- u.icon('download', 14) %></a><% } %>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <% if (isM && stage !== 'approved') { %>
+        <form method="post" action="<%= base %>/updates" class="update-box">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="label" for="upd">Quick update for <%= first(reviewer) %></label>
+          <textarea class="in" id="upd" name="text" rows="2" maxlength="2000" placeholder="What did you get done? Anything slowing you down?"></textarea>
+          <div class="split"><label class="chip pick red"><input type="checkbox" name="blocked" value="1"> ⚑ I’m blocked</label><span class="hint" style="flex:1">Blocked alerts <%= first(reviewer) %> in their Action centre.</span><button class="btn btn-p btn-sm">Post update</button></div>
+        </form>
+      <% } %>
+      <% updates.forEach((e) => { const k = KIND[e.kind] || [e.kind, 'grey']; const kc = u.color(k[1]); %>
+        <div class="tl<%= e.kind === 'blocked' ? ' blocked' : '' %>"><%- u.avatar(e.uid ? { id: e.uid, name: e.name, color: e.color } : null, 'sm') %>
+          <div style="flex:1;min-width:0"><div class="split"><b style="font-size:14px"><%= e.name || 'CTENT' %></b><span class="tag" style="background:<%= kc[1] %>;color:<%= kc[0] %>;font-size:11px"><%= k[0] %></span><span class="mono" style="text-transform:none"><%= u.ago(e.created_at) %></span></div><p class="text-2" style="margin-top:4px;white-space:pre-wrap"><%= e.text %></p></div></div>
+      <% }) %>
+    <% } %>
+    </div>
+  </section>
+
+  <aside class="card flush chatbox" id="chat" style="flex:1 1 290px">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--line-2)"><b>Questions & feedback</b><div class="hint">Only about this task · <%= first(reviewer) %> and <%= first(assignee) %></div></div>
+    <div class="chat-thread">
+      <% if (!comments.length) { %><div class="empty" style="padding:16px"><%= isM ? 'Unsure about something? Ask here before you start.' : 'Messages about this task appear here.' %></div><% } %>
+      <% comments.forEach((c) => { const mine = c.uid === me.id; %><div class="bubble-row<%= mine ? ' mine' : '' %>"><div class="bubble"><span class="hint" style="font-weight:600"><%= c.name ? c.name.split(' ')[0] : '?' %> · <%= u.ago(c.created_at) %></span><div style="white-space:pre-wrap"><%= c.body %></div></div></div><% }) %>
+    </div>
+    <form method="post" action="<%= base %>/comments" style="padding:12px;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:8px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="chips"><% (isM ? ['Is this format OK?', 'Can I have 2 more days?', 'Where is the data?'] : ['Looks good so far 👍', 'Any blockers?', 'Let’s discuss at the sync']).forEach((q) => { %><button type="button" class="chip" style="height:28px;font-size:12px" data-fill="<%= q %>"><%= q %></button><% }) %></div>
+      <div class="split"><label class="sr" for="cm">Message</label><input class="in" id="cm" name="body" maxlength="2000" required placeholder="<%= isM ? 'Ask ' + first(reviewer) + ' about this task…' : 'Message ' + first(assignee) + ' about this task…' %>" style="flex:1"><button class="btn btn-p" aria-label="Send"><%- u.icon('send', 16) %></button></div>
+    </form>
+  </aside>
+</div>
+
+<% if (isR && stage === 'submitted') { %>
+<form method="post" action="<%= base %>/review" class="card review" id="review">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="split"><span class="tag" style="background:var(--teal-soft);color:var(--teal);font-weight:700">YOUR REVIEW</span><h2 style="flex:1">Review v<%= latest ? latest.version : 1 %><%= latest && latest.file_name ? ' — ' + latest.file_name : '' %></h2><% if (latest && latest.file_id) { %><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= latest.file_id %>?view=1" target="_blank" rel="noopener">Open file</a><% } %></div>
+  <% if (hasBrief) { %>
+    <p class="text-2">Tick each point this version meets. Anything left unticked is sent back as a change request.</p>
+    <div style="display:flex;flex-direction:column;gap:6px"><% criteria.forEach((c) => { %><label class="crit pickable"><input type="checkbox" name="met" value="<%= c.id %>" data-crit-check><span><%= c.text %></span></label><% }) %></div>
+  <% } %>
+  <fieldset style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Common reasons (optional)</legend><div class="chips"><% ['Needs more sources', 'Too long — tighten it', 'Missing data or figures', 'Unclear argument'].forEach((x) => { %><label class="chip pick red"><input type="checkbox" name="reasons" value="<%= x %>"> <%= x %></label><% }) %></div></fieldset>
+  <div class="field"><label for="note">Feedback for <%= first(assignee) %></label><textarea id="note" name="note" rows="3" maxlength="3000" placeholder="Be specific about what to change (or what you liked)"></textarea></div>
+  <div class="split"><span class="hint" style="flex:1" data-review-hint><%= hasBrief ? 'Tick every point to enable Approve.' : '' %></span><button class="btn btn-s" name="decision" value="changes">Request changes</button><button class="btn btn-p" name="decision" value="approve" data-approve<%= hasBrief ? ' disabled' : '' %>>Approve &amp; lock</button></div>
+</form>
+<% } %>
+<%- include('../partials/bottom') %>

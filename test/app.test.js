@@ -227,6 +227,86 @@ test('every main page renders for a leader', async () => {
   }
 });
 
+test('task flow: brief → start → steps → upload → submit → changes → v2 → approve', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  const tom = await agentFor('tom@ctent.demo');
+  assert.strictEqual((await aisha.get('/topics/' + tid + '/tasks/new')).status, 403, 'members cannot create briefs');
+  const page = await leader.get('/topics/' + tid + '/tasks/new');
+  assert.strictEqual(page.status, 200);
+  const create = await leader.post('/topics/' + tid + '/tasks/new').type('form').send({ _csrf: leader.csrf, title: 'Draft the downstream impact section', goal: 'Explain downstream effects for Assam and Bangladesh separately.', deliverable: 'doc', assignee_id: ids.aisha, priority: 'high', due_date: '2030-01-10', criteria: ['Covers India and Bangladesh separately', 'At least 8 cited sources'], steps: 'Read sources\nOutline' });
+  assert.strictEqual(create.status, 302);
+  const task = await db('tasks').where({ title: 'Draft the downstream impact section' }).first();
+  const url = '/topics/' + tid + '/tasks/' + task.id;
+  assert.strictEqual(create.headers.location, url);
+  assert.strictEqual((await db('task_criteria').where({ task_id: task.id })).length, 2);
+  assert.strictEqual((await db('task_steps').where({ task_id: task.id })).length, 2);
+  assert.ok(await db('notifications').where({ user_id: ids.aisha }).where('title', 'like', '%gave you a task%').first());
+  // Member sees "Start working"; another member cannot act on it
+  assert.match((await aisha.get(url)).text, /Start working/);
+  assert.strictEqual((await tom.post(url + '/act').type('form').send({ _csrf: tom.csrf, action: 'start' })).status, 403);
+  await aisha.post(url + '/act').type('form').send({ _csrf: aisha.csrf, action: 'start' });
+  assert.strictEqual((await db('tasks').where({ id: task.id }).first()).status, 'doing');
+  // Steps
+  await aisha.post(url + '/steps').type('form').send({ _csrf: aisha.csrf, text: 'Write first draft' });
+  const step = await db('task_steps').where({ task_id: task.id, text: 'Read sources' }).first();
+  await aisha.post(url + '/steps/' + step.id).type('form').send({ _csrf: aisha.csrf });
+  assert.ok((await db('task_steps').where({ id: step.id }).first()).done);
+  // Can't submit without a file; members can't move a brief task to done on the board
+  await aisha.post(url + '/act').type('form').send({ _csrf: aisha.csrf, action: 'submit' });
+  assert.strictEqual((await db('tasks').where({ id: task.id }).first()).status, 'doing');
+  const mv = await aisha.post(url + '/move').set('Accept', 'application/json').set('x-csrf-token', aisha.csrf).send({ status: 'done' });
+  assert.strictEqual(mv.status, 409);
+  // Upload v1, submit
+  await aisha.post(url + '/versions').field('_csrf', aisha.csrf).attach('file', Buffer.from('Downstream draft v1'), 'downstream_v1.txt');
+  await aisha.post(url + '/act').type('form').send({ _csrf: aisha.csrf, action: 'submit' });
+  assert.strictEqual((await db('tasks').where({ id: task.id }).first()).status, 'review');
+  // It shows in the leader's Action centre
+  assert.match((await leader.get('/actions')).text, /Review task “Draft the downstream impact section”/);
+  // Member can't review own work; approve is refused with an unmet point
+  assert.strictEqual((await aisha.post(url + '/review').type('form').send({ _csrf: aisha.csrf, decision: 'approve' })).status, 403);
+  const crit = await db('task_criteria').where({ task_id: task.id }).orderBy('position');
+  await leader.post(url + '/review').type('form').send({ _csrf: leader.csrf, decision: 'approve', met: [crit[0].id] });
+  assert.strictEqual((await db('tasks').where({ id: task.id }).first()).status, 'review', 'approve blocked while a point is unmet');
+  await leader.post(url + '/review').type('form').send({ _csrf: leader.csrf, decision: 'changes', met: [crit[0].id], reasons: ['Needs more sources'], note: 'Add Bangladesh sources' });
+  let t2 = await db('tasks').where({ id: task.id }).first();
+  assert.strictEqual(t2.status, 'changes');
+  assert.strictEqual(t2.round, 2);
+  assert.match((await aisha.get(url)).text, /Add Bangladesh sources/);
+  // v2 → submit → approve
+  await aisha.post(url + '/versions').field('_csrf', aisha.csrf).attach('file', Buffer.from('Downstream draft v2 with more sources'), 'downstream_v2.txt');
+  await aisha.post(url + '/act').type('form').send({ _csrf: aisha.csrf, action: 'submit' });
+  await leader.post(url + '/review').type('form').send({ _csrf: leader.csrf, decision: 'approve', met: crit.map((c) => c.id), note: 'Great work' });
+  t2 = await db('tasks').where({ id: task.id }).first();
+  assert.strictEqual(t2.status, 'done');
+  const versions = await db('task_versions').where({ task_id: task.id }).orderBy('version');
+  assert.deepStrictEqual(versions.map((v) => v.state), ['changes', 'approved']);
+  assert.ok(await db('notifications').where({ user_id: ids.aisha }).where('title', 'like', '%approved%').first());
+  // Chat and blocked updates
+  await leader.post(url + '/comments').type('form').send({ _csrf: leader.csrf, body: 'Thanks <b>Aisha</b>' });
+  const view = await aisha.get(url);
+  assert.match(view.text, /Thanks &lt;b&gt;Aisha&lt;\/b&gt;/);
+  // Guests can't open task pages
+  const lin = await agentFor('lin@ctent.demo');
+  const zka = await topicId('CT-0131');
+  const someTask = await db('tasks').where({ topic_id: zka }).first();
+  assert.strictEqual((await lin.get('/topics/' + zka + '/tasks/' + someTask.id)).status, 403);
+});
+
+test('blocked update alerts the leader in the Action centre', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const tom = await agentFor('tom@ctent.demo');
+  await leader.post('/topics/' + tid + '/tasks/new').type('form').send({ _csrf: leader.csrf, title: 'Map dam diplomacy sources', assignee_id: ids.tom, criteria: ['20+ sources grouped'] });
+  const task = await db('tasks').where({ title: 'Map dam diplomacy sources' }).first();
+  const url = '/topics/' + tid + '/tasks/' + task.id;
+  await tom.post(url + '/act').type('form').send({ _csrf: tom.csrf, action: 'start' });
+  await tom.post(url + '/updates').type('form').send({ _csrf: tom.csrf, text: 'Library access is down', blocked: '1' });
+  assert.ok((await db('tasks').where({ id: task.id }).first()).blocked);
+  assert.match((await leader.get('/actions')).text, /is blocked on “Map dam diplomacy sources”/);
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);
