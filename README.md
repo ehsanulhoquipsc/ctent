@@ -56,6 +56,10 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
   - Every topic has channels, and anyone can create a private room across topics.
   - Messages arrive live without reloading.
   - @mentions notify the person mentioned.
+- **Meeting rooms:**
+  - Every topic gets a **project room** automatically: an always-open video room (free Jitsi link, or paste your own Zoom/Meet/Teams room) for everyone in the topic, linked to its chat.
+  - Anyone can add **team rooms**. Pick a part or task and its people are filled in for you, then add or remove anyone. Each team room can have its own group chat.
+  - Meetings can be scheduled in a room. A team-room meeting uses that room's link and only notifies its people.
 - **Meetings:**
   - Paste a Zoom, Google Meet or Teams link and the platform is detected automatically.
   - Members are notified when a meeting is scheduled.
@@ -110,7 +114,7 @@ You need [Node.js](https://nodejs.org) 20 or newer.
 ```bash
 npm install
 npm run dev          # http://localhost:3000, uses a local SQLite file in data/
-npm test             # 27 automated tests (sign-in, permissions, workflows)
+npm test             # 29 automated tests (sign-in, permissions, workflows)
 npm run reset-demo   # wipe the database and reload the demo data
 ```
 

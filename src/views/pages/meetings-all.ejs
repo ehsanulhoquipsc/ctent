@@ -1,5 +1,5 @@
 <%- include('../partials/top', { crumb: 'Meetings' }) %>
-<div class="page-head"><div><h1>Meetings</h1><p>Across all your topics. To schedule one, open a topic → Discuss → Meetings.</p></div></div>
+<div class="page-head"><div><h1>Meetings</h1><p>Across all your topics. Each topic has its own project room; open a topic → Discuss → Meetings to add team rooms.</p></div></div>
 <% const card = (m, past) => { %>
   <div class="row" style="flex-wrap:wrap;align-items:flex-start">
     <span class="kind" style="background:<%= past ? 'var(--line-2)' : 'var(--teal-soft)' %>;color:<%= past ? 'var(--muted)' : 'var(--teal)' %>"><%- u.icon('video', 16) %></span>
@@ -7,6 +7,18 @@
     <% if (!past && m.link) { %><a class="btn btn-p btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
     <a class="btn btn-s btn-sm" href="/topics/<%= m.topic_id %>/meetings#m<%= m.id %>"><%= past ? 'Minutes' : 'Details' %></a>
   </div>
+<% } %>
+<% if (roomGroups.length) { %>
+<section class="card" style="display:flex;flex-direction:column;gap:12px"><div class="card-head" style="margin:0"><h2>Your rooms</h2><span class="hint">Always open — join any time</span></div>
+  <div class="room-grid">
+  <% roomGroups.forEach((g) => { g.rooms.forEach((r) => { %>
+    <div class="room<%= r.kind === 'project' ? ' project' : '' %>">
+      <div><b><%= r.name %></b><br><a class="mono" style="text-decoration:none" href="/topics/<%= g.topic.id %>/meetings#room<%= r.id %>"><%= g.topic.code %> · <%= r.kind === 'project' ? 'everyone' : r.people.length + ' people' %></a></div>
+      <div class="split"><% if (r.link) { %><a class="btn btn-p btn-sm" href="<%= r.link %>" target="_blank" rel="noopener"><%- u.icon('video', 14) %>Join now</a><% } %><a class="btn btn-s btn-sm" href="/topics/<%= g.topic.id %>/meetings?room=<%= r.id %>#schedule">Schedule</a></div>
+    </div>
+  <% }) }) %>
+  </div>
+</section>
 <% } %>
 <section class="card"><div class="card-head"><h2>Upcoming</h2><span class="mono"><%= upcoming.length %></span></div>
   <% if (!upcoming.length) { %><div class="empty" style="padding:16px">No upcoming meetings.</div><% } %>

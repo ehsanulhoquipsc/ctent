@@ -4,6 +4,7 @@ const db = require('../db');
 const auth = require('../lib/auth');
 const { notify, audit } = require('../lib/events');
 const { now, matchScore, detectPlatform, safeUrl, toDate } = require('../lib/util');
+const rooms = require('../lib/rooms');
 
 const r = express.Router();
 const clean = (v, max) => String(v || '').trim().slice(0, max || 240);
@@ -165,22 +166,113 @@ r.post('/topics/:tid/tasks/:id', auth.loadTopic('member'), writable, async (req,
   res.redirect('/topics/' + t.id + '/board');
 });
 
+// ================= Meeting rooms =================
+async function syncChat(room, ids, name) {
+  if (!room.channel_id) return;
+  const ch = await db('channels').where({ id: room.channel_id, kind: 'room' }).first();
+  if (!ch) return;
+  if (name) await db('channels').where({ id: ch.id }).update({ name });
+  await db('channel_members').where({ channel_id: ch.id }).whereNotIn('user_id', ids.concat([0])).del();
+  const have = (await db('channel_members').where({ channel_id: ch.id }).select('user_id')).map((x) => x.user_id);
+  const add = ids.filter((id) => !have.includes(id));
+  if (add.length) await db('channel_members').insert(add.map((user_id) => ({ channel_id: ch.id, user_id })));
+}
+const slug = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+r.post('/topics/:tid/rooms', auth.loadTopic('member'), writable, async (req, res) => {
+  const t = req.topic;
+  const name = clean(req.body.name, 80);
+  if (!name) { req.flash('error', 'Give the room a name.'); return res.redirect('/topics/' + t.id + '/meetings#rooms'); }
+  const valid = (await members(t.id, false)).map((m) => m.id);
+  const ids = [...new Set([req.user.id, ...[].concat(req.body.members || []).map((x) => parseInt(x, 10))])].filter((x) => valid.includes(x));
+  const link = safeUrl(req.body.link) || rooms.autoLink(t.code, name);
+  if (req.body.link && !safeUrl(req.body.link)) { req.flash('error', 'That meeting link doesn’t look valid. Paste the full https:// link, or leave it blank for a free video room.'); return res.redirect('/topics/' + t.id + '/meetings#rooms'); }
+  const [kind, ref] = String(req.body.based_on || '').split(':');
+  const part = kind === 'part' ? await db('parts').where({ id: parseInt(ref, 10), topic_id: t.id }).first() : null;
+  const task = kind === 'task' ? await db('tasks').where({ id: parseInt(ref, 10), topic_id: t.id }).first() : null;
+  let channelId = null;
+  if (req.body.chat === '1') {
+    channelId = await db.insertId('channels', { topic_id: null, name: slug(t.code + '-' + name) || 'team-room', kind: 'room', purpose: 'Chat for the ' + name + ' room in ' + t.code, created_by: req.user.id, created_at: now() });
+    await db('channel_members').insert(ids.map((user_id) => ({ channel_id: channelId, user_id })));
+  }
+  const id = await db.insertId('meeting_rooms', { topic_id: t.id, name, kind: 'team', purpose: clean(req.body.purpose, 240) || null, link, platform: detectPlatform(link), part_id: part ? part.id : null, task_id: task ? task.id : null, channel_id: channelId, created_by: req.user.id, created_at: now() });
+  await db('meeting_room_members').insert(ids.map((user_id) => ({ room_id: id, user_id })));
+  await notify(ids, { kind: 'meeting', title: req.user.name + ' added you to the room “' + name + '”', body: t.code + ' · join any time from Meetings', link: '/topics/' + t.id + '/meetings#room' + id }, req.user.id);
+  await audit(req.user.id, t.id, 'room.created', 'Created the room “' + name + '” for ' + ids.length + ' people');
+  req.flash('ok', 'Room created' + (channelId ? ' with its own chat' : '') + '.');
+  res.redirect('/topics/' + t.id + '/meetings#room' + id);
+});
+r.post('/topics/:tid/rooms/:rid', auth.loadTopic('member'), writable, async (req, res) => {
+  const t = req.topic;
+  const room = await db('meeting_rooms').where({ id: parseInt(req.params.rid, 10), topic_id: t.id }).first();
+  if (!room) return auth.notFound(res);
+  const leader = req.topicRole === 'leader';
+  if (!(leader || (room.kind === 'team' && room.created_by === req.user.id))) return auth.forbidden(res, room.kind === 'project' ? 'Only a topic leader can change the project room.' : 'Only the person who made this room or a leader can change it.');
+  const back = '/topics/' + t.id + '/meetings#rooms';
+  if (req.body.action === 'delete') {
+    if (room.kind === 'project') { req.flash('error', 'The project room can’t be deleted — it belongs to the whole topic.'); return res.redirect(back); }
+    await db('meeting_rooms').where({ id: room.id }).del();
+    await audit(req.user.id, t.id, 'room.deleted', 'Deleted the room “' + room.name + '”');
+    req.flash('ok', 'Room deleted.' + (room.channel_id ? ' Its chat history stays in Messages.' : ''));
+    return res.redirect(back);
+  }
+  if (req.body.action === 'newlink') {
+    const link = rooms.autoLink(t.code, room.name);
+    await db('meeting_rooms').where({ id: room.id }).update({ link, platform: detectPlatform(link) });
+    req.flash('ok', 'New free video link created.');
+    return res.redirect(back);
+  }
+  const name = clean(req.body.name, 80) || room.name;
+  const link = req.body.link ? safeUrl(req.body.link) : room.link;
+  if (!link) { req.flash('error', 'That meeting link doesn’t look valid. Paste the full https:// link.'); return res.redirect(back); }
+  await db('meeting_rooms').where({ id: room.id }).update({ name, purpose: clean(req.body.purpose, 240) || null, link, platform: detectPlatform(link) });
+  if (room.kind === 'team' && req.body.members !== undefined) {
+    const valid = (await members(t.id, false)).map((m) => m.id);
+    const ids = [...new Set([].concat(req.body.members || []).map((x) => parseInt(x, 10)))].filter((x) => valid.includes(x));
+    if (!ids.length) { req.flash('error', 'A room needs at least one person.'); return res.redirect(back); }
+    const before = (await db('meeting_room_members').where({ room_id: room.id }).select('user_id')).map((x) => x.user_id);
+    await db('meeting_room_members').where({ room_id: room.id }).del();
+    await db('meeting_room_members').insert(ids.map((user_id) => ({ room_id: room.id, user_id })));
+    await syncChat(room, ids, slug(t.code + '-' + name));
+    const added = ids.filter((x) => !before.includes(x));
+    if (added.length) await notify(added, { kind: 'meeting', title: req.user.name + ' added you to the room “' + name + '”', body: t.code, link: '/topics/' + t.id + '/meetings#room' + room.id }, req.user.id);
+  }
+  await audit(req.user.id, t.id, 'room.edited', 'Edited the room “' + name + '”');
+  req.flash('ok', 'Room saved.');
+  res.redirect(back);
+});
+
 // ================= Meetings =================
 r.get('/topics/:tid/meetings', auth.loadTopic('member'), async (req, res) => {
   const t = req.topic;
   const list = await db('meetings').leftJoin('users', 'users.id', 'meetings.created_by').where('meetings.topic_id', t.id).orderBy('meetings.starts_at').select('meetings.*', 'users.name as by');
   const cut = Date.now() - 3600000;
-  res.render('pages/meetings', { title: 'Meetings · ' + t.code, active: 'topics', tab: 'Meetings', crumb: crumb(t, 'Meetings'), upcoming: list.filter((m) => toDate(m.starts_at) >= cut), past: list.filter((m) => toDate(m.starts_at) < cut).reverse() });
+  const roomList = await rooms.roomsFor(t, req.user, req.topicRole);
+  const people = await members(t.id, false);
+  // "Based on" options: each part's team and each task's people, so a room can be set up in one click.
+  const parts = await db('parts').where({ topic_id: t.id }).orderBy('id').select('id', 'title', 'proposed_user_id', 'status');
+  const tasks = await db('tasks').where({ topic_id: t.id }).whereNot('status', 'done').orderBy('id', 'desc').limit(40).select('id', 'title', 'part_id', 'assignee_id', 'created_by', 'reviewer_id');
+  const valid = new Set(people.map((p) => p.id));
+  const presets = [
+    ...parts.map((p) => ({ key: 'part:' + p.id, label: 'Part · ' + p.title, name: p.title, ids: [...new Set([p.status === 'approved' ? p.proposed_user_id : null, ...tasks.filter((x) => x.part_id === p.id).map((x) => x.assignee_id)])].filter((x) => valid.has(x)) })),
+    ...tasks.map((x) => ({ key: 'task:' + x.id, label: 'Task · ' + x.title, name: x.title, ids: [...new Set([x.assignee_id, x.reviewer_id || x.created_by])].filter((y) => valid.has(y)) }))
+  ].map((o) => ({ ...o, name: o.name.slice(0, 80) }));
+  const roomOf = Object.fromEntries(roomList.map((r) => [r.id, r]));
+  res.render('pages/meetings', { title: 'Meetings · ' + t.code, active: 'topics', tab: 'Meetings', crumb: crumb(t, 'Meetings'), upcoming: list.filter((m) => toDate(m.starts_at) >= cut), past: list.filter((m) => toDate(m.starts_at) < cut).reverse(),
+    rooms: roomList, roomOf, people, presets, roomSel: parseInt(req.query.room, 10) || null });
 });
 r.post('/topics/:tid/meetings', auth.loadTopic('member'), writable, async (req, res) => {
   const t = req.topic;
   const title = clean(req.body.title, 200);
   const when = new Date(String(req.body.date || '') + 'T' + String(req.body.time || '09:00') + ':00' + (/^[+-]\d{2}:\d{2}$/.test(req.body.tz || '') ? req.body.tz : '+11:00'));
-  const link = safeUrl(req.body.link);
+  let link = safeUrl(req.body.link);
   if (!title || isNaN(when)) { req.flash('error', 'Add a title, date and time.'); return res.redirect('/topics/' + t.id + '/meetings'); }
   if (req.body.link && !link) { req.flash('error', 'That meeting link doesn’t look valid. Paste the full https:// link.'); return res.redirect('/topics/' + t.id + '/meetings'); }
-  await db('meetings').insert({ topic_id: t.id, title, starts_at: when.toISOString(), duration_min: Math.min(480, Math.max(10, parseInt(req.body.duration, 10) || 60)), link: link || null, platform: detectPlatform(link), agenda: clean(req.body.agenda, 2000), created_by: req.user.id, created_at: now() });
-  const others = (await members(t.id, false)).map((m) => m.id);
+  const visible = await rooms.roomsFor(t, req.user, req.topicRole);
+  const room = visible.find((r) => r.id === parseInt(req.body.room_id, 10)) || null;
+  if (room && !link) link = room.link;
+  await db('meetings').insert({ topic_id: t.id, title, starts_at: when.toISOString(), duration_min: Math.min(480, Math.max(10, parseInt(req.body.duration, 10) || 60)), link: link || null, platform: detectPlatform(link), agenda: clean(req.body.agenda, 2000), room_id: room ? room.id : null, created_by: req.user.id, created_at: now() });
+  // A team-room meeting invites that team; otherwise everyone in the topic.
+  const others = room && room.kind === 'team' ? room.people.map((p) => p.id) : (await members(t.id, false)).map((m) => m.id);
   await notify(others, { kind: 'meeting', title: 'Meeting scheduled: ' + title, body: when.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney' }) + (link ? ' · ' + detectPlatform(link) : ''), link: '/topics/' + t.id + '/meetings' }, req.user.id);
   await audit(req.user.id, t.id, 'meeting.created', 'Scheduled “' + title + '”');
   req.flash('ok', 'Meeting scheduled and members notified.');

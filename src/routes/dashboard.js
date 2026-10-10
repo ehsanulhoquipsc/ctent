@@ -101,7 +101,15 @@ r.get('/meetings', async (req, res) => {
   const ids = await auth.workTopicIds(req.user);
   const all = ids.length ? await db('meetings').join('topics', 'topics.id', 'meetings.topic_id').whereIn('meetings.topic_id', ids).orderBy('meetings.starts_at').select('meetings.*', 'topics.code', 'topics.title as topic_title') : [];
   const cut = Date.now() - 3600000;
-  res.render('pages/meetings-all', { title: 'Meetings', active: 'meetings', upcoming: all.filter((m) => toDate(m.starts_at) >= cut), past: all.filter((m) => toDate(m.starts_at) < cut).reverse() });
+  // Rooms you can join, grouped by topic (non-archived topics only)
+  const topics = ids.length ? await db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc') : [];
+  const roleOf = Object.fromEntries((await db('topic_members').where({ user_id: req.user.id }).select('topic_id', 'role')).map((x) => [x.topic_id, x.role]));
+  const roomGroups = [];
+  for (const t of topics) {
+    const list = await require('../lib/rooms').roomsFor(t, req.user, req.user.platform_role === 'admin' ? 'leader' : roleOf[t.id]);
+    roomGroups.push({ topic: t, rooms: list.filter((r) => r.kind === 'project' || r.people.some((p) => p.id === req.user.id)) });
+  }
+  res.render('pages/meetings-all', { title: 'Meetings', active: 'meetings', roomGroups, upcoming: all.filter((m) => toDate(m.starts_at) >= cut), past: all.filter((m) => toDate(m.starts_at) < cut).reverse() });
 });
 
 r.get('/search', async (req, res) => {

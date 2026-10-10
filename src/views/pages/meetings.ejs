@@ -2,12 +2,47 @@
 <%- include('../partials/topic-header') %>
 <div class="cols">
   <div class="wide">
+    <section class="card" id="rooms" style="display:flex;flex-direction:column;gap:12px">
+      <div class="card-head" style="margin:0"><div style="flex:1"><h2>Rooms</h2><span class="hint">Always-open video rooms. The project room is made automatically for everyone in <%= topic.code %>; add a team room for a part or task.</span></div>
+        <% if (topic.status !== 'archived') { %><button class="btn btn-p btn-sm" type="button" data-open="newMeetRoom"><%- u.icon('plus', 16) %>New room</button><% } %></div>
+      <div class="room-grid">
+      <% rooms.forEach((r) => { const canEdit = topic.status !== 'archived' && (isTopicLeader || (r.kind === 'team' && r.created_by === me.id)); const chatHref = r.channel_id ? '/messages/' + r.channel_id : (r.kind === 'project' ? '/topics/' + topic.id + '/channels' : null); %>
+        <div class="room<%= r.kind === 'project' ? ' project' : '' %>" id="room<%= r.id %>">
+          <div class="split" style="align-items:flex-start">
+            <span class="kind" style="background:<%= r.kind === 'project' ? 'var(--pri-soft)' : 'var(--teal-soft)' %>;color:<%= r.kind === 'project' ? 'var(--pri-text)' : 'var(--teal)' %>"><%- u.icon('video', 16) %></span>
+            <div style="flex:1;min-width:0"><b><%= r.name %></b><br><span class="mono" style="text-transform:none"><%= r.kind === 'project' ? 'Project room · everyone' : (r.part_title ? (r.part_title === r.name ? 'Part team' : 'Part · ' + r.part_title) : r.task_title ? (r.task_title === r.name ? 'Task team' : 'Task · ' + r.task_title) : 'Team room') %> · <%= r.platform || 'Link' %></span></div>
+            <% if (canEdit) { %>
+              <details class="ed"><summary class="mini icon-only" aria-label="Edit room" title="Edit room"><%- u.icon('edit') %></summary>
+                <form method="post" action="/topics/<%= topic.id %>/rooms/<%= r.id %>" class="ed-pop">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="edit">
+                  <h3>Edit <%= r.kind === 'project' ? 'project room' : 'room' %></h3>
+                  <div class="field"><label for="rn<%= r.id %>">Name</label><input id="rn<%= r.id %>" name="name" required maxlength="80" value="<%= r.name %>"></div>
+                  <div class="field"><label for="rp<%= r.id %>">Purpose</label><input id="rp<%= r.id %>" name="purpose" maxlength="240" value="<%= r.purpose || '' %>"></div>
+                  <div class="field"><label for="rl<%= r.id %>">Video link</label><input id="rl<%= r.id %>" name="link" value="<%= r.link || '' %>" data-meeting-link><span class="hint">Paste your own Zoom, Meet or Teams room to replace the free one.</span></div>
+                  <% if (r.kind === 'team') { %><fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">People</legend><div class="pick-list"><% people.forEach((p) => { %><label class="split"><input type="checkbox" name="members" value="<%= p.id %>"<%= r.people.some((x) => x.id === p.id) ? ' checked' : '' %>><%= p.name %></label><% }) %></div></fieldset><% } %>
+                  <button class="btn btn-p btn-sm">Save room</button>
+                </form>
+              </details>
+              <% if (r.kind === 'team') { %><%- u.delForm('/topics/' + topic.id + '/rooms/' + r.id, csrf, 'Delete the room “' + r.name + '”? Its chat history stays in Messages.', 'Delete', { action: 'delete' }) %><% } %>
+            <% } %>
+          </div>
+          <% if (r.purpose && r.kind !== 'project') { %><span class="hint"><%= r.purpose %></span><% } %>
+          <div class="split"><div class="stack"><% r.people.slice(0, 6).forEach((p) => { %><%- u.avatar(p, 'sm', true) %><% }) %></div><span class="hint"><%= r.people.length %> <%= r.people.length === 1 ? 'person' : 'people' %></span></div>
+          <div class="split">
+            <% if (r.link) { %><a class="btn btn-p btn-sm" href="<%= r.link %>" target="_blank" rel="noopener"><%- u.icon('video', 14) %>Join now</a><% } %>
+            <% if (chatHref) { %><a class="btn btn-s btn-sm" href="<%= chatHref %>">Chat</a><% } %>
+            <% if (topic.status !== 'archived') { %><a class="btn btn-s btn-sm" href="?room=<%= r.id %>#schedule">Schedule here</a><% } %>
+          </div>
+        </div>
+      <% }) %>
+      </div>
+    </section>
     <section class="card"><div class="card-head"><h2>Upcoming</h2><span class="mono"><%= upcoming.length %></span></div>
       <% if (!upcoming.length) { %><div class="empty" style="padding:16px">No upcoming meetings. Schedule one on the right.</div><% } %>
       <% upcoming.forEach((m) => { %>
         <div class="row" id="m<%= m.id %>" style="flex-wrap:wrap;align-items:flex-start">
           <span class="kind" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('video', 16) %></span>
-          <span style="flex:1 1 300px;min-width:0"><b><%= m.title %></b><br><span class="text-2" style="font-size:13px"><%= u.fmtDateTime(m.starts_at) %> · <%= m.duration_min %> min · <%= m.platform || 'No link yet' %> · by <%= m.by || '—' %></span><% if (m.agenda) { %><br><span class="hint">Agenda: <%= m.agenda %></span><% } %></span>
+          <span style="flex:1 1 300px;min-width:0"><b><%= m.title %></b><br><span class="text-2" style="font-size:13px"><%= u.fmtDateTime(m.starts_at) %> · <%= m.duration_min %> min · <%= m.room_id && roomOf[m.room_id] ? roomOf[m.room_id].name + ' · ' : '' %><%= m.platform || 'No link yet' %> · by <%= m.by || '—' %></span><% if (m.agenda) { %><br><span class="hint">Agenda: <%= m.agenda %></span><% } %></span>
           <% if (m.link) { %><a class="btn btn-p btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
           <% if ((isTopicLeader || m.created_by === me.id) && topic.status !== 'archived') { %><%- include('../partials/meeting-edit', { m }) %><%- u.delForm('/topics/' + topic.id + '/meetings/' + m.id, csrf, 'Cancel “' + m.title + '”? Members won’t see it any more.', 'Cancel meeting', { action: 'delete' }) %><% } %>
         </div>
@@ -31,7 +66,7 @@
   </div>
   <div class="narrow">
     <% if (topic.status !== 'archived') { %>
-    <form method="post" action="/topics/<%= topic.id %>/meetings" class="card" style="display:flex;flex-direction:column;gap:12px">
+    <form method="post" action="/topics/<%= topic.id %>/meetings" class="card" id="schedule" style="display:flex;flex-direction:column;gap:12px">
       <h2>Schedule a meeting</h2>
       <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tz" value="+11:00">
       <div class="field"><label for="mt">Title</label><input id="mt" name="title" required placeholder="Weekly sync"></div>
@@ -40,11 +75,34 @@
         <div class="field"><label for="mtime">Time</label><input id="mtime" name="time" type="time" required value="09:00"></div>
       </div>
       <div class="field"><label for="mdur">Length</label><select id="mdur" name="duration"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option></select></div>
-      <div class="field"><label for="ml">Meeting link</label><input id="ml" name="link" data-meeting-link placeholder="Paste a Zoom, Google Meet or Teams link"><span class="hint" data-platform></span></div>
+      <div class="field"><label for="mroom">Room</label><select id="mroom" name="room_id"><% rooms.forEach((r, i) => { %><option value="<%= r.id %>"<%= (roomSel ? roomSel === r.id : i === 0) ? ' selected' : '' %>><%= r.name %> (<%= r.kind === 'project' ? 'everyone' : r.people.length + ' people' %>)</option><% }) %><option value="">No room — I’ll paste a link</option></select><span class="hint">Team-room meetings notify only that room’s people.</span></div>
+      <div class="field"><label for="ml">Different link (optional)</label><input id="ml" name="link" data-meeting-link placeholder="Leave blank to use the room’s video link"><span class="hint" data-platform></span></div>
       <div class="field"><label for="ma">Agenda</label><textarea id="ma" name="agenda" rows="3"></textarea></div>
       <button class="btn btn-p">Schedule & notify members</button>
     </form>
     <% } %>
   </div>
 </div>
+<% if (topic.status !== 'archived') { %>
+<dialog id="newMeetRoom" aria-label="New room">
+  <form method="post" action="/topics/<%= topic.id %>/rooms" class="dlg" data-room-form>
+    <div class="split"><h2 style="flex:1">New room in <%= topic.code %></h2><button type="button" class="icon-btn" data-close aria-label="Close" style="border:0">×</button></div>
+    <p class="text-2">A standing video room for a smaller group. Pick a part or task to fill in its people automatically, then add or remove anyone.</p>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field"><label for="nrb">Based on</label><select id="nrb" name="based_on" data-preset>
+      <option value="" data-ids="[]">Nothing — I’ll pick people</option>
+      <% if (presets.some((o) => o.key.startsWith('part:'))) { %><optgroup label="Parts"><% presets.filter((o) => o.key.startsWith('part:')).forEach((o) => { %><option value="<%= o.key %>" data-name="<%= o.name %>" data-ids="<%= JSON.stringify(o.ids) %>"><%= o.label.replace('Part · ', '') %> (<%= o.ids.length %>)</option><% }) %></optgroup><% } %>
+      <% if (presets.some((o) => o.key.startsWith('task:'))) { %><optgroup label="Open tasks"><% presets.filter((o) => o.key.startsWith('task:')).forEach((o) => { %><option value="<%= o.key %>" data-name="<%= o.name %>" data-ids="<%= JSON.stringify(o.ids) %>"><%= o.label.replace('Task · ', '') %> (<%= o.ids.length %>)</option><% }) %></optgroup><% } %>
+    </select></div>
+    <div class="field"><label for="nrn">Room name</label><input id="nrn" name="name" required maxlength="80" placeholder="e.g. Survey team"></div>
+    <div class="field"><label for="nrp">Purpose (optional)</label><input id="nrp" name="purpose" maxlength="240"></div>
+    <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">People <span class="hint" style="font-weight:400">· you’re added automatically</span></legend>
+      <div class="pick-list"><% people.forEach((p) => { %><label class="split"><input type="checkbox" name="members" value="<%= p.id %>"<%= p.id === me.id ? ' checked' : '' %>><%= p.name %><% if (p.role === 'leader') { %> <span class="hint">· leader</span><% } %></label><% }) %></div>
+    </fieldset>
+    <div class="field"><label for="nrl">Video link (optional)</label><input id="nrl" name="link" data-meeting-link placeholder="Leave blank for a free video room"><span class="hint" data-platform></span></div>
+    <label class="split" style="font-size:14px"><input type="checkbox" name="chat" value="1" checked> Also make a group chat for these people</label>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-close>Cancel</button><button class="btn btn-p">Create room</button></div>
+  </form>
+</dialog>
+<% } %>
 <%- include('../partials/bottom') %>

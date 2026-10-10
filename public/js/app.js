@@ -83,17 +83,29 @@
   document.querySelectorAll('dialog[data-autoopen]').forEach(function (d) { if (d.showModal) d.showModal(); });
 
   // Fill a meeting's platform as the link is typed
-  var link = document.querySelector('[data-meeting-link]');
-  if (link) {
-    var out = document.querySelector('[data-platform]');
+  document.querySelectorAll('[data-meeting-link]').forEach(function (link) {
+    var f = link.closest('.field'); var out = f && f.querySelector('[data-platform]'); if (!out) return;
     var detect = function () {
       var l = link.value.toLowerCase(), p = '';
       if (l.indexOf('zoom.us') > -1) p = 'Zoom'; else if (l.indexOf('meet.google.com') > -1) p = 'Google Meet';
-      else if (l.indexOf('teams.') > -1) p = 'Microsoft Teams'; else if (l.indexOf('webex') > -1) p = 'Webex'; else if (l) p = 'Other link';
+      else if (l.indexOf('teams.') > -1) p = 'Microsoft Teams'; else if (l.indexOf('webex') > -1) p = 'Webex'; else if (l.indexOf('jit.si') > -1) p = 'Jitsi'; else if (l) p = 'Other link';
       out.textContent = p ? 'Detected: ' + p : '';
     };
     link.addEventListener('input', detect); detect();
-  }
+  });
+
+  // New room: picking a part or task fills in its name and people
+  document.querySelectorAll('[data-room-form]').forEach(function (f) {
+    var sel = f.querySelector('[data-preset]'), name = f.querySelector('[name=name]'), auto = '';
+    if (!sel) return;
+    sel.addEventListener('change', function () {
+      var o = sel.options[sel.selectedIndex], ids = [];
+      try { ids = JSON.parse(o.getAttribute('data-ids') || '[]'); } catch (e) {}
+      if (ids.length || !o.value) f.querySelectorAll('[name=members]').forEach(function (c) { c.checked = c.defaultChecked || ids.indexOf(parseInt(c.value, 10)) > -1; });
+      var n = o.getAttribute('data-name') || '';
+      if (!name.value || name.value === auto) { name.value = n; auto = n; }
+    });
+  });
 
   // Kanban drag and drop (buttons work without JS too)
   var board = document.querySelector('[data-board]');

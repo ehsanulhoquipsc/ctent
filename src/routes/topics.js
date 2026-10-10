@@ -53,6 +53,7 @@ r.post('/topics/new', auth.requireRole('leader'), async (req, res) => {
   const id = await db.insertId('topics', { code, title: v.title, description: v.description, field: v.field, due_date: v.due_date, color: v.color, visibility: v.visibility, status: 'active', created_by: req.user.id, created_at: now() });
   await db('topic_members').insert({ topic_id: id, user_id: req.user.id, role: 'leader', joined_at: now() });
   await db('channels').insert({ topic_id: id, name: 'general', kind: 'topic', purpose: 'Everything about ' + code, created_by: req.user.id, created_at: now() });
+  await require('../lib/rooms').ensureProjectRoom(await db('topics').where({ id }).first(), req.user.id);
   for (const [title, skills] of TEMPLATES[v.template].parts) await db('parts').insert({ topic_id: id, title, skills, status: 'open', created_at: now() });
   await audit(req.user.id, id, 'topic.created', 'Created topic ' + code + (v.template !== 'blank' ? ' from the “' + TEMPLATES[v.template].name + '” template' : ''));
   req.flash('ok', 'Topic ' + code + ' created. Next: invite members and plan the parts.');

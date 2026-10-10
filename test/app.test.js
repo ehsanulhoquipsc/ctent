@@ -468,6 +468,48 @@ test('a task assigned by someone else is locked for the assignee, even a co-lead
   await db('topic_members').where({ topic_id: tid, user_id: ids.aisha }).update({ role: 'member' });
 });
 
+test('meeting rooms: automatic project room, team rooms from a part, scoped invites', async () => {
+  const tid = await topicId('CT-0142');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  const priya = await agentFor('priya@ctent.demo');
+  const page = await aisha.get('/topics/' + tid + '/meetings');
+  assert.strictEqual(page.status, 200);
+  const project = await db('meeting_rooms').where({ topic_id: tid, kind: 'project' }).first();
+  assert.ok(project && /^https:\/\/meet\.jit\.si\//.test(project.link), 'project room made automatically with a video link');
+  assert.match(page.text, /Project room · everyone/);
+  // New topics get one straight away
+  await leader.post('/topics/new').type('form').send({ _csrf: leader.csrf, title: 'Room test topic', code: '', template: 'paper', visibility: 'private' });
+  const nt = await db('topics').where({ title: 'Room test topic' }).first();
+  if (nt) assert.ok(await db('meeting_rooms').where({ topic_id: nt.id, kind: 'project' }).first());
+  // Team room: Aisha + Tom
+  await aisha.post('/topics/' + tid + '/rooms').type('form').send({ _csrf: aisha.csrf, name: 'Field team', members: [ids.tom], chat: '1' });
+  const room = await db('meeting_rooms').where({ name: 'Field team' }).first();
+  const who = (await db('meeting_room_members').where({ room_id: room.id })).map((x) => x.user_id).sort();
+  assert.deepStrictEqual(who, [ids.aisha, ids.tom].sort());
+  assert.ok(room.channel_id && await db('channel_members').where({ channel_id: room.channel_id, user_id: ids.tom }).first(), 'room chat created');
+  assert.doesNotMatch((await priya.get('/topics/' + tid + '/meetings')).text, /Field team/, 'other members don’t see private team rooms');
+  assert.strictEqual((await priya.post('/topics/' + tid + '/rooms/' + room.id).type('form').send({ _csrf: priya.csrf, name: 'x' })).status, 403);
+  // Meeting in the team room notifies only its people and uses its link
+  await aisha.post('/topics/' + tid + '/meetings').type('form').send({ _csrf: aisha.csrf, title: 'Field sync', date: '2030-04-01', time: '09:00', tz: '+11:00', duration: '30', room_id: room.id });
+  const m = await db('meetings').where({ title: 'Field sync' }).first();
+  assert.strictEqual(m.link, room.link);
+  assert.ok(await db('notifications').where({ user_id: ids.tom }).where('title', 'like', '%Field sync%').first());
+  assert.ok(!(await db('notifications').where({ user_id: ids.priya }).where('title', 'like', '%Field sync%').first()));
+  // Edit members, then project room is protected
+  await aisha.post('/topics/' + tid + '/rooms/' + room.id).type('form').send({ _csrf: aisha.csrf, name: 'Field team', members: [ids.aisha, ids.priya] });
+  assert.ok(await db('channel_members').where({ channel_id: room.channel_id, user_id: ids.priya }).first());
+  assert.ok(!(await db('channel_members').where({ channel_id: room.channel_id, user_id: ids.tom }).first()));
+  assert.strictEqual((await aisha.post('/topics/' + tid + '/rooms/' + project.id).type('form').send({ _csrf: aisha.csrf, link: 'https://zoom.us/j/1' })).status, 403);
+  await leader.post('/topics/' + tid + '/rooms/' + project.id).type('form').send({ _csrf: leader.csrf, name: project.name, link: 'https://zoom.us/j/999' });
+  assert.strictEqual((await db('meeting_rooms').where({ id: project.id }).first()).platform, 'Zoom');
+  await leader.post('/topics/' + tid + '/rooms/' + project.id).type('form').send({ _csrf: leader.csrf, action: 'delete' });
+  assert.ok(await db('meeting_rooms').where({ id: project.id }).first(), 'project room can’t be deleted');
+  await aisha.post('/topics/' + tid + '/rooms/' + room.id).type('form').send({ _csrf: aisha.csrf, action: 'delete' });
+  assert.ok(!(await db('meeting_rooms').where({ id: room.id }).first()));
+  assert.match((await aisha.get('/meetings')).text, /Your rooms/);
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);
