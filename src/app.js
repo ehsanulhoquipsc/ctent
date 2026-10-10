@@ -1,4 +1,6 @@
 'use strict';
+// Changes on every deploy so browsers fetch fresh CSS/JS despite long cache times.
+const ASSET_V = (process.env.RENDER_GIT_COMMIT || '').slice(0, 8) || Date.now().toString(36);
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
@@ -55,6 +57,7 @@ function createApp() {
   // Values every page can use
   app.use(async (req, res, next) => {
     res.locals.u = util;
+    res.locals.assetV = ASSET_V;
     res.locals.csrf = auth.csrfToken(req);
     res.locals.path = req.path;
     res.locals.flash = req.session.flash || null;
