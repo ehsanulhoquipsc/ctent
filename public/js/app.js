@@ -114,9 +114,9 @@
         var status = col.getAttribute('data-col');
         col.querySelector('[data-list]').appendChild(dragged);
         fetch(dragged.getAttribute('data-move'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' }, body: JSON.stringify({ status: status }) })
-          .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || ''); return d; }); })
           .then(function () { board.querySelectorAll('[data-col]').forEach(function (c) { var n = c.querySelectorAll('[data-task]').length; var k = c.querySelector('[data-count]'); if (k) k.textContent = n; }); var sel = dragged.querySelector('select[name=status]'); if (sel) sel.value = status; })
-          .catch(function () { window.location.reload(); });
+          .catch(function (err) { if (err && err.message) alert(err.message); window.location.reload(); });
       });
     });
   }

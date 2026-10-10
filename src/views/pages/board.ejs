@@ -15,7 +15,7 @@
     <section class="col" data-col="<%= k %>" aria-label="<%= label %>">
       <div class="col-head"><span class="dot" style="border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= label %><span class="mono" data-count style="margin-left:auto"><%= full.length %></span></div>
       <div data-list style="display:flex;flex-direction:column;gap:10px;min-height:40px">
-      <% list.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); const mine = isTopicLeader || t.assignee_id === me.id || t.created_by === me.id || !t.assignee_id; %>
+      <% list.forEach((t) => { const late = u.isOverdue(t.due_date, t.status); const mine = isTopicLeader || t.assignee_id === me.id || t.created_by === me.id || !t.assignee_id; const locked = t.assignee_id === me.id && t.created_by && t.created_by !== me.id; %>
         <article class="task" data-task data-move="/topics/<%= topic.id %>/tasks/<%= t.id %>/move"<%- mine ? '' : ' draggable="false"' %>>
           <div class="split"><a class="task-link" href="/topics/<%= topic.id %>/tasks/<%= t.id %>" style="font-weight:500;flex:1"><%= t.title %></a><% if (t.status === 'changes') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">Changes</span><% } %><% if (t.blocked) { %><span class="tag" style="background:var(--red-soft);color:var(--red)">⚑ Blocked</span><% } %><% if (t.priority === 'high') { %><span class="tag" style="background:var(--red-soft);color:var(--red)">High</span><% } %></div>
           <% if (t.description) { %><span class="hint"><%= t.description.slice(0, 120) %></span><% } %>
@@ -26,13 +26,13 @@
           <% if (mine && topic.status !== 'archived') { %>
           <div class="split">
             <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>/move"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="st<%= t.id %>">Status</label>
-              <select id="st<%= t.id %>" name="status" data-autosubmit><% COLS.forEach(([k2, l2]) => { %><option value="<%= k2 %>"<%= k2 === t.status ? ' selected' : '' %>><%= l2 %></option><% }) %></select></form>
-            <% if (isTopicLeader || !t.assignee_id) { %>
+              <select id="st<%= t.id %>" name="status" data-autosubmit<%= locked && t.status === 'done' ? ' disabled' : '' %>><% COLS.forEach(([k2, l2]) => { %><option value="<%= k2 %>"<%= k2 === t.status ? ' selected' : '' %><%= locked && k2 === 'done' && t.status !== 'done' ? ' disabled' : '' %>><%= l2 %><%= locked && k2 === 'done' && t.status !== 'done' ? ' (reviewer marks done)' : '' %></option><% }) %></select></form>
+            <% if (!locked && (isTopicLeader || !t.assignee_id)) { %>
             <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="as<%= t.id %>">Assignee</label>
               <select id="as<%= t.id %>" name="assignee_id" data-autosubmit><option value="">Unassigned</option><% people.filter((p) => isTopicLeader || p.id === me.id).forEach((p) => { %><option value="<%= p.id %>"<%= p.id === t.assignee_id ? ' selected' : '' %>><%= p.name %></option><% }) %></select></form>
             <% } %>
             <span class="inline-actions right"><a class="mini icon-only" href="/topics/<%= topic.id %>/tasks/<%= t.id %>" aria-label="Open or edit task" title="Open / edit"><%- u.icon('edit') %></a>
-            <% if (isTopicLeader || t.created_by === me.id) { %><form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>" class="inline" data-confirm="Delete “<%= t.title %>”?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete"><button class="mini del icon-only" aria-label="Delete task" title="Delete"><%- u.icon('trash') %></button></form><% } %></span>
+            <% if (locked) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)" title="Only the person who assigned it can reassign, delete or mark it done">🔒 Assigned to you</span><% } else if (isTopicLeader || t.created_by === me.id) { %><form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>" class="inline" data-confirm="Delete “<%= t.title %>”?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete"><button class="mini del icon-only" aria-label="Delete task" title="Delete"><%- u.icon('trash') %></button></form><% } %></span>
           </div>
           <% } %>
         </article>

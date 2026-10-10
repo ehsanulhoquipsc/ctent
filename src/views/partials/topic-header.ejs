@@ -16,7 +16,7 @@
   <div class="topic-title">
     <div>
       <span class="mono"><%= topic.code %> · <%= topic.field || 'Research' %> · <%= topic.visibility %></span>
-      <div class="split"><h1><%= topic.title %></h1><%- u.tag(topic.status) %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Guest · read only</span><% } %></div>
+      <div class="split"><h1><%= topic.title %></h1><%- u.tag(topic.status) %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Guest · read only</span><% } else if (isTopicLeader) { %><span class="tag" style="background:var(--pri-soft);color:var(--pri-text)" title="Your role in this topic"><%= me.platform_role === 'admin' ? 'You: admin (full access)' : 'You: leader of this topic' %></span><% } else { %><span class="tag" style="background:var(--indigo-soft);color:var(--indigo)" title="Your role in this topic">You: member</span><% } %></div>
     </div>
     <div class="stack"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
     <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/settings"><%- u.icon('edit', 16) %>Edit topic</a><a class="btn btn-s" href="<%= base %>/members">Invite</a><% } %>

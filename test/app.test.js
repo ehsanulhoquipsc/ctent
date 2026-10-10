@@ -447,6 +447,27 @@ test('admin edits and deletes user accounts safely', async () => {
   assert.ok(!(await db('users').where({ id: ids.rahul }).first()));
 });
 
+test('a task assigned by someone else is locked for the assignee, even a co-leader', async () => {
+  const tid = await topicId('CT-0142');
+  await db('topic_members').where({ topic_id: tid, user_id: ids.aisha }).update({ role: 'leader' });
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  await leader.post('/topics/' + tid + '/tasks').type('form').send({ _csrf: leader.csrf, title: 'Code wave 2 transcripts', assignee_id: ids.aisha, status: 'todo' });
+  const task = await db('tasks').where({ title: 'Code wave 2 transcripts' }).first();
+  assert.strictEqual(task.assignee_id, ids.aisha);
+  const url = '/topics/' + tid + '/tasks/' + task.id;
+  assert.match((await aisha.get('/topics/' + tid + '/board')).text, /Assigned to you/);
+  assert.strictEqual((await aisha.post(url).type('form').send({ _csrf: aisha.csrf, assignee_id: '' })).status, 403, 'cannot unassign');
+  assert.strictEqual((await aisha.post(url).type('form').send({ _csrf: aisha.csrf, action: 'delete' })).status, 403, 'cannot delete');
+  assert.strictEqual((await aisha.post(url + '/delete').type('form').send({ _csrf: aisha.csrf })).status, 403);
+  assert.strictEqual((await aisha.post(url + '/edit').type('form').send({ _csrf: aisha.csrf, title: 'Something else' })).status, 403);
+  assert.strictEqual((await aisha.post(url + '/move').set('Accept', 'application/json').set('x-csrf-token', aisha.csrf).send({ status: 'done' })).status, 409, 'cannot close it herself');
+  assert.strictEqual((await aisha.post(url + '/move').set('Accept', 'application/json').set('x-csrf-token', aisha.csrf).send({ status: 'review' })).status, 200, 'can send it for review');
+  await leader.post(url + '/move').set('Accept', 'application/json').set('x-csrf-token', leader.csrf).send({ status: 'done' });
+  assert.strictEqual((await db('tasks').where({ id: task.id }).first()).status, 'done');
+  await db('topic_members').where({ topic_id: tid, user_id: ids.aisha }).update({ role: 'member' });
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

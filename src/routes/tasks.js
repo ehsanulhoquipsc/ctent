@@ -137,7 +137,7 @@ r.get('/topics/:tid/tasks/:id', auth.loadTopic('member'), loadTask, async (req, 
   res.render('pages/task', {
     title: task.title, active: 'topics', tab: 'Board', crumb: crumb(t, 'T-' + task.id),
     task, stage, order, criteria, steps, done, resources, versions, latest, updates, comments, assignee, reviewer, part, people: ppl, next, hasBrief,
-    canManage: canManage(req), canDelete: req.topicRole === 'leader' || task.created_by === req.user.id, isLeader: req.topicRole === 'leader', DELIVERABLES,
+    canManage: canManage(req), canDelete: canDelete(req), isLeader: req.topicRole === 'leader', DELIVERABLES,
     isM, isR, canEditSteps: isM && (stage === 'working' || stage === 'changes' || stage === 'assigned'), canUpload: isM && (stage === 'working' || stage === 'changes'),
     deliverable: DELIVERABLES[task.deliverable] || null, maxMb: MAX / 1024 / 1024, tabSel: ['steps', 'files', 'updates'].includes(req.query.tab) ? req.query.tab : (stage === 'submitted' && isR ? 'files' : 'steps')
   });
@@ -227,7 +227,9 @@ r.post('/topics/:tid/tasks/:id/updates', auth.loadTopic('member'), writable, loa
 });
 
 // ---------- Edit / delete the task itself (leader, creator or reviewer) ----------
-const canManage = (req) => req.topicRole === 'leader' || req.task.created_by === req.user.id || req.task.reviewer_id === req.user.id;
+const givenByOther = (req) => req.task.assignee_id === req.user.id && !!req.task.created_by && req.task.created_by !== req.user.id;
+const canManage = (req) => !givenByOther(req) && (req.topicRole === 'leader' || req.task.created_by === req.user.id || req.task.reviewer_id === req.user.id);
+const canDelete = (req) => !givenByOther(req) && (req.topicRole === 'leader' || req.task.created_by === req.user.id);
 r.post('/topics/:tid/tasks/:id/edit', auth.loadTopic('member'), writable, loadTask, async (req, res) => {
   const t = req.topic, task = req.task;
   if (!canManage(req)) return auth.forbidden(res, 'Only a leader or the person who set this task can edit it.');
@@ -258,7 +260,7 @@ r.post('/topics/:tid/tasks/:id/edit', auth.loadTopic('member'), writable, loadTa
 });
 r.post('/topics/:tid/tasks/:id/delete', auth.loadTopic('member'), writable, loadTask, async (req, res) => {
   const t = req.topic, task = req.task;
-  if (req.topicRole !== 'leader' && task.created_by !== req.user.id) return auth.forbidden(res, 'Only a leader or the person who created this task can delete it.');
+  if (!canDelete(req)) return auth.forbidden(res, givenByOther(req) ? 'This task was assigned to you by someone else — ask them to delete it.' : 'Only a leader or the person who created this task can delete it.');
   await db('tasks').where({ id: task.id }).del();
   await audit(req.user.id, t.id, 'task.deleted', 'Deleted task “' + task.title + '”');
   req.flash('ok', 'Task deleted.');

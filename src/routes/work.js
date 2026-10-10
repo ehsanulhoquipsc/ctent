@@ -109,6 +109,9 @@ r.post('/topics/:tid/tasks', auth.loadTopic('member'), writable, async (req, res
   req.flash('ok', 'Task added.');
   res.redirect('/topics/' + t.id + '/board');
 });
+// A task someone else gave you is locked for you: you can work on it and send it for review,
+// but you can't reassign it, delete it, or mark it done yourself — even if you're a co-leader.
+const givenByOther = (req, task) => task.assignee_id === req.user.id && !!task.created_by && task.created_by !== req.user.id;
 async function canEditTask(req, task) { return req.topicRole === 'leader' || task.assignee_id === req.user.id || task.created_by === req.user.id || !task.assignee_id; }
 r.post('/topics/:tid/tasks/:id/move', auth.loadTopic('member'), writable, async (req, res) => {
   const t = req.topic;
@@ -118,10 +121,15 @@ r.post('/topics/:tid/tasks/:id/move', auth.loadTopic('member'), writable, async 
   if (!(await canEditTask(req, task))) return json ? res.status(403).json({ error: 'Only the assignee or a leader can move this task.' }) : auth.forbidden(res, 'Only the assignee or a leader can move this task.');
   const status = STATUSES.includes(req.body.status) ? req.body.status : task.status;
   const hasBrief = await db('task_criteria').where({ task_id: task.id }).first();
-  if (hasBrief && req.topicRole !== 'leader' && status !== task.status && (['review', 'done'].includes(status) || ['review', 'done'].includes(task.status))) {
+  if (hasBrief && (req.topicRole !== 'leader' || givenByOther(req, task)) && status !== task.status && (['review', 'done'].includes(status) || ['review', 'done'].includes(task.status))) {
     const msg = 'This task has a brief — submit and review it on the task page.';
     if (json) return res.status(409).json({ error: msg });
     req.flash('error', msg); return res.redirect('/topics/' + t.id + '/tasks/' + task.id);
+  }
+  if (givenByOther(req, task) && status !== task.status && (status === 'done' || task.status === 'done')) {
+    const msg = 'This task was assigned to you — move it to In review and the person who assigned it will mark it done.';
+    if (json) return res.status(409).json({ error: msg });
+    req.flash('error', msg); return res.redirect('/topics/' + t.id + '/board');
   }
   if (status !== task.status) {
     await db('tasks').where({ id: task.id }).update({ status, completed_at: status === 'done' ? now() : null, updated_at: now() });
@@ -138,6 +146,9 @@ r.post('/topics/:tid/tasks/:id', auth.loadTopic('member'), writable, async (req,
   const task = await db('tasks').where({ id: parseInt(req.params.id, 10), topic_id: t.id }).first();
   if (!task) return auth.notFound(res);
   if (!(await canEditTask(req, task))) return auth.forbidden(res, 'Only the assignee or a leader can change this task.');
+  if (givenByOther(req, task) && (req.body.action === 'delete' || (req.body.assignee_id !== undefined && String(req.body.assignee_id) !== String(task.assignee_id)))) {
+    return auth.forbidden(res, 'This task was assigned to you by someone else. Ask them (or another leader) to reassign or delete it.');
+  }
   if (req.body.action === 'delete') {
     if (req.topicRole !== 'leader' && task.created_by !== req.user.id) return auth.forbidden(res, 'Only a leader or the person who created this task can delete it.');
     await db('tasks').where({ id: task.id }).del();
