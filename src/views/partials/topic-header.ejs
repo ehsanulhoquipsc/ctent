@@ -19,7 +19,7 @@
       <div class="split"><h1><%= topic.title %></h1><%- u.tag(topic.status) %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Guest · read only</span><% } %></div>
     </div>
     <div class="stack"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
-    <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/members">Invite</a><% } %>
+    <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/settings"><%- u.icon('edit', 16) %>Edit topic</a><a class="btn btn-s" href="<%= base %>/members">Invite</a><% } %>
     <% if (!isGuest) { %><a class="btn btn-p" href="<%= base %>/submissions/new"><%- u.icon('upload') %>New submission</a><% } %>
   </div>
   <nav aria-label="Topic sections">

@@ -307,6 +307,146 @@ test('blocked update alerts the leader in the Action centre', async () => {
   assert.match((await leader.get('/actions')).text, /is blocked on “Map dam diplomacy sources”/);
 });
 
+test('edit/delete: tasks, comments and updates respect roles', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  await leader.post('/topics/' + tid + '/tasks/new').type('form').send({ _csrf: leader.csrf, title: 'Map the treaty landscape', goal: 'g', deliverable: 'doc', assignee_id: ids.aisha, criteria: ['Lists every treaty'] });
+  const task = await db('tasks').where({ title: 'Map the treaty landscape' }).first();
+  const url = '/topics/' + tid + '/tasks/' + task.id;
+  assert.match((await leader.get(url)).text, /Edit task/);
+  assert.doesNotMatch((await aisha.get(url)).text, /Edit task/);
+  assert.strictEqual((await aisha.post(url + '/edit').type('form').send({ _csrf: aisha.csrf, title: 'Hijack' })).status, 403);
+  assert.strictEqual((await aisha.post(url + '/delete').type('form').send({ _csrf: aisha.csrf })).status, 403);
+  assert.strictEqual((await aisha.post(url).type('form').send({ _csrf: aisha.csrf, action: 'delete' })).status, 403, 'board delete is leader/creator only');
+  await leader.post(url + '/edit').type('form').send({ _csrf: leader.csrf, title: 'Map the water-treaty landscape', goal: 'new goal', criteria: 'Lists every treaty\nNotes gaps', assignee_id: ids.aisha, priority: 'high', deliverable: 'analysis', due_date: '2030-02-01' });
+  const t2 = await db('tasks').where({ id: task.id }).first();
+  assert.strictEqual(t2.title, 'Map the water-treaty landscape');
+  assert.strictEqual(t2.due_date, '2030-02-01');
+  assert.strictEqual((await db('task_criteria').where({ task_id: task.id })).length, 2);
+  // Comments: own edit, others can't, leader can delete
+  await aisha.post(url + '/comments').type('form').send({ _csrf: aisha.csrf, body: 'Which years?' });
+  const c = await db('task_comments').where({ task_id: task.id }).first();
+  await aisha.post(url + '/comments/' + c.id).type('form').send({ _csrf: aisha.csrf, body: 'Which years should I cover?' });
+  const c2 = await db('task_comments').where({ id: c.id }).first();
+  assert.strictEqual(c2.body, 'Which years should I cover?');
+  assert.ok(c2.edited_at);
+  assert.strictEqual((await leader.post(url + '/comments/' + c.id).type('form').send({ _csrf: leader.csrf, body: 'changed' })).status, 403, 'nobody edits someone else’s words');
+  await leader.post(url + '/comments/' + c.id).type('form').send({ _csrf: leader.csrf, action: 'delete' });
+  assert.ok(!(await db('task_comments').where({ id: c.id }).first()));
+  // Updates: own edit/delete
+  await aisha.post(url + '/updates').type('form').send({ _csrf: aisha.csrf, text: 'Halfway' });
+  const up = await db('task_updates').where({ task_id: task.id, text: 'Halfway' }).first();
+  await aisha.post(url + '/updates/' + up.id).type('form').send({ _csrf: aisha.csrf, text: 'Halfway there' });
+  assert.strictEqual((await db('task_updates').where({ id: up.id }).first()).text, 'Halfway there');
+  const sys = await db('task_updates').where({ task_id: task.id, kind: 'assigned' }).first();
+  assert.strictEqual((await leader.post(url + '/updates/' + sys.id).type('form').send({ _csrf: leader.csrf, action: 'delete' })).status, 403, 'history entries are locked');
+  await aisha.post(url + '/updates/' + up.id).type('form').send({ _csrf: aisha.csrf, action: 'delete' });
+  assert.ok(!(await db('task_updates').where({ id: up.id }).first()));
+  // Draft version delete
+  await aisha.post(url + '/act').type('form').send({ _csrf: aisha.csrf, action: 'start' });
+  await aisha.post(url + '/versions').field('_csrf', aisha.csrf).attach('file', Buffer.from('draft'), 'draft.txt');
+  const v = await db('task_versions').where({ task_id: task.id }).first();
+  await aisha.post(url + '/versions/' + v.id + '/delete').type('form').send({ _csrf: aisha.csrf });
+  assert.ok(!(await db('task_versions').where({ id: v.id }).first()));
+  assert.ok(!(await db('files').where({ id: v.file_id }).first()));
+  // Leader deletes the task
+  await leader.post(url + '/delete').type('form').send({ _csrf: leader.csrf });
+  assert.ok(!(await db('tasks').where({ id: task.id }).first()));
+});
+
+test('edit/delete: chat messages and channels', async () => {
+  const tid = await topicId('CT-0142');
+  const ch = await db('channels').where({ topic_id: tid, name: 'methods' }).first();
+  const api = '/api/channels/' + ch.id + '/messages';
+  const aisha = await agentFor('aisha@ctent.demo');
+  const priya = await agentFor('priya@ctent.demo');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const m = (await aisha.post(api).set('x-csrf-token', aisha.csrf).send({ body: 'Typo herre' })).body;
+  const first = await aisha.get(api + '?after=' + m.id + '&since=' + new Date(Date.now() - 1000).toISOString());
+  assert.strictEqual((await priya.post(api + '/' + m.id).set('x-csrf-token', priya.csrf).set('Accept', 'application/json').send({ action: 'edit', body: 'x' })).status, 403);
+  assert.strictEqual((await priya.post(api + '/' + m.id).set('x-csrf-token', priya.csrf).set('Accept', 'application/json').send({ action: 'delete' })).status, 403);
+  const ed = await aisha.post(api + '/' + m.id).set('x-csrf-token', aisha.csrf).set('Accept', 'application/json').send({ action: 'edit', body: 'Typo here' });
+  assert.strictEqual(ed.status, 200);
+  assert.strictEqual(ed.body.body, 'Typo here');
+  assert.ok(ed.body.edited);
+  const poll = await priya.get(api + '?after=' + m.id + '&since=' + first.body.now);
+  assert.ok(poll.body.changed.some((x) => x.id === m.id && x.body === 'Typo here'), 'poll returns edited messages');
+  const del = await leader.post(api + '/' + m.id).set('x-csrf-token', leader.csrf).set('Accept', 'application/json').send({ action: 'delete' });
+  assert.strictEqual(del.status, 200);
+  assert.ok(del.body.deleted);
+  assert.strictEqual(del.body.body, '');
+  // Channel rename: member no, leader yes
+  assert.strictEqual((await aisha.post('/messages/' + ch.id + '/edit').type('form').send({ _csrf: aisha.csrf, name: 'nope' })).status, 403);
+  await leader.post('/messages/' + ch.id + '/edit').type('form').send({ _csrf: leader.csrf, name: 'Methods Lab', purpose: 'Methods' });
+  assert.strictEqual((await db('channels').where({ id: ch.id }).first()).name, 'methods-lab');
+  // Room: creator can delete, others cannot
+  await aisha.post('/messages/rooms').type('form').send({ _csrf: aisha.csrf, name: 'temp-room', members: [ids.priya] });
+  const room = await db('channels').where({ name: 'temp-room' }).first();
+  assert.strictEqual((await priya.post('/messages/' + room.id + '/delete').type('form').send({ _csrf: priya.csrf })).status, 403);
+  await aisha.post('/messages/' + room.id + '/delete').type('form').send({ _csrf: aisha.csrf });
+  assert.ok(!(await db('channels').where({ id: room.id }).first()));
+});
+
+test('edit/delete: meetings, submissions, files, notifications, expertise', async () => {
+  const tid = await topicId('CT-0142');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  const priya = await agentFor('priya@ctent.demo');
+  await aisha.post('/topics/' + tid + '/meetings').type('form').send({ _csrf: aisha.csrf, title: 'Coding sync', date: '2030-03-01', time: '10:00', tz: '+11:00', duration: '60' });
+  const mt = await db('meetings').where({ title: 'Coding sync' }).first();
+  assert.strictEqual((await priya.post('/topics/' + tid + '/meetings/' + mt.id).type('form').send({ _csrf: priya.csrf, action: 'edit', title: 'x', date: '2030-03-01', time: '10:00' })).status, 403);
+  await aisha.post('/topics/' + tid + '/meetings/' + mt.id).type('form').send({ _csrf: aisha.csrf, action: 'edit', title: 'Coding sync (moved)', date: '2030-03-02', time: '11:30', tz: '+11:00', duration: '45', link: 'https://zoom.us/j/123' });
+  const mt2 = await db('meetings').where({ id: mt.id }).first();
+  assert.strictEqual(mt2.title, 'Coding sync (moved)');
+  assert.strictEqual(mt2.platform, 'Zoom');
+  await leader.post('/topics/' + tid + '/meetings/' + mt.id).type('form').send({ _csrf: leader.csrf, action: 'delete' });
+  assert.ok(!(await db('meetings').where({ id: mt.id }).first()));
+  // Submissions
+  await aisha.post('/topics/' + tid + '/submissions').field('_csrf', aisha.csrf).field('title', 'Interview notes').attach('file', Buffer.from('notes'), 'notes.txt');
+  const s = await db('submissions').where({ title: 'Interview notes' }).first();
+  assert.strictEqual((await priya.post('/topics/' + tid + '/submissions/' + s.id + '/edit').type('form').send({ _csrf: priya.csrf, title: 'x' })).status, 403);
+  await aisha.post('/topics/' + tid + '/submissions/' + s.id + '/edit').type('form').send({ _csrf: aisha.csrf, title: 'Interview notes, wave 1', milestone: 'Fieldwork' });
+  assert.strictEqual((await db('submissions').where({ id: s.id }).first()).milestone, 'Fieldwork');
+  await aisha.post('/topics/' + tid + '/submissions/' + s.id + '/edit').type('form').send({ _csrf: aisha.csrf, action: 'delete' });
+  assert.ok(!(await db('submissions').where({ id: s.id }).first()));
+  // Files: rename/move by uploader; others refused
+  await aisha.post('/topics/' + tid + '/files').field('_csrf', aisha.csrf).field('folder', 'Data').attach('file', Buffer.from('a,b'), 'raw.csv');
+  const f = await db('files').where({ name: 'raw.csv', topic_id: tid }).first();
+  assert.strictEqual((await priya.post('/topics/' + tid + '/files/' + f.id + '/edit').type('form').send({ _csrf: priya.csrf, name: 'x.csv' })).status, 403);
+  await aisha.post('/topics/' + tid + '/files/' + f.id + '/edit').type('form').send({ _csrf: aisha.csrf, name: 'clean.csv', folder: 'Clean data' });
+  const f2 = await db('files').where({ id: f.id }).first();
+  assert.deepStrictEqual([f2.name, f2.folder], ['clean.csv', 'Clean data']);
+  // Notifications: only your own
+  const n = await db('notifications').where({ user_id: ids.priya }).first();
+  await aisha.post('/notifications/' + n.id + '/delete').type('form').send({ _csrf: aisha.csrf });
+  assert.ok(await db('notifications').where({ id: n.id }).first(), 'cannot delete someone else’s notification');
+  await priya.post('/notifications/' + n.id + '/delete').type('form').send({ _csrf: priya.csrf });
+  assert.ok(!(await db('notifications').where({ id: n.id }).first()));
+  // Expertise level edit
+  const e = await db('expertise').where({ user_id: ids.aisha }).first();
+  await aisha.post('/profile/expertise/' + e.id).type('form').send({ _csrf: aisha.csrf, name: e.name, kind: e.kind, level: '1' });
+  assert.strictEqual((await db('expertise').where({ id: e.id }).first()).level, 1);
+});
+
+test('admin edits and deletes user accounts safely', async () => {
+  const admin = await agentFor('nadia@ctent.demo');
+  const leader = await agentFor('ehsan@ctent.demo');
+  assert.strictEqual((await leader.post('/admin/users/' + ids.rahul).type('form').send({ _csrf: leader.csrf, action: 'delete', confirm: 'rahul@ctent.demo' })).status, 403);
+  await admin.post('/admin/users/' + ids.rahul).type('form').send({ _csrf: admin.csrf, action: 'edit', name: 'Rahul K. Mehta', email: 'rahul@ctent.demo', institution: 'KOI', title: 'Analyst' });
+  assert.strictEqual((await db('users').where({ id: ids.rahul }).first()).name, 'Rahul K. Mehta');
+  await admin.post('/admin/users/' + ids.rahul).type('form').send({ _csrf: admin.csrf, action: 'edit', name: 'Rahul', email: 'ehsan@ctent.demo' });
+  assert.strictEqual((await db('users').where({ id: ids.rahul }).first()).email, 'rahul@ctent.demo', 'duplicate email refused');
+  await admin.post('/admin/users/' + ids.rahul).type('form').send({ _csrf: admin.csrf, action: 'delete', confirm: 'wrong' });
+  assert.ok(await db('users').where({ id: ids.rahul }).first(), 'needs the email typed to confirm');
+  await admin.post('/admin/users/' + ids.ehsan).type('form').send({ _csrf: admin.csrf, action: 'delete', confirm: 'ehsan@ctent.demo' });
+  assert.ok(await db('users').where({ id: ids.ehsan }).first(), 'sole topic leader cannot be deleted');
+  await admin.post('/admin/users/' + ids.nadia).type('form').send({ _csrf: admin.csrf, action: 'delete', confirm: 'nadia@ctent.demo' });
+  assert.ok(await db('users').where({ id: ids.nadia }).first(), 'admins cannot delete themselves');
+  await admin.post('/admin/users/' + ids.rahul).type('form').send({ _csrf: admin.csrf, action: 'delete', confirm: 'rahul@ctent.demo' });
+  assert.ok(!(await db('users').where({ id: ids.rahul }).first()));
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

@@ -49,6 +49,33 @@ r.post('/admin/users/:id', async (req, res) => {
   const u = await db('users').where({ id: parseInt(req.params.id, 10) }).first();
   if (!u) return auth.notFound(res);
   const action = req.body.action;
+  if (action === 'edit') {
+    const name = clean(req.body.name, 120);
+    const email = clean(req.body.email, 190).toLowerCase();
+    if (name.length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { req.flash('error', 'Enter a name and a valid email.'); return res.redirect('/admin#users'); }
+    if (await db('users').whereRaw('lower(email) = ?', [email]).whereNot('id', u.id).first()) { req.flash('error', 'Someone else already uses that email.'); return res.redirect('/admin#users'); }
+    await db('users').where({ id: u.id }).update({ name, email, institution: clean(req.body.institution), title: clean(req.body.title) });
+    await audit(req.user.id, null, 'user.edited', 'Edited details for ' + name + (email !== u.email ? ' (email changed)' : ''));
+    req.flash('ok', name + '’s details saved.');
+    return res.redirect('/admin#users');
+  }
+  if (action === 'delete') {
+    if (u.id === req.user.id) { req.flash('error', 'You can’t delete your own account.'); return res.redirect('/admin#users'); }
+    // Don't leave a topic without a leader.
+    const led = await db('topic_members').join('topics', 'topics.id', 'topic_members.topic_id').where({ 'topic_members.user_id': u.id, 'topic_members.role': 'leader' }).select('topics.id', 'topics.code');
+    const orphans = [];
+    for (const t of led) {
+      const others = await db('topic_members').where({ topic_id: t.id, role: 'leader' }).whereNot('user_id', u.id).count({ n: '*' }).first();
+      if (!Number(others.n)) orphans.push(t.code);
+    }
+    if (orphans.length) { req.flash('error', u.name + ' is the only leader of ' + orphans.join(', ') + '. Make someone else a leader there first, or suspend the account instead.'); return res.redirect('/admin#users'); }
+    if (String(req.body.confirm || '').trim().toLowerCase() !== u.email.toLowerCase()) { req.flash('error', 'Type the person’s email to confirm deleting their account.'); return res.redirect('/admin#users'); }
+    await auth.killSessions(u.id);
+    await db('users').where({ id: u.id }).del();
+    await audit(req.user.id, null, 'user.deleted', 'Deleted the account of ' + u.name + ' (' + u.email + ')');
+    req.flash('ok', u.name + '’s account was deleted. Their past messages and work stay, shown as “Former member”.');
+    return res.redirect('/admin#users');
+  }
   if (u.id === req.user.id && action !== 'reset') { req.flash('error', 'You can’t change your own role or suspend yourself.'); return res.redirect('/admin#users'); }
   if (action === 'role') {
     const role = ['admin', 'leader', 'member', 'guest'].includes(req.body.role) ? req.body.role : u.platform_role;

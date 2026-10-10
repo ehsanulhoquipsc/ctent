@@ -9,7 +9,20 @@
         <div class="row">
           <span style="flex:1;min-width:0"><b style="font-weight:500"><%= e.name %></b> <span class="hint"><%= e.kind %></span></span>
           <span class="bar" style="width:120px"><span style="width:<%= e.level * 20 %>%"></span></span><span class="mono" style="width:30px"><%= e.level %>/5</span>
-          <form method="post" action="/profile/expertise/<%= e.id %>/delete"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn-link" style="color:var(--muted)" aria-label="Remove <%= e.name %>">Remove</button></form>
+          <span class="inline-actions">
+            <details class="ed"><summary class="mini icon-only" aria-label="Edit <%= e.name %>" title="Edit"><%- u.icon('edit') %></summary>
+              <form method="post" action="/profile/expertise/<%= e.id %>" class="ed-pop">
+                <input type="hidden" name="_csrf" value="<%= csrf %>"><h3>Edit expertise</h3>
+                <div class="field"><label for="xn<%= e.id %>">Name</label><input id="xn<%= e.id %>" name="name" required maxlength="120" value="<%= e.name %>"></div>
+                <div class="split">
+                  <div class="field" style="flex:1"><label for="xk<%= e.id %>">Type</label><select id="xk<%= e.id %>" name="kind"><% ['field', 'method', 'region', 'language'].forEach((k) => { %><option value="<%= k %>"<%= e.kind === k ? ' selected' : '' %>><%= k[0].toUpperCase() + k.slice(1) %></option><% }) %></select></div>
+                  <div class="field" style="flex:1"><label for="xl<%= e.id %>">Level</label><select id="xl<%= e.id %>" name="level"><% [1, 2, 3, 4, 5].forEach((l) => { %><option value="<%= l %>"<%= e.level === l ? ' selected' : '' %>><%= l %><%= l === 1 ? ' · Beginner' : l === 3 ? ' · Solid' : l === 5 ? ' · Expert' : '' %></option><% }) %></select></div>
+                </div>
+                <button class="btn btn-p btn-sm">Save</button>
+              </form>
+            </details>
+            <%- u.delForm('/profile/expertise/' + e.id + '/delete', csrf, 'Remove ' + e.name + ' from your expertise?', 'Remove') %>
+          </span>
         </div>
       <% }) %>
       <form method="post" action="/profile/expertise" class="split" style="padding-top:12px;border-top:1px solid var(--line-2);align-items:flex-end">

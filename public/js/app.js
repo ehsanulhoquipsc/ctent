@@ -28,6 +28,40 @@
   document.querySelectorAll('select[data-other]').forEach(function (s) {
     s.addEventListener('change', function () { if (s.value) s.form.querySelectorAll('input[name=user_id]').forEach(function (r) { r.checked = false; }); });
   });
+  // Edit/delete popovers: position on screen (so tables and scroll areas don't clip them), one open at a time
+  var placePop = function (d) {
+    var pop = d.querySelector('.ed-pop'), sum = d.querySelector('summary'); if (!pop || !sum) return;
+    var r = sum.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    pop.style.position = 'fixed'; pop.style.right = 'auto'; pop.style.bottom = 'auto';
+    var w = pop.offsetWidth, h = pop.offsetHeight;
+    var left = Math.min(Math.max(16, r.right - w), vw - w - 16);
+    var top = r.bottom + 6;
+    if (top + h > vh - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
+    if (top + h > vh - 8) top = Math.max(8, vh - h - 8);
+    pop.style.left = Math.max(8, left) + 'px'; pop.style.top = top + 'px';
+    pop.style.maxHeight = (vh - 16) + 'px'; pop.style.overflowY = 'auto';
+  };
+  document.querySelectorAll('details.ed').forEach(function (d) {
+    d.addEventListener('toggle', function () {
+      if (!d.open) return;
+      document.querySelectorAll('details.ed[open]').forEach(function (o) { if (o !== d) o.open = false; });
+      placePop(d);
+      var f = d.querySelector('.ed-pop input:not([type=hidden]), .ed-pop textarea, .ed-pop select'); if (f) f.focus();
+    });
+  });
+  var closeEd = function () { document.querySelectorAll('details.ed[open]').forEach(function (o) { o.open = false; }); };
+  document.addEventListener('click', function (e) { if (!e.target.closest('details.ed')) closeEd(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeEd(); });
+  window.addEventListener('resize', closeEd);
+  document.addEventListener('scroll', function (e) { var o = document.querySelector('details.ed[open]'); if (o && !(e.target.closest && e.target.closest('.ed-pop'))) placePop(o); }, true);
+  // Show existing meeting times in the browser's own timezone when editing
+  document.querySelectorAll('form[data-meeting-at]').forEach(function (f) {
+    var d = new Date(f.getAttribute('data-meeting-at')); if (isNaN(d)) return;
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    var di = f.querySelector('[name=date]'), ti = f.querySelector('[name=time]');
+    if (di) di.value = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    if (ti) ti.value = p(d.getHours()) + ':' + p(d.getMinutes());
+  });
   // Send the browser's timezone with meeting times
   document.querySelectorAll('input[name=tz]').forEach(function (i) {
     var o = -new Date().getTimezoneOffset(), sign = o >= 0 ? '+' : '-', a = Math.abs(o);
@@ -96,16 +130,65 @@
     var url = chat.getAttribute('data-chat');
     var scroll = function () { box.scrollTop = box.scrollHeight; };
     var esc = function (s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+    var me = parseInt(chat.getAttribute('data-me') || '0', 10), mod = chat.getAttribute('data-mod') === '1', ro = chat.getAttribute('data-ro') === '1';
+    var since = chat.getAttribute('data-since') || '';
+    var ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    var ICON_DEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>';
+    var decorate = function (el) {
+      var old = el.querySelector('.msg-actions'); if (old) old.remove();
+      if (ro || el.hasAttribute('data-deleted')) return;
+      var mine = parseInt(el.getAttribute('data-uid') || '0', 10) === me;
+      if (!mine && !mod) return;
+      var a = document.createElement('span'); a.className = 'msg-actions';
+      a.innerHTML = (mine ? '<button type="button" class="mini icon-only" data-msg-edit aria-label="Edit message" title="Edit">' + ICON_EDIT + '</button>' : '') +
+        '<button type="button" class="mini del icon-only" data-msg-del aria-label="Delete message" title="Delete">' + ICON_DEL + '</button>';
+      el.querySelector('.split').appendChild(a);
+    };
+    var fill = function (el, m) {
+      el.setAttribute('data-id', m.id); el.setAttribute('data-uid', m.uid || '');
+      if (m.deleted) el.setAttribute('data-deleted', ''); else el.removeAttribute('data-deleted');
+      el.innerHTML = m.avatar + '<div class="body"><div class="split"><b>' + esc(m.name) + '</b><span class="mono">' + esc(m.time) + '</span>' + (m.edited ? '<span class="edited">(edited)</span>' : '') + '</div><p>' + (m.deleted ? '<i class="hint">This message was deleted.</i>' : esc(m.body)) + '</p></div>';
+      decorate(el);
+    };
     var render = function (m) {
-      var el = document.createElement('div'); el.className = 'msg'; el.setAttribute('data-id', m.id);
-      el.innerHTML = m.avatar + '<div class="body"><div class="split"><b>' + esc(m.name) + '</b><span class="mono">' + esc(m.time) + '</span></div><p>' + esc(m.body) + '</p></div>';
+      var el = document.createElement('div'); el.className = 'msg';
+      fill(el, m);
       box.appendChild(el);
       var e = box.querySelector('[data-empty]'); if (e) e.remove();
     };
+    box.querySelectorAll('.msg').forEach(decorate);
+    var send = function (id, payload) {
+      return fetch(url + '/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'Something went wrong.'); return d; }); });
+    };
+    box.addEventListener('click', function (e) {
+      var el = e.target.closest('.msg'); if (!el) return;
+      var id = el.getAttribute('data-id');
+      if (e.target.closest('[data-msg-del]')) {
+        if (!confirm('Delete this message for everyone?')) return;
+        send(id, { action: 'delete' }).then(function (m) { fill(el, m); }).catch(function (err) { alert(err.message); });
+      } else if (e.target.closest('[data-msg-edit]')) {
+        if (el.querySelector('[data-edit-box]')) return;
+        var p = el.querySelector('.body p'); var text = p.textContent;
+        var f = document.createElement('form'); f.setAttribute('data-edit-box', ''); f.className = 'split'; f.style.marginTop = '4px';
+        f.innerHTML = '<label class="sr">Edit message</label><textarea class="in" rows="2" style="flex:1 1 240px"></textarea><button class="btn btn-p btn-sm">Save</button><button type="button" class="btn btn-s btn-sm" data-cancel>Cancel</button>';
+        f.querySelector('textarea').value = text;
+        p.hidden = true; p.after(f); f.querySelector('textarea').focus();
+        f.querySelector('textarea').addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); f.requestSubmit(); } if (k.key === 'Escape') { f.remove(); p.hidden = false; } });
+        f.querySelector('[data-cancel]').addEventListener('click', function () { f.remove(); p.hidden = false; });
+        f.addEventListener('submit', function (s) {
+          s.preventDefault();
+          var body = f.querySelector('textarea').value.trim(); if (!body) return;
+          send(id, { action: 'edit', body: body }).then(function (m) { fill(el, m); }).catch(function (err) { alert(err.message); });
+        });
+      }
+    });
     var poll = function () {
-      fetch(url + '?after=' + last, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
+      fetch(url + '?after=' + last + '&since=' + encodeURIComponent(since), { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
         var near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
         (d.messages || []).forEach(function (m) { if (!box.querySelector('[data-id="' + m.id + '"]')) render(m); last = Math.max(last, m.id); });
+        (d.changed || []).forEach(function (m) { var el = box.querySelector('[data-id="' + m.id + '"]'); if (el && !el.querySelector('[data-edit-box]')) fill(el, m); });
+        if (d.now) since = d.now;
         if (d.messages && d.messages.length && near) scroll();
       }).catch(function () {});
     };

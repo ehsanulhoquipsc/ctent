@@ -137,6 +137,7 @@ r.get('/topics/:tid/tasks/:id', auth.loadTopic('member'), loadTask, async (req, 
   res.render('pages/task', {
     title: task.title, active: 'topics', tab: 'Board', crumb: crumb(t, 'T-' + task.id),
     task, stage, order, criteria, steps, done, resources, versions, latest, updates, comments, assignee, reviewer, part, people: ppl, next, hasBrief,
+    canManage: canManage(req), canDelete: req.topicRole === 'leader' || task.created_by === req.user.id, isLeader: req.topicRole === 'leader', DELIVERABLES,
     isM, isR, canEditSteps: isM && (stage === 'working' || stage === 'changes' || stage === 'assigned'), canUpload: isM && (stage === 'working' || stage === 'changes'),
     deliverable: DELIVERABLES[task.deliverable] || null, maxMb: MAX / 1024 / 1024, tabSel: ['steps', 'files', 'updates'].includes(req.query.tab) ? req.query.tab : (stage === 'submitted' && isR ? 'files' : 'steps')
   });
@@ -190,6 +191,7 @@ r.post('/topics/:tid/tasks/:id/steps/:sid', auth.loadTopic('member'), writable, 
   const step = await db('task_steps').where({ id: parseInt(req.params.sid, 10), task_id: req.task.id }).first();
   if (step) {
     if (req.body.action === 'remove') await db('task_steps').where({ id: step.id }).del();
+    else if (req.body.action === 'rename') { const text = clean(req.body.text, 300); if (text) await db('task_steps').where({ id: step.id }).update({ text }); }
     else await db('task_steps').where({ id: step.id }).update({ done: !step.done });
   }
   if ((req.get('accept') || '').includes('application/json')) return res.json({ ok: true });
@@ -222,6 +224,92 @@ r.post('/topics/:tid/tasks/:id/updates', auth.loadTopic('member'), writable, loa
   await notify(leaders, { kind: blocked ? 'request' : 'task', title: blocked ? req.user.name + ' is blocked on “' + task.title + '”' : req.user.name + ' posted an update on “' + task.title + '”', body: text.slice(0, 140), link: back(req) + '?tab=updates' }, req.user.id);
   req.flash('ok', blocked ? 'Your reviewer has been alerted.' : 'Update posted.');
   res.redirect(back(req) + '?tab=updates');
+});
+
+// ---------- Edit / delete the task itself (leader, creator or reviewer) ----------
+const canManage = (req) => req.topicRole === 'leader' || req.task.created_by === req.user.id || req.task.reviewer_id === req.user.id;
+r.post('/topics/:tid/tasks/:id/edit', auth.loadTopic('member'), writable, loadTask, async (req, res) => {
+  const t = req.topic, task = req.task;
+  if (!canManage(req)) return auth.forbidden(res, 'Only a leader or the person who set this task can edit it.');
+  const title = clean(req.body.title);
+  if (title.length < 3) { req.flash('error', 'Give the task a title (at least 3 characters).'); return res.redirect(back(req)); }
+  let assignee = req.body.assignee_id === '' ? null : parseInt(req.body.assignee_id, 10) || task.assignee_id;
+  if (assignee && !(await db('topic_members').where({ topic_id: t.id, user_id: assignee }).whereNot('role', 'guest').first())) assignee = task.assignee_id;
+  await db('tasks').where({ id: task.id }).update({
+    title, goal: clean(req.body.goal, 2000) || null, deliverable: DELIVERABLES[req.body.deliverable] ? req.body.deliverable : task.deliverable,
+    priority: ['low', 'normal', 'high'].includes(req.body.priority) ? req.body.priority : task.priority,
+    due_date: validDate(req.body.due_date), assignee_id: assignee, updated_at: now()
+  });
+  if (req.body.criteria !== undefined) {
+    const wanted = list(String(req.body.criteria).split(/\r?\n/)).map((x) => x.slice(0, 300)).slice(0, 12);
+    const old = await db('task_criteria').where({ task_id: task.id }).orderBy('position');
+    const same = wanted.length === old.length && wanted.every((x, i) => x === old[i].text);
+    if (!same) {
+      await db('task_criteria').where({ task_id: task.id }).del();
+      if (wanted.length) await db('task_criteria').insert(wanted.map((text, position) => ({ task_id: task.id, text, position, met: !!(old.find((o) => o.text === text) || {}).met })));
+    }
+  }
+  await log(task.id, req.user.id, 'update', 'Edited the brief.');
+  if (assignee && assignee !== task.assignee_id) await notify(assignee, { kind: 'task', title: req.user.name + ' gave you a task: ' + title, body: t.code, link: back(req) }, req.user.id);
+  else if (task.assignee_id && task.assignee_id !== req.user.id) await notify(task.assignee_id, { kind: 'task', title: req.user.name + ' edited the brief for “' + title + '”', body: t.code, link: back(req) }, req.user.id);
+  await audit(req.user.id, t.id, 'task.edited', 'Edited task “' + title + '”');
+  req.flash('ok', 'Task updated.');
+  res.redirect(back(req));
+});
+r.post('/topics/:tid/tasks/:id/delete', auth.loadTopic('member'), writable, loadTask, async (req, res) => {
+  const t = req.topic, task = req.task;
+  if (req.topicRole !== 'leader' && task.created_by !== req.user.id) return auth.forbidden(res, 'Only a leader or the person who created this task can delete it.');
+  await db('tasks').where({ id: task.id }).del();
+  await audit(req.user.id, t.id, 'task.deleted', 'Deleted task “' + task.title + '”');
+  req.flash('ok', 'Task deleted.');
+  res.redirect('/topics/' + t.id + '/board');
+});
+
+// ---------- Delete a draft version (assignee, before it's reviewed) ----------
+r.post('/topics/:tid/tasks/:id/versions/:vid/delete', auth.loadTopic('member'), writable, loadTask, mustBeAssignee, async (req, res) => {
+  const v = await db('task_versions').where({ id: parseInt(req.params.vid, 10), task_id: req.task.id }).first();
+  if (!v) return auth.notFound(res);
+  if (v.state !== 'draft') { req.flash('error', 'Only an unsent draft can be deleted. Versions that were reviewed stay in the history.'); return res.redirect(back(req) + '?tab=files'); }
+  await db('task_versions').where({ id: v.id }).del();
+  if (v.file_id) await db('files').where({ id: v.file_id }).del();
+  await log(req.task.id, req.user.id, 'update', 'Deleted draft v' + v.version + '.');
+  req.flash('ok', 'Draft v' + v.version + ' deleted.');
+  res.redirect(back(req) + '?tab=files');
+});
+
+// ---------- Edit / delete own updates (system entries can't be edited) ----------
+r.post('/topics/:tid/tasks/:id/updates/:uid', auth.loadTopic('member'), writable, loadTask, async (req, res) => {
+  const e = await db('task_updates').where({ id: parseInt(req.params.uid, 10), task_id: req.task.id }).first();
+  if (!e) return auth.notFound(res);
+  const mine = e.user_id === req.user.id;
+  if (!['update', 'blocked'].includes(e.kind)) return auth.forbidden(res, 'Automatic history entries can’t be changed.');
+  if (req.body.action === 'delete') {
+    if (!mine && req.topicRole !== 'leader') return auth.forbidden(res, 'You can only delete your own updates.');
+    await db('task_updates').where({ id: e.id }).del();
+    req.flash('ok', 'Update deleted.');
+  } else {
+    if (!mine) return auth.forbidden(res, 'You can only edit your own updates.');
+    const text = clean(req.body.text, 2000);
+    if (text) await db('task_updates').where({ id: e.id }).update({ text, edited_at: now() });
+    req.flash('ok', 'Update edited.');
+  }
+  res.redirect(back(req) + '?tab=updates');
+});
+
+// ---------- Edit / delete chat comments ----------
+r.post('/topics/:tid/tasks/:id/comments/:cid', auth.loadTopic('member'), loadTask, async (req, res) => {
+  const c = await db('task_comments').where({ id: parseInt(req.params.cid, 10), task_id: req.task.id }).first();
+  if (!c) return auth.notFound(res);
+  const mine = c.user_id === req.user.id;
+  if (req.body.action === 'delete') {
+    if (!mine && req.topicRole !== 'leader') return auth.forbidden(res, 'You can only delete your own messages.');
+    await db('task_comments').where({ id: c.id }).del();
+  } else {
+    if (!mine) return auth.forbidden(res, 'You can only edit your own messages.');
+    const body = clean(req.body.body, 2000);
+    if (body) await db('task_comments').where({ id: c.id }).update({ body, edited_at: now() });
+  }
+  res.redirect(back(req) + '#chat');
 });
 
 // ---------- Task chat (assignee, reviewer, leaders) ----------

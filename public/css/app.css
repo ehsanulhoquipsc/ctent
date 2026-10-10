@@ -286,3 +286,29 @@ dialog .dlg { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .task-link { color: var(--text); text-decoration: none; }
 .task-link:hover { color: var(--pri-text); filter: none; text-decoration: underline; }
 @media (max-width: 900px) { .stepper li b { font-size: 12px; } .next { padding: 16px; } }
+
+/* ===== Edit / delete controls ===== */
+.ed { position: relative; display: inline-block; }
+.ed > summary { list-style: none; cursor: pointer; }
+.ed > summary::-webkit-details-marker { display: none; }
+.ed-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; width: 380px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 16px; display: flex; flex-direction: column; gap: 10px; text-align: left; font-weight: 400; color: var(--text); }
+.ed-pop.left { right: auto; left: 0; }
+.ed-pop h3 { font-size: 15px; }
+.mini { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--text-2); font: 500 12px var(--font); cursor: pointer; text-decoration: none; white-space: nowrap; }
+.mini:hover { background: var(--surface-2); color: var(--text); filter: none; }
+.mini.del { color: var(--red); border-color: var(--red-soft); }
+.mini.del:hover { background: var(--red-soft); color: var(--red); }
+.mini svg { width: 14px; height: 14px; }
+.inline-actions { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+form.inline { display: inline; }
+.msg .msg-actions { display: none; gap: 4px; margin-left: auto; }
+.msg:hover .msg-actions, .msg:focus-within .msg-actions { display: inline-flex; }
+.edited { font-size: 11px; color: var(--muted); }
+.ed-pop.wide { width: 540px; }
+.ed-pop.up { top: auto; bottom: calc(100% + 6px); }
+@media (hover: none) { .msg .msg-actions { display: inline-flex; } }
+.bubble .msg-actions { display: none; gap: 4px; margin-top: 4px; }
+.bubble-row:hover .msg-actions, .bubble-row:focus-within .msg-actions { display: inline-flex; }
+@media (hover: none) { .bubble .msg-actions { display: inline-flex; } }
+.mini.icon-only { padding: 0 6px; }
+.ed-pop { white-space: normal; }

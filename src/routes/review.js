@@ -103,6 +103,29 @@ r.post('/topics/:tid/submissions/:sid/version', auth.loadTopic('member'), writab
   req.flash('ok', 'Version ' + v + ' uploaded and sent for review.');
   res.redirect('/topics/' + t.id + '/submissions/' + s.id);
 });
+// Edit title/milestone, or delete. Author (until approved) or a leader.
+r.post('/topics/:tid/submissions/:sid/edit', auth.loadTopic('member'), writable, async (req, res) => {
+  const t = req.topic;
+  const s = await db('submissions').where({ id: parseInt(req.params.sid, 10), topic_id: t.id }).first();
+  if (!s) return auth.notFound(res);
+  const leader = req.topicRole === 'leader';
+  if (!leader && (s.created_by !== req.user.id || s.status === 'approved')) return auth.forbidden(res, s.status === 'approved' ? 'Approved submissions are locked. Ask a leader.' : 'Only the author or a leader can edit this submission.');
+  const back = '/topics/' + t.id + '/submissions/' + s.id;
+  if (req.body.action === 'delete') {
+    const fileIds = (await db('submission_versions').where({ submission_id: s.id }).select('file_id')).map((x) => x.file_id).filter(Boolean);
+    await db('submissions').where({ id: s.id }).del();
+    if (fileIds.length) await db('files').whereIn('id', fileIds).del();
+    await audit(req.user.id, t.id, 'submission.deleted', 'Deleted submission “' + s.title + '”');
+    req.flash('ok', 'Submission deleted.');
+    return res.redirect('/topics/' + t.id + '/submissions');
+  }
+  const title = clean(req.body.title, 200);
+  if (!title) { req.flash('error', 'Give the submission a title.'); return res.redirect(back); }
+  await db('submissions').where({ id: s.id }).update({ title, milestone: clean(req.body.milestone, 120) || null, updated_at: now() });
+  await audit(req.user.id, t.id, 'submission.edited', 'Edited submission “' + title + '”');
+  req.flash('ok', 'Submission updated.');
+  res.redirect(back);
+});
 r.post('/topics/:tid/submissions/:sid/review', auth.loadTopic('leader'), writable, async (req, res) => {
   const t = req.topic;
   const s = await db('submissions').where({ id: parseInt(req.params.sid, 10), topic_id: t.id }).first();
@@ -150,6 +173,20 @@ r.get('/topics/:tid/files/:fid', auth.loadTopic(), async (req, res) => {
   res.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox");
   res.set('Content-Disposition', (inline ? 'inline' : 'attachment') + '; filename="' + f.name.replace(/[^\w.\- ]+/g, '_') + '"; filename*=UTF-8\'\'' + encodeURIComponent(f.name));
   res.send(Buffer.from(f.data));
+});
+r.post('/topics/:tid/files/:fid/edit', auth.loadTopic('member'), writable, async (req, res) => {
+  const t = req.topic;
+  const f = await db('files').where({ id: parseInt(req.params.fid, 10), topic_id: t.id }).first();
+  if (!f) return auth.notFound(res);
+  if (f.uploaded_by !== req.user.id && req.topicRole !== 'leader') return auth.forbidden(res, 'Only the uploader or a leader can rename this file.');
+  let name = clean(req.body.name, 200).replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_');
+  if (!name) { req.flash('error', 'Give the file a name.'); return res.redirect('/topics/' + t.id + '/files'); }
+  if (BLOCKED.test(name)) { req.flash('error', 'That file type isn’t allowed.'); return res.redirect('/topics/' + t.id + '/files'); }
+  const folder = clean(req.body.folder, 60) || f.folder || 'General';
+  await db('files').where({ id: f.id }).update({ name, folder });
+  await audit(req.user.id, t.id, 'file.edited', (name !== f.name ? 'Renamed ' + f.name + ' to ' + name : 'Edited ' + name) + (folder !== f.folder ? ' (moved to ' + folder + ')' : ''));
+  req.flash('ok', 'File updated.');
+  res.redirect('/topics/' + t.id + '/files' + (req.body.back_folder ? '?folder=' + encodeURIComponent(folder) : ''));
 });
 r.post('/topics/:tid/files/:fid/delete', auth.loadTopic('member'), writable, async (req, res) => {
   const t = req.topic;

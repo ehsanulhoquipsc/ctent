@@ -73,6 +73,11 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
   - Platform stats.
   - Audit log.
 - **Activity log** for each topic.
+- **Edit and delete everywhere, by role:**
+  - **Members** edit or delete their own messages, task comments, updates, steps, unsent drafts, meetings they organised, files they uploaded, submissions (until approved), expertise and notifications.
+  - **Leaders** can also edit or delete anything in topics they lead: the topic, parts, task briefs, meetings, channels, files and submissions, and remove anyone's message.
+  - **Admins** can do all of that in every topic, and edit or delete user accounts. A topic's only leader can't be deleted, and nobody can delete their own account.
+  - Edited messages show "(edited)", deleted chat messages leave a placeholder, and chat edits appear live for everyone.
 
 | Plan & assign | Submission review |
 |---|---|
@@ -105,7 +110,7 @@ You need [Node.js](https://nodejs.org) 20 or newer.
 ```bash
 npm install
 npm run dev          # http://localhost:3000, uses a local SQLite file in data/
-npm test             # 20 automated tests (sign-in, permissions, workflows)
+npm test             # 27 automated tests (sign-in, permissions, workflows)
 npm run reset-demo   # wipe the database and reload the demo data
 ```
 

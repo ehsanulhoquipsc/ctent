@@ -3,7 +3,19 @@
 <div class="cols">
   <div class="wide">
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
-      <div class="split"><span class="mono">Submission #<%= s.id %> · <%= s.milestone || 'No milestone' %></span><span class="right"><%- u.tag(s.status) %></span></div>
+      <div class="split"><span class="mono">Submission #<%= s.id %> · <%= s.milestone || 'No milestone' %></span><span class="right inline-actions"><%- u.tag(s.status) %>
+        <% if (topic.status !== 'archived' && (isTopicLeader || (isAuthor && s.status !== 'approved'))) { %>
+          <details class="ed"><%- u.editSummary() %>
+            <form method="post" action="/topics/<%= topic.id %>/submissions/<%= s.id %>/edit" class="ed-pop">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="edit">
+              <h3>Edit submission</h3>
+              <div class="field"><label for="es-t">Title</label><input id="es-t" name="title" required maxlength="200" value="<%= s.title %>"></div>
+              <div class="field"><label for="es-m">Milestone</label><input id="es-m" name="milestone" maxlength="120" value="<%= s.milestone || '' %>"></div>
+              <button class="btn btn-p btn-sm">Save</button>
+            </form>
+          </details>
+          <%- u.delForm('/topics/' + topic.id + '/submissions/' + s.id + '/edit', csrf, 'Delete “' + s.title + '” with all its versions and reviews? This can’t be undone.', 'Delete', { action: 'delete' }) %>
+        <% } %></span></div>
       <h2 style="font-size:22px"><%= s.title %></h2>
       <div class="split"><%- u.avatar({ id: s.author_id, name: s.author, color: s.author_color }, 'sm', true) %><span class="text-2">by <%= s.author %> · updated <%= u.ago(s.updated_at) %></span></div>
       <% if (versions[0]) { %>

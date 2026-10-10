@@ -25,6 +25,31 @@
         <span class="hint">· created <%= u.fmtDate(task.created_at) %></span>
       </div>
     </div>
+    <% if (canManage || canDelete) { %>
+    <div class="inline-actions">
+      <% if (canManage) { %>
+      <details class="ed"><%- u.editSummary('Edit task') %>
+        <form method="post" action="<%= base %>/edit" class="ed-pop wide">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <h3>Edit task</h3>
+          <div class="field"><label for="et-title">Title</label><input id="et-title" name="title" required minlength="3" maxlength="240" value="<%= task.title %>"></div>
+          <div class="field"><label for="et-goal">Goal</label><textarea id="et-goal" name="goal" rows="3" maxlength="2000"><%= task.goal || '' %></textarea></div>
+          <div class="field"><label for="et-crit">Done when <span class="hint">· one point per line</span></label><textarea id="et-crit" name="criteria" rows="4"><%= criteria.map((c) => c.text).join('\n') %></textarea></div>
+          <div class="split">
+            <div class="field" style="flex:1"><label for="et-who">Assigned to</label><select id="et-who" name="assignee_id"><option value="">Nobody yet</option><% people.forEach((p) => { %><option value="<%= p.id %>"<%= p.id === task.assignee_id ? ' selected' : '' %>><%= p.name %></option><% }) %></select></div>
+            <div class="field" style="flex:1"><label for="et-due">Due date</label><input id="et-due" name="due_date" type="date" value="<%= task.due_date || '' %>"></div>
+          </div>
+          <div class="split">
+            <div class="field" style="flex:1"><label for="et-del">Deliver</label><select id="et-del" name="deliverable"><% Object.entries(DELIVERABLES).forEach(([k, d]) => { %><option value="<%= k %>"<%= k === task.deliverable ? ' selected' : '' %>><%= d[0] %> <%= d[1] %></option><% }) %></select></div>
+            <div class="field" style="flex:1"><label for="et-pri">Priority</label><select id="et-pri" name="priority"><% ['low', 'normal', 'high'].forEach((p) => { %><option value="<%= p %>"<%= p === task.priority ? ' selected' : '' %>><%= p[0].toUpperCase() + p.slice(1) %></option><% }) %></select></div>
+          </div>
+          <button class="btn btn-p btn-sm">Save changes</button>
+        </form>
+      </details>
+      <% } %>
+      <% if (canDelete) { %><%- u.delForm(base + '/delete', csrf, 'Delete the task “' + task.title + '”? Its steps, drafts, updates and chat are deleted too.', 'Delete') %><% } %>
+    </div>
+    <% } %>
     <% if (task.due_date) { %>
     <div class="due <%= stage === 'approved' ? 'ok' : late ? 'late' : '' %>"><span class="mono" style="color:inherit">Due</span><b style="font-size:19px"><%= u.fmtDate(task.due_date, { weekday: 'short', day: 'numeric', month: 'short' }) %></b><span style="font-size:12px;font-weight:600"><%= stage === 'approved' ? 'Completed' : late ? Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft) === 1 ? '' : 's') + ' overdue' : daysLeft === 0 ? 'Due today' : daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ' left' %></span></div>
     <% } %>
@@ -84,6 +109,7 @@
             <form method="post" action="<%= base %>/steps/<%= s.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="box" aria-label="<%= s.done ? 'Mark not done' : 'Mark done' %>: <%= s.text %>"><%= s.done ? '✓' : '' %></button></form>
           <% } else { %><span class="box"><%= s.done ? '✓' : '' %></span><% } %>
           <span style="flex:1"><%= s.text %></span>
+          <% if (canEditSteps) { %><details class="ed"><summary class="mini icon-only" aria-label="Rename step"><%- u.icon('edit') %></summary><form method="post" action="<%= base %>/steps/<%= s.id %>" class="ed-pop"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="rename"><label class="label" for="st<%= s.id %>">Rename step</label><input class="in" id="st<%= s.id %>" name="text" required maxlength="300" value="<%= s.text %>"><button class="btn btn-p btn-sm">Save</button></form></details><% } %>
           <% if (canEditSteps) { %><form method="post" action="<%= base %>/steps/<%= s.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="remove"><button class="btn-link" style="color:var(--muted);font-size:18px" aria-label="Remove step">×</button></form><% } %>
         </div>
       <% }) %>
@@ -104,6 +130,7 @@
           <span style="flex:1;min-width:0"><b style="font-weight:600"><%= v.file_name || 'File removed' %></b><br><span class="hint"><%= u.humanSize(v.file_size) %> · <%= u.ago(v.created_at) %></span></span>
           <span class="tag" style="background:<%= vc[1] %>;color:<%= vc[0] %>"><%= vs[0] %></span>
           <% if (v.file_id) { %><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= v.file_id %>?view=1" target="_blank" rel="noopener">Open</a><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= v.file_id %>" aria-label="Download v<%= v.version %>"><%- u.icon('download', 14) %></a><% } %>
+          <% if (isM && v.state === 'draft' && canUpload) { %><%- u.delForm(base + '/versions/' + v.id + '/delete', csrf, 'Delete draft v' + v.version + '?', 'Delete') %><% } %>
         </div>
       <% }) %>
     <% } else { %>
@@ -117,7 +144,11 @@
       <% } %>
       <% updates.forEach((e) => { const k = KIND[e.kind] || [e.kind, 'grey']; const kc = u.color(k[1]); %>
         <div class="tl<%= e.kind === 'blocked' ? ' blocked' : '' %>"><%- u.avatar(e.uid ? { id: e.uid, name: e.name, color: e.color } : null, 'sm') %>
-          <div style="flex:1;min-width:0"><div class="split"><b style="font-size:14px"><%= e.name || 'CTENT' %></b><span class="tag" style="background:<%= kc[1] %>;color:<%= kc[0] %>;font-size:11px"><%= k[0] %></span><span class="mono" style="text-transform:none"><%= u.ago(e.created_at) %></span></div><p class="text-2" style="margin-top:4px;white-space:pre-wrap"><%= e.text %></p></div></div>
+          <div style="flex:1;min-width:0"><div class="split"><b style="font-size:14px"><%= e.name || 'CTENT' %></b><span class="tag" style="background:<%= kc[1] %>;color:<%= kc[0] %>;font-size:11px"><%= k[0] %></span><span class="mono" style="text-transform:none"><%= u.ago(e.created_at) %></span><% if (e.edited_at) { %><span class="edited">(edited)</span><% } %>
+            <% if (['update', 'blocked'].includes(e.kind) && (e.uid === me.id || isLeader) && topic.status !== 'archived') { %><span class="inline-actions" style="margin-left:auto">
+              <% if (e.uid === me.id) { %><details class="ed"><%- u.editSummary() %><form method="post" action="<%= base %>/updates/<%= e.id %>" class="ed-pop"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="label" for="ue<%= e.id %>">Edit update</label><textarea class="in" id="ue<%= e.id %>" name="text" rows="3" maxlength="2000" required><%= e.text %></textarea><button class="btn btn-p btn-sm">Save</button></form></details><% } %>
+              <%- u.delForm(base + '/updates/' + e.id, csrf, 'Delete this update?', 'Delete', { action: 'delete' }) %></span><% } %>
+          </div><p class="text-2" style="margin-top:4px;white-space:pre-wrap"><%= e.text %></p></div></div>
       <% }) %>
     <% } %>
     </div>
@@ -127,7 +158,9 @@
     <div style="padding:16px 18px;border-bottom:1px solid var(--line-2)"><b>Questions & feedback</b><div class="hint">Only about this task · <%= first(reviewer) %> and <%= first(assignee) %></div></div>
     <div class="chat-thread">
       <% if (!comments.length) { %><div class="empty" style="padding:16px"><%= isM ? 'Unsure about something? Ask here before you start.' : 'Messages about this task appear here.' %></div><% } %>
-      <% comments.forEach((c) => { const mine = c.uid === me.id; %><div class="bubble-row<%= mine ? ' mine' : '' %>"><div class="bubble"><span class="hint" style="font-weight:600"><%= c.name ? c.name.split(' ')[0] : '?' %> · <%= u.ago(c.created_at) %></span><div style="white-space:pre-wrap"><%= c.body %></div></div></div><% }) %>
+      <% comments.forEach((c) => { const mine = c.uid === me.id; %><div class="bubble-row<%= mine ? ' mine' : '' %>"><div class="bubble"><span class="hint" style="font-weight:600"><%= c.name ? c.name.split(' ')[0] : '?' %> · <%= u.ago(c.created_at) %></span><div style="white-space:pre-wrap"><%= c.body %></div><% if (c.edited_at) { %><span class="edited">(edited)</span><% } %>
+        <% if (mine || isLeader) { %><span class="msg-actions"><% if (mine) { %><details class="ed"><%- u.editSummary() %><form method="post" action="<%= base %>/comments/<%= c.id %>" class="ed-pop up"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="label" for="ce<%= c.id %>">Edit message</label><textarea class="in" id="ce<%= c.id %>" name="body" rows="3" maxlength="2000" required><%= c.body %></textarea><button class="btn btn-p btn-sm">Save</button></form></details><% } %><%- u.delForm(base + '/comments/' + c.id, csrf, 'Delete this message?', 'Delete', { action: 'delete' }) %></span><% } %>
+        </div></div><% }) %>
     </div>
     <form method="post" action="<%= base %>/comments" style="padding:12px;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:8px">
       <input type="hidden" name="_csrf" value="<%= csrf %>">

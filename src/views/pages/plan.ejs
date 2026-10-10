@@ -6,7 +6,22 @@
     <% if (!parts.length) { %><section class="card"><div class="empty"><b>No parts yet</b><span><%= isTopicLeader ? 'Add the first part on the right.' : 'The leader hasn’t split this topic yet.' %></span></div></section><% } %>
     <% parts.forEach((p) => { %>
       <section class="card" style="display:flex;flex-direction:column;gap:12px">
-        <div class="split"><h3 style="flex:1"><%= p.title %></h3><%- u.tag(p.status) %><% if (p.due_date) { %><span class="hint">Due <%= u.fmtDate(p.due_date) %></span><% } %></div>
+        <div class="split"><h3 style="flex:1"><%= p.title %></h3><%- u.tag(p.status) %><% if (p.due_date) { %><span class="hint">Due <%= u.fmtDate(p.due_date) %></span><% } %>
+          <% if (isTopicLeader && topic.status !== 'archived') { %>
+            <details class="ed"><%- u.editSummary() %>
+              <form method="post" action="/topics/<%= topic.id %>/plan/<%= p.id %>" class="ed-pop">
+                <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="edit">
+                <h3>Edit part</h3>
+                <div class="field"><label for="pt<%= p.id %>">Title</label><input id="pt<%= p.id %>" name="title" required value="<%= p.title %>"></div>
+                <div class="field"><label for="pd<%= p.id %>">What’s involved</label><textarea id="pd<%= p.id %>" name="description" rows="3"><%= p.description || '' %></textarea></div>
+                <div class="field"><label for="ps<%= p.id %>">Skills needed</label><input id="ps<%= p.id %>" name="skills" value="<%= p.skills || '' %>"></div>
+                <div class="field"><label for="pdd<%= p.id %>">Due date</label><input id="pdd<%= p.id %>" name="due_date" type="date" value="<%= p.due_date || '' %>"></div>
+                <button class="btn btn-p btn-sm">Save part</button>
+              </form>
+            </details>
+            <%- u.delForm('/topics/' + topic.id + '/plan/' + p.id, csrf, 'Delete the part “' + p.title + '”? Its tasks stay on the board.', 'Delete', { action: 'delete' }) %>
+          <% } %>
+        </div>
         <% if (p.description) { %><p class="text-2"><%= p.description %></p><% } %>
         <% if (p.skills) { %><div class="split"><span class="mono">Needs</span><% p.skills.split(',').forEach((s) => { %><span class="skill"><%= s.trim() %></span><% }) %></div><% } %>
         <% if (p.status === 'approved' && p.owner) { %>
@@ -31,7 +46,6 @@
             <div class="split">
               <button class="btn btn-p btn-sm" name="action" value="approve"><%= p.status === 'approved' ? 'Change owner' : 'Approve owner' %></button>
               <% if (p.status !== 'approved') { %><button class="btn btn-s btn-sm" name="action" value="propose">Save as proposal</button><% } %>
-              <button class="btn btn-d btn-sm right" name="action" value="delete" formnovalidate data-confirm-btn="Delete this part?">Delete part</button>
             </div>
           </form>
         <% } else if (p.owner) { %>

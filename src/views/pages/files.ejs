@@ -19,7 +19,18 @@
             <td class="hint"><%= f.by || '—' %> · <%= u.ago(f.created_at) %></td>
             <td style="text-align:right;white-space:nowrap">
               <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/files/<%= f.id %>"><%- u.icon('download', 14) %>Download</a>
-              <% if (!isGuest && topic.status !== 'archived' && (isTopicLeader || f.uploaded_by === me.id)) { %><form method="post" action="/topics/<%= topic.id %>/files/<%= f.id %>/delete" style="display:inline" data-confirm="Delete <%= f.name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-d btn-sm">Delete</button></form><% } %>
+              <% if (!isGuest && topic.status !== 'archived' && (isTopicLeader || f.uploaded_by === me.id)) { %>
+                <details class="ed"><%- u.editSummary() %>
+                  <form method="post" action="/topics/<%= topic.id %>/files/<%= f.id %>/edit" class="ed-pop">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <h3>Rename or move</h3>
+                    <div class="field"><label for="fn<%= f.id %>">File name</label><input id="fn<%= f.id %>" name="name" required maxlength="200" value="<%= f.name %>"></div>
+                    <div class="field"><label for="fd<%= f.id %>">Folder</label><input id="fd<%= f.id %>" name="folder" list="folders" maxlength="60" value="<%= f.folder %>"></div>
+                    <button class="btn btn-p btn-sm">Save</button>
+                  </form>
+                </details>
+                <%- u.delForm('/topics/' + topic.id + '/files/' + f.id + '/delete', csrf, 'Delete ' + f.name + '?', 'Delete') %>
+              <% } %>
             </td>
           </tr>
         <% }) %>
@@ -34,11 +45,12 @@
       <h2>Upload a file</h2>
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <div class="field"><label for="ff">File</label><input id="ff" name="file" type="file" required><span class="hint">Up to <%= maxMb %> MB.</span></div>
-      <div class="field"><label for="fo">Folder</label><input id="fo" name="folder" list="folders" value="<%= folder || 'General' %>"><datalist id="folders"><% folders.forEach((f) => { %><option value="<%= f.folder %>"><% }) %><option value="Data"><option value="Literature"><option value="Instruments"><option value="Ethics"></datalist></div>
+      <div class="field"><label for="fo">Folder</label><input id="fo" name="folder" list="folders" value="<%= folder || 'General' %>"></div>
       <button class="btn btn-p"><%- u.icon('upload') %>Upload</button>
     </form>
     <% } %>
     <section class="card"><h3>Storage</h3><p class="text-2" style="margin-top:6px"><%= u.humanSize(totalSize) %> used by this topic.</p></section>
   </div>
 </div>
+<datalist id="folders"><% folders.forEach((f) => { %><option value="<%= f.folder %>"><% }) %><option value="Data"><option value="Literature"><option value="Instruments"><option value="Ethics"></datalist>
 <%- include('../partials/bottom') %>

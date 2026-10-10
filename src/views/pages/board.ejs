@@ -31,7 +31,8 @@
             <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="as<%= t.id %>">Assignee</label>
               <select id="as<%= t.id %>" name="assignee_id" data-autosubmit><option value="">Unassigned</option><% people.filter((p) => isTopicLeader || p.id === me.id).forEach((p) => { %><option value="<%= p.id %>"<%= p.id === t.assignee_id ? ' selected' : '' %>><%= p.name %></option><% }) %></select></form>
             <% } %>
-            <form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>" class="right" data-confirm="Delete “<%= t.title %>”?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete"><button class="btn-link" style="color:var(--muted)" aria-label="Delete task">Delete</button></form>
+            <span class="inline-actions right"><a class="mini icon-only" href="/topics/<%= topic.id %>/tasks/<%= t.id %>" aria-label="Open or edit task" title="Open / edit"><%- u.icon('edit') %></a>
+            <% if (isTopicLeader || t.created_by === me.id) { %><form method="post" action="/topics/<%= topic.id %>/tasks/<%= t.id %>" class="inline" data-confirm="Delete “<%= t.title %>”?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete"><button class="mini del icon-only" aria-label="Delete task" title="Delete"><%- u.icon('trash') %></button></form><% } %></span>
           </div>
           <% } %>
         </article>

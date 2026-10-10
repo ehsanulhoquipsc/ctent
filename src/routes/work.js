@@ -52,6 +52,14 @@ r.post('/topics/:tid/plan/:pid', auth.loadTopic('leader'), writable, async (req,
   const part = await db('parts').where({ id: parseInt(req.params.pid, 10), topic_id: t.id }).first();
   if (!part) return auth.notFound(res);
   const action = req.body.action;
+  if (action === 'edit') {
+    const title = clean(req.body.title);
+    if (title.length < 3) { req.flash('error', 'Give the part a title.'); return res.redirect('/topics/' + t.id + '/plan'); }
+    await db('parts').where({ id: part.id }).update({ title, description: clean(req.body.description, 1000), skills: clean(req.body.skills, 400), due_date: validDate(req.body.due_date) });
+    await audit(req.user.id, t.id, 'part.edited', 'Edited part “' + title + '”');
+    req.flash('ok', 'Part updated.');
+    return res.redirect('/topics/' + t.id + '/plan');
+  }
   if (action === 'delete') {
     await db('parts').where({ id: part.id }).del();
     await audit(req.user.id, t.id, 'part.deleted', 'Deleted part “' + part.title + '”');
@@ -131,6 +139,7 @@ r.post('/topics/:tid/tasks/:id', auth.loadTopic('member'), writable, async (req,
   if (!task) return auth.notFound(res);
   if (!(await canEditTask(req, task))) return auth.forbidden(res, 'Only the assignee or a leader can change this task.');
   if (req.body.action === 'delete') {
+    if (req.topicRole !== 'leader' && task.created_by !== req.user.id) return auth.forbidden(res, 'Only a leader or the person who created this task can delete it.');
     await db('tasks').where({ id: task.id }).del();
     await audit(req.user.id, t.id, 'task.deleted', 'Deleted task “' + task.title + '”');
     req.flash('ok', 'Task deleted.');
@@ -170,8 +179,25 @@ r.post('/topics/:tid/meetings/:mid', auth.loadTopic('member'), writable, async (
   const t = req.topic;
   const m = await db('meetings').where({ id: parseInt(req.params.mid, 10), topic_id: t.id }).first();
   if (!m) return auth.notFound(res);
+  const canManage = req.topicRole === 'leader' || m.created_by === req.user.id;
+  if (req.body.action === 'edit') {
+    if (!canManage) return auth.forbidden(res, 'Only the organiser or a leader can edit this meeting.');
+    const title = clean(req.body.title, 200);
+    const when = new Date(String(req.body.date || '') + 'T' + String(req.body.time || '09:00') + ':00' + (/^[+-]\d{2}:\d{2}$/.test(req.body.tz || '') ? req.body.tz : '+11:00'));
+    const link = safeUrl(req.body.link);
+    if (!title || isNaN(when)) { req.flash('error', 'Add a title, date and time.'); return res.redirect('/topics/' + t.id + '/meetings#m' + m.id); }
+    if (req.body.link && !link) { req.flash('error', 'That meeting link doesn’t look valid. Paste the full https:// link.'); return res.redirect('/topics/' + t.id + '/meetings#m' + m.id); }
+    await db('meetings').where({ id: m.id }).update({ title, starts_at: when.toISOString(), duration_min: Math.min(480, Math.max(10, parseInt(req.body.duration, 10) || 60)), link: link || null, platform: detectPlatform(link), agenda: clean(req.body.agenda, 2000) });
+    if (when.toISOString() !== new Date(m.starts_at).toISOString() || title !== m.title) {
+      const others = (await members(t.id, false)).map((x) => x.id);
+      await notify(others, { kind: 'meeting', title: 'Meeting updated: ' + title, body: when.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney' }), link: '/topics/' + t.id + '/meetings' }, req.user.id);
+    }
+    await audit(req.user.id, t.id, 'meeting.edited', 'Edited “' + title + '”');
+    req.flash('ok', 'Meeting updated.');
+    return res.redirect('/topics/' + t.id + '/meetings#m' + m.id);
+  }
   if (req.body.action === 'delete') {
-    if (req.topicRole !== 'leader' && m.created_by !== req.user.id) return auth.forbidden(res, 'Only the organiser or a leader can cancel this meeting.');
+    if (!canManage) return auth.forbidden(res, 'Only the organiser or a leader can cancel this meeting.');
     await db('meetings').where({ id: m.id }).del();
     await audit(req.user.id, t.id, 'meeting.cancelled', 'Cancelled “' + m.title + '”');
     req.flash('ok', 'Meeting cancelled.');

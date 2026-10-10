@@ -1,0 +1,16 @@
+<% const at = new Date(m.starts_at); const dLocal = at.toLocaleDateString('en-CA', { timeZone: u.TZ }); const tLocal = at.toLocaleTimeString('en-GB', { timeZone: u.TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); %>
+<details class="ed"><%- u.editSummary() %>
+  <form method="post" action="/topics/<%= topic.id %>/meetings/<%= m.id %>" class="ed-pop" data-meeting-at="<%= at.toISOString() %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="edit"><input type="hidden" name="tz" value="+11:00">
+    <h3>Edit meeting</h3>
+    <div class="field"><label for="emt<%= m.id %>">Title</label><input id="emt<%= m.id %>" name="title" required maxlength="200" value="<%= m.title %>"></div>
+    <div class="split">
+      <div class="field" style="flex:1"><label for="emd<%= m.id %>">Date</label><input id="emd<%= m.id %>" name="date" type="date" required value="<%= dLocal %>"></div>
+      <div class="field" style="flex:1"><label for="emh<%= m.id %>">Time</label><input id="emh<%= m.id %>" name="time" type="time" required value="<%= tLocal %>"></div>
+    </div>
+    <div class="field"><label for="emdur<%= m.id %>">Length</label><select id="emdur<%= m.id %>" name="duration"><% [[30, '30 min'], [45, '45 min'], [60, '1 hour'], [90, '1.5 hours'], [120, '2 hours']].forEach(([v, l]) => { %><option value="<%= v %>"<%= m.duration_min === v ? ' selected' : '' %>><%= l %></option><% }) %><% if (![30, 45, 60, 90, 120].includes(m.duration_min)) { %><option value="<%= m.duration_min %>" selected><%= m.duration_min %> min</option><% } %></select></div>
+    <div class="field"><label for="eml<%= m.id %>">Meeting link</label><input id="eml<%= m.id %>" name="link" value="<%= m.link || '' %>" placeholder="https://…"></div>
+    <div class="field"><label for="ema<%= m.id %>">Agenda</label><textarea id="ema<%= m.id %>" name="agenda" rows="3"><%= m.agenda || '' %></textarea></div>
+    <button class="btn btn-p btn-sm">Save meeting</button>
+  </form>
+</details>

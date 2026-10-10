@@ -43,6 +43,16 @@ r.post('/profile/expertise', async (req, res) => {
   req.flash('ok', name + ' saved at level ' + level + '.');
   res.redirect('/profile#expertise');
 });
+r.post('/profile/expertise/:id', async (req, res) => {
+  const e = await db('expertise').where({ id: parseInt(req.params.id, 10), user_id: req.user.id }).first();
+  if (!e) return auth.notFound(res);
+  const name = clean(req.body.name, 120) || e.name;
+  const kind = ['field', 'method', 'region', 'language'].includes(req.body.kind) ? req.body.kind : e.kind;
+  const level = Math.max(1, Math.min(5, parseInt(req.body.level, 10) || e.level));
+  await db('expertise').where({ id: e.id }).update({ name, kind, level });
+  req.flash('ok', name + ' updated.');
+  res.redirect('/profile#expertise');
+});
 r.post('/profile/expertise/:id/delete', async (req, res) => {
   await db('expertise').where({ id: parseInt(req.params.id, 10), user_id: req.user.id }).del();
   res.redirect('/profile#expertise');

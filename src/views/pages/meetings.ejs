@@ -9,7 +9,7 @@
           <span class="kind" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('video', 16) %></span>
           <span style="flex:1 1 300px;min-width:0"><b><%= m.title %></b><br><span class="text-2" style="font-size:13px"><%= u.fmtDateTime(m.starts_at) %> · <%= m.duration_min %> min · <%= m.platform || 'No link yet' %> · by <%= m.by || '—' %></span><% if (m.agenda) { %><br><span class="hint">Agenda: <%= m.agenda %></span><% } %></span>
           <% if (m.link) { %><a class="btn btn-p btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
-          <% if (isTopicLeader || m.created_by === me.id) { %><form method="post" action="/topics/<%= topic.id %>/meetings/<%= m.id %>" data-confirm="Cancel this meeting?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete"><button class="btn btn-s btn-sm">Cancel</button></form><% } %>
+          <% if ((isTopicLeader || m.created_by === me.id) && topic.status !== 'archived') { %><%- include('../partials/meeting-edit', { m }) %><%- u.delForm('/topics/' + topic.id + '/meetings/' + m.id, csrf, 'Cancel “' + m.title + '”? Members won’t see it any more.', 'Cancel meeting', { action: 'delete' }) %><% } %>
         </div>
       <% }) %>
     </section>
@@ -17,7 +17,8 @@
       <% if (!past.length) { %><div class="empty" style="padding:16px">No past meetings yet.</div><% } %>
       <% past.forEach((m) => { %>
         <div id="m<%= m.id %>" style="padding:14px 0;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:8px">
-          <div><b><%= m.title %></b><br><span class="hint"><%= u.fmtDateTime(m.starts_at) %> · <%= m.platform %></span></div>
+          <div class="split" style="align-items:flex-start"><div style="flex:1"><b><%= m.title %></b><br><span class="hint"><%= u.fmtDateTime(m.starts_at) %> · <%= m.platform %></span></div>
+            <% if ((isTopicLeader || m.created_by === me.id) && topic.status !== 'archived') { %><%- include('../partials/meeting-edit', { m }) %><%- u.delForm('/topics/' + topic.id + '/meetings/' + m.id, csrf, 'Delete the meeting “' + m.title + '” and its minutes?', 'Delete', { action: 'delete' }) %><% } %></div>
           <form method="post" action="/topics/<%= topic.id %>/meetings/<%= m.id %>" style="display:flex;flex-direction:column;gap:8px">
             <input type="hidden" name="_csrf" value="<%= csrf %>">
             <label class="sr" for="min<%= m.id %>">Minutes</label>

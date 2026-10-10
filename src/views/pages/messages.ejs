@@ -18,6 +18,18 @@
       <header class="chat-head">
         <div style="flex:1;min-width:0"><b style="font-size:16px"><%= channel.kind === 'room' ? '◆ ' : '# ' %><%= channel.name %></b><br><span class="hint"><%= channel.purpose || (topic ? topic.title : 'Private room') %> · <%= members.length %> people</span></div>
         <div class="stack"><% members.slice(0, 5).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
+        <% if (canMod && !readOnly) { %>
+          <details class="ed"><%- u.editSummary(channel.kind === 'room' ? 'Edit room' : 'Edit channel') %>
+            <form method="post" action="/messages/<%= channel.id %>/edit" class="ed-pop">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <h3><%= channel.kind === 'room' ? 'Edit room' : 'Edit channel' %></h3>
+              <div class="field"><label for="ecn">Name</label><input id="ecn" name="name" required maxlength="<%= channel.kind === 'room' ? 60 : 40 %>" value="<%= channel.name %>"></div>
+              <div class="field"><label for="ecp">Purpose</label><input id="ecp" name="purpose" maxlength="240" value="<%= channel.purpose || '' %>"></div>
+              <button class="btn btn-p btn-sm">Save</button>
+            </form>
+          </details>
+          <%- u.delForm('/messages/' + channel.id + '/delete', csrf, 'Delete ' + (channel.kind === 'room' ? 'the room “' + channel.name + '”' : '#' + channel.name) + ' and all its messages for everyone? This can’t be undone.', 'Delete') %>
+        <% } %>
         <% if (topic) { %>
           <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/meetings"><%- u.icon('video', 16) %>Meet</a>
           <button class="btn btn-s btn-sm" type="button" data-open="newChannel">+ Channel</button>
@@ -25,12 +37,13 @@
           <form method="post" action="/messages/<%= channel.id %>/leave" data-confirm="Leave this room?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm">Leave room</button></form>
         <% } %>
       </header>
-      <div data-chat="/api/channels/<%= channel.id %>/messages" data-last="<%= last %>" style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div data-chat="/api/channels/<%= channel.id %>/messages" data-last="<%= last %>" data-since="<%= since %>" data-me="<%= me.id %>" data-mod="<%= canMod ? 1 : 0 %>" data-ro="<%= readOnly ? 1 : 0 %>" style="display:flex;flex-direction:column;flex:1;min-height:0">
         <div class="chat-msgs" data-msgs aria-live="polite">
           <% if (!msgs.length) { %><div class="empty" data-empty>No messages yet. Say hello 👋</div><% } %>
-          <% msgs.forEach((m) => { %><div class="msg" data-id="<%= m.id %>"><%- m.avatar %><div class="body"><div class="split"><b><%= m.name %></b><span class="mono"><%= m.time %></span></div><p><%= m.body %></p></div></div><% }) %>
+          <% msgs.forEach((m) => { %><div class="msg" data-id="<%= m.id %>" data-uid="<%= m.uid || '' %>"<%= m.deleted ? ' data-deleted' : '' %>><%- m.avatar %><div class="body"><div class="split"><b><%= m.name %></b><span class="mono"><%= m.time %></span><% if (m.edited) { %><span class="edited">(edited)</span><% } %></div><p><% if (m.deleted) { %><i class="hint">This message was deleted.</i><% } else { %><%= m.body %><% } %></p></div></div><% }) %>
         </div>
-        <form class="chat-form">
+        <% if (readOnly) { %><div class="hint" style="padding:12px 16px;border-top:1px solid var(--line-2)">This topic is archived — the conversation is read-only.</div><% } %>
+        <form class="chat-form"<%= readOnly ? ' hidden' : '' %>>
           <label class="sr" for="msg">Message</label>
           <textarea id="msg" rows="1" placeholder="Message <%= channel.kind === 'room' ? channel.name : '#' + channel.name %> — type @name to mention, Enter to send"></textarea>
           <button class="btn btn-p" aria-label="Send"><%- u.icon('send', 16) %>Send</button>

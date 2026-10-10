@@ -26,8 +26,29 @@
           <td class="hint"><%= x.last_login_at ? u.ago(x.last_login_at) : 'Never' %></td>
           <td><span class="tag dotted" style="background:<%= x.status === 'active' ? 'var(--green-soft)' : 'var(--red-soft)' %>;color:<%= x.status === 'active' ? 'var(--green)' : 'var(--red)' %>"><%= x.status === 'active' ? 'Active' : 'Suspended' %></span></td>
           <td style="text-align:right;white-space:nowrap">
+            <details class="ed" style="text-align:left"><%- u.editSummary() %>
+              <form method="post" action="/admin/users/<%= x.id %>" class="ed-pop">
+                <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="edit">
+                <h3>Edit <%= x.name %></h3>
+                <div class="field"><label for="un<%= x.id %>">Full name</label><input id="un<%= x.id %>" name="name" required maxlength="120" value="<%= x.name %>"></div>
+                <div class="field"><label for="ue<%= x.id %>">Email</label><input id="ue<%= x.id %>" name="email" type="email" required value="<%= x.email %>"></div>
+                <div class="field"><label for="ui<%= x.id %>">Institution</label><input id="ui<%= x.id %>" name="institution" value="<%= x.institution || '' %>"></div>
+                <div class="field"><label for="ut<%= x.id %>">Title</label><input id="ut<%= x.id %>" name="title" value="<%= x.title || '' %>"></div>
+                <button class="btn btn-p btn-sm">Save</button>
+              </form>
+            </details>
             <form method="post" action="/admin/users/<%= x.id %>" style="display:inline" data-confirm="Reset <%= x.name %>’s password? They’ll be signed out."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="reset"><button class="btn btn-s btn-sm">Reset password</button></form>
-            <% if (x.id !== me.id) { %><form method="post" action="/admin/users/<%= x.id %>" style="display:inline"<%- x.status === 'active' ? ' data-confirm="Suspend ' + u.esc(x.name) + '? They will be signed out."' : '' %>><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="status"><button class="btn <%= x.status === 'active' ? 'btn-d' : 'btn-s' %> btn-sm"><%= x.status === 'active' ? 'Suspend' : 'Restore' %></button></form><% } %>
+            <% if (x.id !== me.id) { %><form method="post" action="/admin/users/<%= x.id %>" style="display:inline"<%- x.status === 'active' ? ' data-confirm="Suspend ' + u.esc(x.name) + '? They will be signed out."' : '' %>><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="status"><button class="btn <%= x.status === 'active' ? 'btn-d' : 'btn-s' %> btn-sm"><%= x.status === 'active' ? 'Suspend' : 'Restore' %></button></form>
+              <details class="ed" style="text-align:left"><summary class="mini del"><%- u.icon('trash') %>Delete</summary>
+                <form method="post" action="/admin/users/<%= x.id %>" class="ed-pop" data-confirm="Permanently delete <%= x.name %>’s account? This can’t be undone.">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="delete">
+                  <h3>Delete <%= x.name %>?</h3>
+                  <p class="hint">Their account, topic memberships, expertise and notifications are removed. Messages, files and tasks they made stay, shown as “Former member”. To keep everything, suspend instead.</p>
+                  <label class="label" for="ud<%= x.id %>">Type <b class="kbd"><%= x.email %></b> to confirm</label>
+                  <input class="in" id="ud<%= x.id %>" name="confirm" autocomplete="off" required>
+                  <button class="btn btn-d btn-sm">Delete account</button>
+                </form>
+              </details><% } %>
           </td>
         </tr>
       <% }) %>

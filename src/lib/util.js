@@ -148,11 +148,20 @@ const ICONS = {
   menu: 'M3 6h18M3 12h18M3 18h18',
   file: 'M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2zM14 2v6h6',
   check: 'M20 6 9 17l-5-5',
-  send: 'm22 2-7 20-4-9-9-4ZM22 2 11 13'
+  send: 'm22 2-7 20-4-9-9-4ZM22 2 11 13',
+  edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z',
+  trash: 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6'
 };
 function icon(name, size) {
   const n = size || 18;
   return '<svg width="' + n + '" height="' + n + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + (ICONS[name] || '') + '"></path></svg>';
 }
 
-module.exports = { icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };
+// Small delete button inside its own form, with a confirm prompt.
+function delForm(action, csrf, confirmText, label, hidden) {
+  const extra = Object.entries(hidden || {}).map(([k, v]) => '<input type="hidden" name="' + esc(k) + '" value="' + esc(v) + '">').join('');
+  return '<form method="post" action="' + esc(action) + '" class="inline" data-confirm="' + esc(confirmText || 'Delete this? This can’t be undone.') + '"><input type="hidden" name="_csrf" value="' + esc(csrf) + '">' + extra + '<button class="mini del" type="submit">' + icon('trash') + esc(label || 'Delete') + '</button></form>';
+}
+function editSummary(label) { return '<summary class="mini">' + icon('edit') + esc(label || 'Edit') + '</summary>'; }
+
+module.exports = { delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };

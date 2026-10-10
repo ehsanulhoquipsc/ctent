@@ -27,7 +27,20 @@ async function canRead(user, ch) {
 function shape(m) {
   const d = toDate(m.created_at);
   const today = d && d.toDateString() === new Date().toDateString();
-  return { id: m.id, body: m.body, name: m.name || 'Former member', time: (today ? '' : fmtDate(d) + ' ') + fmtTime(d), avatar: avatar({ id: m.uid, name: m.name || '?', color: m.color }) };
+  return { id: m.id, uid: m.uid || null, body: m.deleted ? '' : m.body, deleted: !!m.deleted, edited: !!m.edited_at && !m.deleted, name: m.name || 'Former member', time: (today ? '' : fmtDate(d) + ' ') + fmtTime(d), avatar: avatar({ id: m.uid, name: m.name || '?', color: m.color }) };
+}
+// Who can moderate (rename/delete the channel, delete anyone's message): admins, topic leaders, or the room's creator.
+async function canModerate(user, ch) {
+  if (!ch) return false;
+  if (user.platform_role === 'admin') return true;
+  if (ch.kind === 'room') return ch.created_by === user.id;
+  const m = await db('topic_members').where({ topic_id: ch.topic_id, user_id: user.id }).first();
+  return !!m && m.role === 'leader';
+}
+async function isArchived(ch) {
+  if (!ch.topic_id) return false;
+  const t = await db('topics').where({ id: ch.topic_id }).first();
+  return !!t && t.status === 'archived';
 }
 const msgQuery = (cid) => db('messages').leftJoin('users', 'users.id', 'messages.user_id').where('messages.channel_id', cid).select('messages.*', 'users.name', 'users.color', 'users.id as uid');
 
@@ -54,7 +67,8 @@ r.get('/messages/:cid', async (req, res) => {
     ? await db('channel_members').join('users', 'users.id', 'channel_members.user_id').where({ channel_id: ch.id }).select('users.id', 'users.name', 'users.color')
     : await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where({ topic_id: ch.topic_id }).whereNot('role', 'guest').select('users.id', 'users.name', 'users.color');
   const people = await db('users').where({ status: 'active' }).whereNot('id', req.user.id).whereNot('platform_role', 'guest').orderBy('name').select('id', 'name');
-  res.render('pages/messages', { title: (ch.kind === 'room' ? '' : '#') + ch.name, active: 'messages', mainClass: 'chat-page', channel: ch, topic, topicCh, rooms, msgs, members, people, last: msgs.length ? msgs[msgs.length - 1].id : 0 });
+  res.render('pages/messages', { title: (ch.kind === 'room' ? '' : '#') + ch.name, active: 'messages', mainClass: 'chat-page', channel: ch, topic, topicCh, rooms, msgs, members, people, last: msgs.length ? msgs[msgs.length - 1].id : 0,
+    canMod: await canModerate(req.user, ch), readOnly: !!topic && topic.status === 'archived', since: now() });
 });
 
 // JSON API used by the live chat
@@ -62,8 +76,11 @@ r.get('/api/channels/:cid/messages', async (req, res) => {
   const ch = await db('channels').where({ id: parseInt(req.params.cid, 10) }).first();
   if (!(await canRead(req.user, ch))) return res.status(404).json({ error: 'Not found' });
   const after = parseInt(req.query.after, 10) || 0;
+  const stamp = now();
   const msgs = await msgQuery(ch.id).where('messages.id', '>', after).orderBy('messages.id').limit(100);
-  res.json({ messages: msgs.map(shape) });
+  const since = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(req.query.since || '') ? req.query.since : null;
+  const changed = since ? await msgQuery(ch.id).where('messages.id', '<=', after).where('messages.edited_at', '>', since).orderBy('messages.id').limit(200) : [];
+  res.json({ messages: msgs.map(shape), changed: changed.map(shape), now: stamp });
 });
 r.post('/api/channels/:cid/messages', async (req, res) => {
   const ch = await db('channels').where({ id: parseInt(req.params.cid, 10) }).first();
@@ -86,6 +103,51 @@ r.post('/api/channels/:cid/messages', async (req, res) => {
   }
   const m = await msgQuery(ch.id).where('messages.id', id).first();
   res.json(shape(m));
+});
+
+// Edit your own message, or delete it (moderators can delete anyone's). Deleted messages leave a placeholder.
+r.post('/api/channels/:cid/messages/:mid', async (req, res) => {
+  const ch = await db('channels').where({ id: parseInt(req.params.cid, 10) }).first();
+  if (!(await canRead(req.user, ch))) return res.status(404).json({ error: 'Not found' });
+  if (await isArchived(ch)) return res.status(403).json({ error: 'This topic is archived.' });
+  const m = await db('messages').where({ id: parseInt(req.params.mid, 10), channel_id: ch.id }).first();
+  if (!m || m.deleted) return res.status(404).json({ error: 'That message no longer exists.' });
+  const mine = m.user_id === req.user.id;
+  if (req.body.action === 'delete') {
+    if (!mine && !(await canModerate(req.user, ch))) return res.status(403).json({ error: 'You can only delete your own messages.' });
+    await db('messages').where({ id: m.id }).update({ deleted: true, body: '', edited_at: now() });
+    if (!mine && ch.topic_id) await audit(req.user.id, ch.topic_id, 'message.deleted', 'Removed a message in #' + ch.name);
+  } else {
+    if (!mine) return res.status(403).json({ error: 'You can only edit your own messages.' });
+    const body = clean(req.body.body, 4000);
+    if (!body) return res.status(400).json({ error: 'A message can’t be empty. Delete it instead.' });
+    await db('messages').where({ id: m.id }).update({ body, edited_at: now() });
+  }
+  const out = await msgQuery(ch.id).where('messages.id', m.id).first();
+  if ((req.get('accept') || '').includes('application/json')) return res.json(shape(out));
+  res.redirect('/messages/' + ch.id);
+});
+
+// Rename / delete a channel or room
+r.post('/messages/:cid/edit', async (req, res) => {
+  const ch = await db('channels').where({ id: parseInt(req.params.cid, 10) }).first();
+  if (!(await canRead(req.user, ch))) return auth.notFound(res);
+  if (!(await canModerate(req.user, ch))) return auth.forbidden(res, ch.kind === 'room' ? 'Only the person who created this room can change it.' : 'Only a topic leader can change channels.');
+  const name = clean(req.body.name, ch.kind === 'room' ? 60 : 40).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!name) { req.flash('error', 'Give it a name.'); return res.redirect('/messages/' + ch.id); }
+  await db('channels').where({ id: ch.id }).update({ name, purpose: clean(req.body.purpose, 240) });
+  if (ch.topic_id) await audit(req.user.id, ch.topic_id, 'channel.edited', 'Renamed #' + ch.name + (name !== ch.name ? ' to #' + name : ''));
+  req.flash('ok', 'Saved.');
+  res.redirect('/messages/' + ch.id);
+});
+r.post('/messages/:cid/delete', async (req, res) => {
+  const ch = await db('channels').where({ id: parseInt(req.params.cid, 10) }).first();
+  if (!(await canRead(req.user, ch))) return auth.notFound(res);
+  if (!(await canModerate(req.user, ch))) return auth.forbidden(res, ch.kind === 'room' ? 'Only the person who created this room can delete it.' : 'Only a topic leader can delete channels.');
+  await db('channels').where({ id: ch.id }).del();
+  if (ch.topic_id) await audit(req.user.id, ch.topic_id, 'channel.deleted', 'Deleted #' + ch.name + ' and its messages');
+  req.flash('ok', (ch.kind === 'room' ? 'Room' : 'Channel') + ' deleted.');
+  res.redirect(ch.topic_id ? '/topics/' + ch.topic_id + '/channels' : '/messages');
 });
 
 r.post('/messages/rooms', async (req, res) => {

@@ -80,6 +80,15 @@ r.post('/notifications/read-all', async (req, res) => {
   await db('notifications').where({ user_id: req.user.id }).whereNull('read_at').update({ read_at: now() });
   res.redirect('/notifications');
 });
+r.post('/notifications/clear-read', async (req, res) => {
+  const n = await db('notifications').where({ user_id: req.user.id }).whereNotNull('read_at').del();
+  req.flash('ok', n ? 'Cleared ' + n + ' read notification' + (n === 1 ? '' : 's') + '.' : 'Nothing to clear.');
+  res.redirect('/notifications');
+});
+r.post('/notifications/:id/delete', async (req, res) => {
+  await db('notifications').where({ id: parseInt(req.params.id, 10), user_id: req.user.id }).del();
+  res.redirect('/notifications' + (req.body.show === 'unread' ? '?show=unread' : ''));
+});
 r.get('/notifications/:id/go', async (req, res) => {
   const n = await db('notifications').where({ id: parseInt(req.params.id, 10), user_id: req.user.id }).first();
   if (!n) return auth.notFound(res);

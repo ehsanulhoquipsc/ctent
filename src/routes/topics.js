@@ -73,6 +73,11 @@ r.post('/topics/:tid/request', async (req, res) => {
   req.flash('ok', 'Request sent. The topic leader will review it.');
   res.redirect('/topics');
 });
+r.post('/topics/:tid/request/cancel', async (req, res) => {
+  await db('join_requests').where({ topic_id: parseInt(req.params.tid, 10), user_id: req.user.id, status: 'pending' }).del();
+  req.flash('ok', 'Request cancelled.');
+  res.redirect('/topics');
+});
 r.post('/requests/:rid', async (req, res) => {
   const jr = await db('join_requests').where({ id: parseInt(req.params.rid, 10), status: 'pending' }).first();
   if (!jr) return auth.notFound(res, 'That request was already handled.');
