@@ -2,6 +2,7 @@
 // Changes on every deploy so browsers fetch fresh CSS/JS despite long cache times.
 const ASSET_V = (process.env.RENDER_GIT_COMMIT || '').slice(0, 8) || Date.now().toString(36);
 const path = require('path');
+const i18n = require('./lib/i18n');
 const express = require('express');
 const session = require('express-session');
 const helmet = require('helmet');
@@ -81,6 +82,34 @@ function createApp() {
   });
   app.use((req, res, next) => {
     req.flash = (type, text) => { req.session.flash = { type, text }; };
+    next();
+  });
+
+  // Interface language: chosen from the globe menu, remembered in a cookie for a year.
+  app.get('/lang/:code', (req, res) => {
+    const code = i18n.LANGS[req.params.code] ? req.params.code : 'en';
+    res.cookie('lang', code, { maxAge: 365 * 86400000, sameSite: 'lax', httpOnly: false, secure: prod });
+    const next = typeof req.query.next === 'string' && req.query.next.startsWith('/') && !req.query.next.startsWith('//') ? req.query.next : '/';
+    res.redirect(next);
+  });
+  app.use((req, res, next) => {
+    const lang = i18n.pick(req);
+    res.locals.lang = lang;
+    res.locals.LANGS = i18n.LANGS;
+    res.locals.here = req.originalUrl;
+    if (lang !== 'en') {
+      const render = res.render.bind(res);
+      res.render = (view, opts, cb) => {
+        if (typeof opts === 'function') { cb = opts; opts = {}; }
+        render(view, opts || {}, (err, html) => {
+          if (err) return cb ? cb(err) : next(err);
+          html = i18n.translateHtml(html, lang);
+          return cb ? cb(null, html) : res.send(html);
+        });
+      };
+      const json = res.json.bind(res);
+      res.json = (body) => { if (body && typeof body.error === 'string') body.error = i18n.t(body.error, lang); return json(body); };
+    }
     next();
   });
 

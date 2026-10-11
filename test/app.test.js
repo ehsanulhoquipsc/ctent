@@ -548,6 +548,32 @@ test('finish project: leader picks the final report; members can open it later',
   assert.ok(r.final_file_id, 'report kept after reopening');
 });
 
+test('language switch: Bengali interface, user content kept as typed', async () => {
+  const anon = request.agent(app);
+  const sw = await anon.get('/lang/bn?next=/login');
+  assert.strictEqual(sw.status, 302);
+  assert.match(sw.headers['set-cookie'].join(';'), /lang=bn/);
+  const login = await anon.get('/login');
+  assert.match(login.text, /<html lang="bn"/);
+  assert.match(login.text, /সাইন ইন/);
+  const leader = await agentFor('ehsan@ctent.demo');
+  const tid = await topicId('CT-0142');
+  await leader.post('/topics/' + tid + '/tasks').type('form').send({ _csrf: leader.csrf, title: 'Delete old files — Done', status: 'todo' });
+  await leader.get('/lang/bn');
+  const board = await leader.get('/topics/' + tid + '/board');
+  assert.match(board.text, /বোর্ড/);
+  assert.match(board.text, /Delete old files — Done/, 'task titles are not translated');
+  const dash = await leader.get('/');
+  assert.match(dash.text, /ড্যাশবোর্ড/);
+  assert.doesNotMatch(dash.text, />Dashboard</);
+  // Errors from the JSON API are translated too
+  const m = await leader.post('/topics/' + tid + '/tasks/999999/move').set('Accept', 'application/json').set('x-csrf-token', leader.csrf).send({ status: 'done' });
+  assert.strictEqual(m.status, 404);
+  await leader.get('/lang/en');
+  assert.match((await leader.get('/')).text, />Dashboard</);
+  assert.strictEqual((await leader.get('/lang/xx?next=//evil.com')).headers.location, '/', 'no open redirects');
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

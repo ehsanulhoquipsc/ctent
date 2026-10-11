@@ -1,0 +1,6 @@
+<details class="ed lang-menu"><summary class="icon-btn lang-btn" aria-label="Change language" title="Language"><%- u.icon('globe', 16) %><span><%= lang === 'en' ? 'EN' : LANGS[lang].native %></span></summary>
+  <div class="ed-pop" style="width:200px;gap:4px">
+    <span class="label">Language</span>
+    <% Object.entries(LANGS).forEach(([code, L]) => { %><a class="lang-opt<%= code === lang ? ' on' : '' %>" href="/lang/<%= code %>?next=<%= encodeURIComponent(here) %>" lang="<%= code %>" data-i18n-skip><%= L.native %><% if (code === lang) { %> ✓<% } %></a><% }) %>
+  </div>
+</details>

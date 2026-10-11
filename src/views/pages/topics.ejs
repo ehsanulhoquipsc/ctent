@@ -23,7 +23,7 @@
         <details class="ed"><summary class="mini del"><%- u.icon('trash') %>Delete</summary>
           <form method="post" action="/topics/<%= t.id %>/delete" class="ed-pop left" data-confirm="Delete <%= t.code %> permanently? This can’t be undone.">
             <input type="hidden" name="_csrf" value="<%= csrf %>">
-            <h3>Delete <%= t.code %>?</h3><p class="hint">Deletes all its tasks, messages, meetings, files and submissions. Type <b class="kbd"><%= t.code %></b> to confirm.</p>
+            <h3>Delete <span><%= t.code %></span>?</h3><p class="hint">Deletes all its tasks, messages, meetings, files and submissions. Type <b class="kbd"><%= t.code %></b> to confirm.</p>
             <input class="in" name="confirm" placeholder="<%= t.code %>" aria-label="Type the topic code"><button class="btn btn-d btn-sm">Delete permanently</button>
           </form></details>
       </div>

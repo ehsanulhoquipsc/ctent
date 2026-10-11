@@ -56,6 +56,10 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
   - Every topic has channels, and anyone can create a private room across topics.
   - Messages arrive live without reloading.
   - @mentions notify the person mentioned.
+- **Language switch (English / বাংলা):**
+  - Use the 🌐 button in the top bar, or on the sign-in page. The choice is remembered on that browser.
+  - The whole interface is translated: menus, buttons, forms, messages, confirmations, dates and times. What people type (titles, messages, file names) stays exactly as written.
+  - Translations are in `src/locales/bn.js`. Edit a line to improve a phrase. To add a language, copy that file and add the language to `src/lib/i18n.js`.
 - **Finish a project:**
   - Leaders and admins get a **🎉 Finish project** button, which opens a congratulations page showing the team's results.
   - The leader chooses the **final report**: an approved submission, approved task work, any file in the project, or a new upload. It's saved with the topic.
@@ -120,7 +124,7 @@ You need [Node.js](https://nodejs.org) 20 or newer.
 ```bash
 npm install
 npm run dev          # http://localhost:3000, uses a local SQLite file in data/
-npm test             # 30 automated tests (sign-in, permissions, workflows)
+npm test             # 31 automated tests (sign-in, permissions, workflows)
 npm run reset-demo   # wipe the database and reload the demo data
 ```
 
@@ -159,7 +163,7 @@ test/         automated tests
 - Email invitations and password-reset emails
 - Final report builder, guest reviewer scoring portal, ethics checklist, budget and grants, and datasets with access requests
 - Timeline (Gantt) view and growth analytics
-- Bengali / English interface, and two-factor sign-in
+- Two-factor sign-in
 - File storage in S3 or R2, and real-time chat over WebSockets
 
 ## Feedback

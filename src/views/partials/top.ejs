@@ -31,6 +31,7 @@
       <button class="icon-btn mobile-only" type="button" data-toggle-side aria-label="Open menu"><%- u.icon('menu') %></button>
       <div class="crumb"><%- typeof crumb !== 'undefined' ? crumb : u.esc(title) %></div>
       <form class="search" role="search" method="get" action="/search"><%- u.icon('search', 16) %><label class="sr" for="q">Search</label><input id="q" name="q" placeholder="Search topics, tasks, files, people" value="<%= typeof q !== 'undefined' ? q : '' %>"></form>
+      <%- include('lang-menu') %>
       <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch light or dark theme" title="Light / dark"><%- u.icon('moon') %></button>
       <a class="icon-btn" href="/notifications" aria-label="Notifications (<%= unread %> unread)"><%- u.icon('bell') %><% if (unread) { %><span class="ping"><%= unread %></span><% } %></a>
       <% if (typeof cta !== 'undefined' && cta) { %><a class="btn btn-p" href="<%= cta.href %>"><%- u.icon('plus') %><%= cta.label %></a><% } %>

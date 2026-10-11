@@ -173,7 +173,7 @@ input[type=file] { font: 400 13px var(--font); color: var(--text-2); }
 .chat-form textarea { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--text); font: 400 14px var(--font); padding: 6px; min-height: 40px; }
 
 /* Auth pages */
-.auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; background: var(--bg); }
+.auth { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; background: var(--bg); }
 .auth-card { width: 440px; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 12px 32px rgba(14,14,14,.06); }
 .auth-card .logo { width: 150px; align-self: center; }
 .demo-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -347,3 +347,12 @@ form.inline { display: inline; }
 .final-banner { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; text-decoration: none; color: var(--text); background: linear-gradient(135deg, var(--pri-soft), var(--teal-soft)); border: 1.5px solid var(--pri); flex-wrap: wrap; }
 .final-banner.ready { border-color: var(--green); }
 .final-banner:hover { filter: none; box-shadow: var(--shadow); }
+/* Language */
+html[lang="bn"] body, html[lang="bn"] .search input, html[lang="bn"] button, html[lang="bn"] input, html[lang="bn"] select, html[lang="bn"] textarea { font-family: 'Noto Sans Bengali', var(--font); }
+html[lang="bn"] body { line-height: 1.6; }
+.lang-btn { width: auto !important; padding: 0 10px; gap: 6px; font: 600 12px var(--font); color: var(--text-2); }
+.lang-menu > summary { list-style: none; }
+.lang-opt { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-size: 14px; }
+.lang-opt:hover { background: var(--surface-2); filter: none; }
+.lang-opt.on { background: var(--pri-soft); color: var(--pri-text); font-weight: 600; }
+.auth-lang { position: absolute; top: 16px; right: 16px; }

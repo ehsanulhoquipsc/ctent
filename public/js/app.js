@@ -1,6 +1,12 @@
 (function () {
   'use strict';
   var csrf = (document.querySelector('meta[name="csrf"]') || {}).content || '';
+  // Text written by this script, in the page's language (the server translates everything else).
+  var BN = { 'Detected: ': 'শনাক্ত হয়েছে: ', 'Edit message': 'বার্তা সম্পাদনা', 'Delete message': 'বার্তা মুছুন', 'Edit': 'সম্পাদনা', 'Delete': 'মুছুন',
+    '(edited)': '(সম্পাদিত)', 'This message was deleted.': 'বার্তাটি মুছে ফেলা হয়েছে।', 'Delete this message for everyone?': 'সবার জন্য বার্তাটি মুছবেন?',
+    'Save': 'সংরক্ষণ', 'Cancel': 'বাতিল', 'Message not sent. Check your connection and try again.': 'বার্তা পাঠানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।', 'Something went wrong.': 'কিছু একটা ভুল হয়েছে।' };
+  BN['Add a sentence on why it matters'] = 'কেন গুরুত্বপূর্ণ তা এক বাক্যে লিখুন'; BN['Add a title and at least one “done when” point to send.'] = 'পাঠাতে একটি শিরোনাম এবং কমপক্ষে একটি “সম্পন্ন হবে যখন” শর্ত যোগ করুন।'; BN['Clear title'] = 'স্পষ্ট শিরোনাম'; BN['Excellent'] = 'চমৎকার'; BN['Give it a specific title'] = 'নির্দিষ্ট একটি শিরোনাম দিন'; BN['Goal explains why'] = 'লক্ষ্যে কারণ বলা আছে'; BN['Good — it starts with an action.'] = 'ভালো — এটি একটি কাজ দিয়ে শুরু হয়েছে।'; BN['Good'] = 'ভালো'; BN['Link at least one file'] = 'অন্তত একটি ফাইল যুক্ত করুন'; BN['Looks great. '] = 'দারুণ হয়েছে। '; BN['Needs work'] = 'আরও ভালো করা দরকার'; BN['None'] = 'কিছু নেই'; BN['Normal'] = 'সাধারণ'; BN['Say how you’ll judge it’s done'] = 'কীভাবে বুঝবেন কাজ শেষ, তা লিখুন'; BN['Start with a verb like Draft, Collect, Analyse'] = 'খসড়া, সংগ্রহ, বিশ্লেষণ — এমন একটি ক্রিয়া দিয়ে শুরু করুন'; BN['Starter file linked'] = 'শুরুর ফাইল যুক্ত'; BN['Starts with an action'] = 'কাজ দিয়ে শুরু'; BN['They’ll be notified straight away.'] = 'তাদের সঙ্গে সঙ্গে জানানো হবে।'; BN['Tip: start with a verb so it reads like a to-do.'] = 'পরামর্শ: ক্রিয়া দিয়ে শুরু করুন, যাতে করণীয়র মতো পড়া যায়।'; BN['Untitled task'] = 'শিরোনামহীন কাজ'; BN['You can send now, or improve the brief first. '] = 'এখনই পাঠাতে পারেন, অথবা আগে নির্দেশনা আরও ভালো করুন। '; 
+  var L = function (s) { return document.documentElement.lang === 'bn' && BN[s] ? BN[s] : s; };
 
   // Light / dark theme
   document.querySelectorAll('[data-theme-toggle]').forEach(function (b) {
@@ -89,7 +95,7 @@
       var l = link.value.toLowerCase(), p = '';
       if (l.indexOf('zoom.us') > -1) p = 'Zoom'; else if (l.indexOf('meet.google.com') > -1) p = 'Google Meet';
       else if (l.indexOf('teams.') > -1) p = 'Microsoft Teams'; else if (l.indexOf('webex') > -1) p = 'Webex'; else if (l.indexOf('jit.si') > -1) p = 'Jitsi'; else if (l) p = 'Other link';
-      out.textContent = p ? 'Detected: ' + p : '';
+      out.textContent = p ? L('Detected: ') + p : '';
     };
     link.addEventListener('input', detect); detect();
   });
@@ -152,14 +158,14 @@
       var mine = parseInt(el.getAttribute('data-uid') || '0', 10) === me;
       if (!mine && !mod) return;
       var a = document.createElement('span'); a.className = 'msg-actions';
-      a.innerHTML = (mine ? '<button type="button" class="mini icon-only" data-msg-edit aria-label="Edit message" title="Edit">' + ICON_EDIT + '</button>' : '') +
-        '<button type="button" class="mini del icon-only" data-msg-del aria-label="Delete message" title="Delete">' + ICON_DEL + '</button>';
+      a.innerHTML = (mine ? '<button type="button" class="mini icon-only" data-msg-edit aria-label="' + L('Edit message') + '" title="' + L('Edit') + '">' + ICON_EDIT + '</button>' : '') +
+        '<button type="button" class="mini del icon-only" data-msg-del aria-label="' + L('Delete message') + '" title="' + L('Delete') + '">' + ICON_DEL + '</button>';
       el.querySelector('.split').appendChild(a);
     };
     var fill = function (el, m) {
       el.setAttribute('data-id', m.id); el.setAttribute('data-uid', m.uid || '');
       if (m.deleted) el.setAttribute('data-deleted', ''); else el.removeAttribute('data-deleted');
-      el.innerHTML = m.avatar + '<div class="body"><div class="split"><b>' + esc(m.name) + '</b><span class="mono">' + esc(m.time) + '</span>' + (m.edited ? '<span class="edited">(edited)</span>' : '') + '</div><p>' + (m.deleted ? '<i class="hint">This message was deleted.</i>' : esc(m.body)) + '</p></div>';
+      el.innerHTML = m.avatar + '<div class="body"><div class="split"><b>' + esc(m.name) + '</b><span class="mono">' + esc(m.time) + '</span>' + (m.edited ? '<span class="edited">' + L('(edited)') + '</span>' : '') + '</div><p>' + (m.deleted ? '<i class="hint">' + L('This message was deleted.') + '</i>' : esc(m.body)) + '</p></div>';
       decorate(el);
     };
     var render = function (m) {
@@ -171,19 +177,19 @@
     box.querySelectorAll('.msg').forEach(decorate);
     var send = function (id, payload) {
       return fetch(url + '/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' }, body: JSON.stringify(payload) })
-        .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'Something went wrong.'); return d; }); });
+        .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || L('Something went wrong.')); return d; }); });
     };
     box.addEventListener('click', function (e) {
       var el = e.target.closest('.msg'); if (!el) return;
       var id = el.getAttribute('data-id');
       if (e.target.closest('[data-msg-del]')) {
-        if (!confirm('Delete this message for everyone?')) return;
+        if (!confirm(L('Delete this message for everyone?'))) return;
         send(id, { action: 'delete' }).then(function (m) { fill(el, m); }).catch(function (err) { alert(err.message); });
       } else if (e.target.closest('[data-msg-edit]')) {
         if (el.querySelector('[data-edit-box]')) return;
         var p = el.querySelector('.body p'); var text = p.textContent;
         var f = document.createElement('form'); f.setAttribute('data-edit-box', ''); f.className = 'split'; f.style.marginTop = '4px';
-        f.innerHTML = '<label class="sr">Edit message</label><textarea class="in" rows="2" style="flex:1 1 240px"></textarea><button class="btn btn-p btn-sm">Save</button><button type="button" class="btn btn-s btn-sm" data-cancel>Cancel</button>';
+        f.innerHTML = '<label class="sr">' + L('Edit message') + '</label><textarea class="in" rows="2" style="flex:1 1 240px"></textarea><button class="btn btn-p btn-sm">' + L('Save') + '</button><button type="button" class="btn btn-s btn-sm" data-cancel>' + L('Cancel') + '</button>';
         f.querySelector('textarea').value = text;
         p.hidden = true; p.after(f); f.querySelector('textarea').focus();
         f.querySelector('textarea').addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); f.requestSubmit(); } if (k.key === 'Escape') { f.remove(); p.hidden = false; } });
@@ -215,7 +221,7 @@
       fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' }, body: JSON.stringify({ body: body }) })
         .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
         .then(function (m) { if (!box.querySelector('[data-id="' + m.id + '"]')) render(m); last = Math.max(last, m.id); scroll(); })
-        .catch(function () { ta.value = body; alert('Message not sent. Check your connection and try again.'); });
+        .catch(function () { ta.value = body; alert(L('Message not sent. Check your connection and try again.')); });
     });
   }
 
@@ -246,25 +252,25 @@
       var title = val('[data-bind="title"]'), goal = val('[data-bind="goal"]');
       var verb = /^(draft|write|collect|analy[sz]e|review|translate|prepare|map|summari[sz]e|build|check|interview|code|clean|design|run|update|create|compile|test|find|read|plan|visit|record|transcribe|model|estimate|compare|survey|measure|calculate|identify|assess|evaluate|explore|investigate|outline|edit|present|share|organi[sz]e|train|book|request|submit|finali[sz]e)/i.test(title);
       var res = Array.prototype.map.call(brief.querySelectorAll('[data-bind-res]:checked'), function (c) { return c.getAttribute('data-bind-res'); });
-      out('title', title || 'Untitled task');
+      out('title', title || L('Untitled task'));
       out('goal', goal || '—');
       var w = brief.querySelector('input[name="assignee_id"]:checked'); out('who', w ? w.getAttribute('data-name') : '—');
       out('deliverable', labelOf('deliverable') || '—');
-      out('priority', labelOf('priority') || 'Normal');
-      out('part', labelOf('part_id') && labelOf('part_id') !== 'None' ? labelOf('part_id') : '');
+      out('priority', labelOf('priority') || L('Normal'));
+      out('part', labelOf('part_id') && labelOf('part_id') !== L('None') ? labelOf('part_id') : '');
       var d = val('[data-due-input]'); out('due', d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '—');
       brief.querySelector('[data-out-res]').innerHTML = res.map(function (r) { return '<span class="skill">🔗 ' + esc2(r) + '</span>'; }).join('');
-      var hint = brief.querySelector('[data-verb-hint]'); if (hint) hint.textContent = verb ? 'Good — it starts with an action.' : 'Tip: start with a verb so it reads like a to-do.';
-      var checks = [[title.length >= 8, 'Clear title', 'Give it a specific title'], [verb, 'Starts with an action', 'Start with a verb like Draft, Collect, Analyse'], [goal.length >= 30, 'Goal explains why', 'Add a sentence on why it matters'], [crit.length >= 2, '2+ “done when” points', 'Say how you’ll judge it’s done'], [res.length > 0 || !brief.querySelector('[data-bind-res]'), 'Starter file linked', 'Link at least one file']];
+      var hint = brief.querySelector('[data-verb-hint]'); if (hint) hint.textContent = verb ? L('Good — it starts with an action.') : L('Tip: start with a verb so it reads like a to-do.');
+      var checks = [[title.length >= 8, L('Clear title'), L('Give it a specific title')], [verb, L('Starts with an action'), L('Start with a verb like Draft, Collect, Analyse')], [goal.length >= 30, L('Goal explains why'), L('Add a sentence on why it matters')], [crit.length >= 2, '2+ “done when” points', L('Say how you’ll judge it’s done')], [res.length > 0 || !brief.querySelector('[data-bind-res]'), L('Starter file linked'), L('Link at least one file')]];
       var score = checks.filter(function (c) { return c[0]; }).length;
       brief.querySelector('[data-checks]').innerHTML = checks.map(function (c) { return '<div class="split"><span class="tag" style="background:' + (c[0] ? 'var(--green-soft);color:var(--green)' : 'var(--amber-soft);color:var(--amber)') + '">' + (c[0] ? '✓' : '!') + '</span><span style="' + (c[0] ? '' : 'color:var(--amber);font-weight:600') + '">' + (c[0] ? c[1] : c[2]) + '</span></div>'; }).join('');
       var pill = brief.querySelector('[data-score-pill]'), bar = brief.querySelector('[data-score-bar]');
-      var tone = score === 5 ? ['var(--green)', 'var(--green-soft)', 'Excellent'] : score >= 3 ? ['var(--amber)', 'var(--amber-soft)', 'Good'] : ['var(--red)', 'var(--red-soft)', 'Needs work'];
+      var tone = score === 5 ? ['var(--green)', 'var(--green-soft)', L('Excellent')] : score >= 3 ? ['var(--amber)', 'var(--amber-soft)', L('Good')] : ['var(--red)', 'var(--red-soft)', L('Needs work')];
       pill.textContent = score + '/5 · ' + tone[2]; pill.style.color = tone[0]; pill.style.background = tone[1];
       bar.style.width = (score * 20) + '%'; bar.style.background = tone[0];
       var ready = title.length >= 3 && crit.length >= 1;
       var send = brief.querySelector('[data-send]'); send.disabled = !ready;
-      brief.querySelector('[data-send-hint]').textContent = ready ? (score === 5 ? 'Looks great. ' : 'You can send now, or improve the brief first. ') + 'They’ll be notified straight away.' : 'Add a title and at least one “done when” point to send.';
+      brief.querySelector('[data-send-hint]').textContent = ready ? (score === 5 ? L('Looks great. ') : L('You can send now, or improve the brief first. ')) + L('They’ll be notified straight away.') : L('Add a title and at least one “done when” point to send.');
     };
     brief.addEventListener('input', update); brief.addEventListener('change', update);
     renderCrit();
