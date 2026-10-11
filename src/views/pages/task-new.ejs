@@ -24,7 +24,8 @@
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">
           <% people.forEach((p, i) => { %>
             <label class="person-pick"><input type="radio" name="assignee_id" value="<%= p.id %>"<%= i === 0 ? ' checked' : '' %> data-name="<%= p.name %>">
-              <span class="split" style="width:100%"><%- u.avatar(p) %><span style="flex:1;min-width:0"><b style="font-size:14px"><%= p.name %></b><br><span class="hint"><%= p.load ? p.load + ' open task' + (p.load > 1 ? 's' : '') : 'Free right now' %></span></span><% if (i === 0 && part && p.score > 0) { %><span class="tag" style="background:var(--green-soft);color:var(--green)">Best fit</span><% } %></span>
+              <span class="split" style="width:100%"><%- u.avatar(p) %><span style="flex:1;min-width:0"><b style="font-size:14px"><%= p.name %></b><br><span class="hint"><%= p.title ? p.title + ' · ' : '' %><%= p.load ? p.load + ' open task' + (p.load > 1 ? 's' : '') : 'Free right now' %></span></span><% if (i === 0 && part && p.score > 0) { %><span class="tag" style="background:var(--green-soft);color:var(--green)">Best fit</span><% } %></span>
+              <%- u.skillChips(p.skills) %>
               <% if (part) { %><span class="split" style="width:100%"><span class="bar" style="flex:1"><span style="width:<%= p.score %>%;background:<%= p.score >= 70 ? 'var(--green)' : p.score >= 40 ? 'var(--amber)' : 'var(--muted)' %>"></span></span><span class="mono" style="text-transform:none"><%= p.score %>% match</span></span><% } %>
             </label>
           <% }) %>

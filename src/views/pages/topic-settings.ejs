@@ -8,7 +8,7 @@
   <div class="form-grid">
     <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= topic.field || '' %>"></div>
     <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= topic.due_date || '' %>"></div>
-    <div class="field"><label for="status">Stage</label><select id="status" name="status"><% [['planning', 'Planning'], ['active', 'Active'], ['review', 'Final review']].forEach(([k, l]) => { %><option value="<%= k %>"<%= topic.status === k ? ' selected' : '' %>><%= l %></option><% }) %></select></div>
+    <div class="field"><label for="status">Stage</label><select id="status" name="status"><% [['planning', 'Planning'], ['active', 'Active'], ['review', 'Final review']].concat(topic.status === 'completed' ? [['completed', 'Completed']] : []).forEach(([k, l]) => { %><option value="<%= k %>"<%= topic.status === k ? ' selected' : '' %>><%= l %></option><% }) %></select></div>
     <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility"><% [['private', 'Private'], ['institution', 'Institution'], ['open', 'Open']].forEach(([k, l]) => { %><option value="<%= k %>"<%= topic.visibility === k ? ' selected' : '' %>><%= l %></option><% }) %></select></div>
     <div class="field"><label for="color">Colour</label><select id="color" name="color"><% colors.forEach((c) => { %><option value="<%= c %>"<%= topic.color === c ? ' selected' : '' %>><%= c %></option><% }) %></select></div>
   </div>

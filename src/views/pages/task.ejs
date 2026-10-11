@@ -36,7 +36,7 @@
           <div class="field"><label for="et-goal">Goal</label><textarea id="et-goal" name="goal" rows="3" maxlength="2000"><%= task.goal || '' %></textarea></div>
           <div class="field"><label for="et-crit">Done when <span class="hint">· one point per line</span></label><textarea id="et-crit" name="criteria" rows="4"><%= criteria.map((c) => c.text).join('\n') %></textarea></div>
           <div class="split">
-            <div class="field" style="flex:1"><label for="et-who">Assigned to</label><select id="et-who" name="assignee_id"><option value="">Nobody yet</option><% people.forEach((p) => { %><option value="<%= p.id %>"<%= p.id === task.assignee_id ? ' selected' : '' %>><%= p.name %></option><% }) %></select></div>
+            <div class="field" style="flex:1"><label for="et-who">Assigned to</label><select id="et-who" name="assignee_id"><option value="">Nobody yet</option><% people.forEach((p) => { %><option value="<%= p.id %>"<%= p.id === task.assignee_id ? ' selected' : '' %>><%= p.name %><%= p.skills && p.skills.length ? ' — ' + p.skills.map((e) => e.name).join(', ') : '' %></option><% }) %></select></div>
             <div class="field" style="flex:1"><label for="et-due">Due date</label><input id="et-due" name="due_date" type="date" value="<%= task.due_date || '' %>"></div>
           </div>
           <div class="split">

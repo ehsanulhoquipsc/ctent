@@ -79,6 +79,18 @@ function safeUrl(link) {
 }
 
 // Score how well a person's expertise matches the skills a part needs (0-100).
+// A person's strongest expertise, marking the ones that match a part's needed skills.
+function topSkills(expertise, skillsCsv, limit) {
+  const needed = String(skillsCsv || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const hit = (name) => { const n = name.toLowerCase(); return needed.some((k) => n === k || n.includes(k) || k.includes(n) || k.split(/\s+/).some((w) => w.length > 3 && n.includes(w))); };
+  return (expertise || []).map((e) => ({ name: e.name, level: e.level, kind: e.kind, match: hit(e.name) }))
+    .sort((a, b) => (b.match - a.match) || (b.level - a.level)).slice(0, limit || 4);
+}
+// Renders those skills as small chips (matches highlighted).
+function skillChips(list) {
+  if (!list || !list.length) return '<span class="hint">No expertise added yet</span>';
+  return '<span class="skill-chips">' + list.map((e) => '<span class="sk' + (e.match ? ' hit' : '') + '" title="' + esc(e.name) + ' · level ' + e.level + ' of 5">' + esc(e.name) + ' <b>' + e.level + '</b></span>').join('') + '</span>';
+}
 function matchScore(skillsCsv, expertise) {
   const needed = String(skillsCsv || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   if (!needed.length) return 0;
@@ -98,7 +110,7 @@ function matchScore(skillsCsv, expertise) {
 const STATUS = {
   todo: ['To do', 'grey'], doing: ['In progress', 'indigo'], review: ['In review', 'amber'], done: ['Done', 'green'],
   in_review: ['In review', 'amber'], changes: ['Changes requested', 'red'], approved: ['Approved', 'green'],
-  planning: ['Planning', 'indigo'], active: ['Active', 'green'], archived: ['Archived', 'grey'],
+  planning: ['Planning', 'indigo'], active: ['Active', 'green'], archived: ['Archived', 'grey'], completed: ['Completed', 'teal'],
   open: ['Needs owner', 'amber'], pending: ['Pending', 'amber']
 };
 function status(key) { const s = STATUS[key] || [key, 'grey']; return { label: s[0], c: color(s[1]) }; }
@@ -164,4 +176,4 @@ function delForm(action, csrf, confirmText, label, hidden) {
 }
 function editSummary(label) { return '<summary class="mini">' + icon('edit') + esc(label || 'Edit') + '</summary>'; }
 
-module.exports = { delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };
+module.exports = { topSkills, skillChips, delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };

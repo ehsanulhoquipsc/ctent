@@ -5,7 +5,7 @@ const multer = require('multer');
 const db = require('../db');
 const auth = require('../lib/auth');
 const { notify, audit, topicLeaders } = require('../lib/events');
-const { now, matchScore, todayStr } = require('../lib/util');
+const { now, matchScore, todayStr, topSkills } = require('../lib/util');
 
 const r = express.Router();
 const MAX = parseInt(process.env.MAX_UPLOAD_MB || '10', 10) * 1024 * 1024;
@@ -54,7 +54,7 @@ r.get('/topics/:tid/tasks/new', auth.loadTopic('leader'), writable, async (req, 
   const part = parts.find((p) => p.id === partId) || null;
   const exp = ppl.length ? await db('expertise').whereIn('user_id', ppl.map((p) => p.id)) : [];
   const load = Object.fromEntries((await db('tasks').whereIn('assignee_id', ppl.map((p) => p.id).concat([0])).whereNot('status', 'done').groupBy('assignee_id').select('assignee_id').count({ n: '*' })).map((x) => [x.assignee_id, Number(x.n)]));
-  const ranked = ppl.map((p) => ({ ...p, score: part ? matchScore(part.skills, exp.filter((e) => e.user_id === p.id)) : 0, load: load[p.id] || 0 }))
+  const ranked = ppl.map((p) => ({ ...p, score: part ? matchScore(part.skills, exp.filter((e) => e.user_id === p.id)) : 0, load: load[p.id] || 0, skills: topSkills(exp.filter((e) => e.user_id === p.id), part ? part.skills : '', 4) }))
     .sort((a, b) => b.score - a.score || a.load - b.load);
   const files = await db('files').where({ topic_id: t.id }).orderBy('id', 'desc').limit(30).select('id', 'name', 'folder');
   res.render('pages/task-new', { title: 'New task · ' + t.code, active: 'topics', tab: 'Board', crumb: crumb(t, 'New task'), people: ranked, parts, part, files, deliverables: DELIVERABLES,
@@ -103,6 +103,8 @@ r.get('/topics/:tid/tasks/:id', auth.loadTopic('member'), loadTask, async (req, 
   const by = (id) => users.find((x) => x.id === id) || null;
   const part = task.part_id ? await db('parts').where({ id: task.part_id }).first() : null;
   const ppl = await people(t.id);
+  const pexp = ppl.length ? await db('expertise').whereIn('user_id', ppl.map((p) => p.id)) : [];
+  ppl.forEach((p) => { p.skills = topSkills(pexp.filter((e) => e.user_id === p.id), '', 3); });
   const stage = STAGE[task.status] || 'working';
   const hasBrief = criteria.length > 0;
   const done = steps.filter((s) => s.done).length;

@@ -19,9 +19,9 @@ async function nextCode() {
 // ----- List -----
 r.get('/topics', async (req, res) => {
   const ids = await auth.myTopicIds(req.user);
-  const show = req.query.show === 'archived' ? 'archived' : 'current';
+  const show = ['archived', 'completed'].includes(req.query.show) ? req.query.show : 'current';
   const all = await topicProgress(ids);
-  let topics = all;
+  let topics = all.filter((t) => (show === 'completed' ? t.status === 'completed' : t.status !== 'completed'));
   if (show === 'archived') topics = ids.length ? (await db('topics').whereIn('id', ids).where('status', 'archived').orderBy('id', 'desc')).map((t) => ({ ...t, total: 0, done: 0, pct: 100 })) : [];
   const roles = await db('topic_members').where({ user_id: req.user.id }).select('topic_id', 'role');
   const roleOf = Object.fromEntries(roles.map((x) => [x.topic_id, x.role]));
@@ -166,7 +166,7 @@ r.post('/topics/:tid/settings', auth.loadTopic('leader'), async (req, res) => {
   const t = req.topic;
   const upd = { title: clean(req.body.title) || t.title, description: clean(req.body.description, 2000), field: clean(req.body.field, 120), due_date: validDate(req.body.due_date),
     color: COLOR_NAMES.includes(req.body.color) ? req.body.color : t.color, visibility: ['private', 'institution', 'open'].includes(req.body.visibility) ? req.body.visibility : t.visibility,
-    status: ['planning', 'active', 'review'].includes(req.body.status) ? req.body.status : t.status };
+    status: t.status !== 'completed' && ['planning', 'active', 'review'].includes(req.body.status) ? req.body.status : t.status };
   await db('topics').where({ id: t.id }).update(upd);
   await audit(req.user.id, t.id, 'topic.settings', 'Updated topic settings');
   req.flash('ok', 'Settings saved.');

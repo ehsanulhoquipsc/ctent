@@ -1,0 +1,58 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<% const done = topic.status === 'completed'; %>
+<section class="celebrate<%= done ? ' done' : '' %>">
+  <div class="confetti" aria-hidden="true"><% for (let i = 0; i < 28; i++) { %><i style="left:<%= (i * 37) % 100 %>%;animation-delay:<%= (i % 7) * 0.35 %>s;background:<%= ['var(--pri)', 'var(--teal)', 'var(--amber)', 'var(--indigo)', 'var(--green)', 'var(--violet)'][i % 6] %>"></i><% } %></div>
+  <div class="trophy" aria-hidden="true"><%= done ? '🏆' : '🎉' %></div>
+  <span class="mono"><%= topic.code %> · <%= done ? 'Project complete' : 'Ready to finish?' %></span>
+  <h1><%= done ? 'Congratulations, team!' : 'Time to wrap up ' + topic.code %></h1>
+  <p class="text-2"><%= topic.title %></p>
+  <% if (done) { %><p class="hint">Finished <%= u.fmtDate(topic.completed_at, { day: 'numeric', month: 'long', year: 'numeric' }) %><%= by ? ' by ' + by.name : '' %><%= sum.days ? ' · ' + sum.days + ' days from start to finish' : '' %></p><% } %>
+</section>
+
+<div class="grid">
+  <div class="card stat"><span class="text-2">Tasks done</span><b><%= sum.done %> / <%= sum.total %></b><div class="bar"><span style="width:<%= sum.total ? Math.round(sum.done / sum.total * 100) : 0 %>%;background:var(--green)"></span></div></div>
+  <div class="card stat"><span class="text-2">Approved submissions</span><b><%= sum.subsApproved %></b><span>reviewed and locked</span></div>
+  <div class="card stat"><span class="text-2">Meetings held</span><b><%= sum.meetings %></b><span>in this project</span></div>
+  <div class="card stat"><span class="text-2">Team</span><b><%= sum.team.length %></b><span><%= sum.days ? sum.days + ' days' : '' %></span></div>
+</div>
+
+<div class="cols" style="align-items:flex-start">
+  <div class="wide">
+    <% if (done) { %>
+      <section class="card final-card">
+        <span class="label">Final report</span>
+        <% if (final) { %>
+          <div class="split" style="gap:14px">
+            <span class="kind big" style="background:var(--pri-soft);color:var(--pri-text)"><%- u.icon('file', 22) %></span>
+            <div style="flex:1;min-width:0"><h2><%= topic.final_title || final.name %></h2><span class="hint"><%= final.name %> · <%= u.humanSize(final.size) %></span></div>
+            <a class="btn btn-s" href="/topics/<%= topic.id %>/files/<%= final.id %>?view=1" target="_blank" rel="noopener">Preview</a>
+            <a class="btn btn-p" href="/topics/<%= topic.id %>/files/<%= final.id %>"><%- u.icon('download', 16) %>Download</a>
+          </div>
+        <% } else { %><div class="alert info">The final report file was removed.<%= isTopicLeader ? ' Choose another one below.' : '' %></div><% } %>
+        <% if (topic.final_note) { %><blockquote class="final-note"><%= topic.final_note %></blockquote><% } %>
+      </section>
+      <% if (isTopicLeader) { %>
+        <details class="card" style="display:block" <%= final ? '' : 'open' %>><summary style="cursor:pointer;font-weight:600">Change the final report</summary><div style="margin-top:14px"><%- include('../partials/final-picker') %></div></details>
+      <% } %>
+    <% } else { %>
+      <% if (sum.open.length) { %>
+        <div class="alert warn" style="flex-direction:column;align-items:flex-start"><b><%= sum.open.length %> task<%= sum.open.length === 1 ? ' is' : 's are' %> still open.</b><span>You can still finish — they stay on the board. <% sum.open.slice(0, 5).forEach((x, i) => { %><%= i ? ', ' : '' %><a href="/topics/<%= topic.id %>/tasks/<%= x.id %>"><%= x.title %></a><% }) %><%= sum.open.length > 5 ? '…' : '' %></span></div>
+      <% } %>
+      <section class="card" style="display:flex;flex-direction:column;gap:14px">
+        <div><h2>Choose the final report</h2><p class="text-2">Pick the final draft or any file from this project. It’s kept with the topic so anyone in the team can open it later.</p></div>
+        <%- include('../partials/final-picker') %>
+      </section>
+    <% } %>
+  </div>
+  <aside class="narrow">
+    <section class="card"><h3 style="margin-bottom:10px"><%= done ? 'The team' : 'Thank your team' %></h3>
+      <% sum.team.forEach((m) => { %><div class="row"><%- u.avatar(m, 'sm', true) %><span style="flex:1;min-width:0;font-size:14px"><b style="font-weight:500"><%= m.name %></b><br><span class="hint"><%= m.role === 'leader' ? 'Leader' : (m.title || 'Member') %></span></span><span class="tag" style="background:var(--green-soft);color:var(--green)"><%= m.doneCount %> done</span></div><% }) %>
+    </section>
+    <% if (done && isTopicLeader) { %>
+      <section class="card"><h3>Need to work on it again?</h3><p class="hint" style="margin:6px 0 10px">Reopening keeps the final report until you finish again.</p>
+        <form method="post" action="/topics/<%= topic.id %>/finish/reopen" data-confirm="Reopen <%= topic.code %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s">Reopen project</button></form></section>
+    <% } %>
+  </aside>
+</div>
+<%- include('../partials/bottom') %>

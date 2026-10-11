@@ -1,0 +1,22 @@
+<form method="post" action="/topics/<%= topic.id %>/finish" enctype="multipart/form-data" class="final-form" id="report">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <% const G = [['approved', 'Approved submissions', 'green'], ['task', 'Approved task work', 'teal'], ['subs', 'Other submissions (not approved)', 'amber'], ['other', 'Other files in this project', 'grey']];
+     const firstId = (groups.approved[0] || groups.task[0] || groups.subs[0] || groups.other[0] || {}).id;
+     const sel = topic.final_file_id || firstId; const any = G.some((g) => groups[g[0]].length); %>
+  <% if (!any) { %><div class="alert info">No files in this project yet — upload the final report below.</div><% } %>
+  <% G.forEach(([k, label, c]) => { if (!groups[k].length) return; const cc = u.color(c); %>
+    <fieldset class="final-group"><legend><span class="dot" style="background:<%= cc[0] %>"></span><%= label %> <span class="mono"><%= groups[k].length %></span></legend>
+      <% groups[k].slice(0, k === 'other' ? 40 : 20).forEach((f) => { %>
+        <label class="final-opt"><input type="radio" name="file_id" value="<%= f.id %>"<%= f.id === sel ? ' checked' : '' %>>
+          <span class="kind" style="background:<%= cc[1] %>;color:<%= cc[0] %>"><%- u.icon('file', 16) %></span>
+          <span style="flex:1;min-width:0"><b><%= f.name %></b><br><span class="hint"><%= f.label %> · <%= u.humanSize(f.size) %> · <%= u.ago(f.created_at) %></span></span>
+          <a class="mini" href="/topics/<%= topic.id %>/files/<%= f.id %>?view=1" target="_blank" rel="noopener">Preview</a>
+        </label>
+      <% }) %>
+    </fieldset>
+  <% }) %>
+  <div class="final-upload"><label class="label" for="ffile">…or upload the final version now</label><input id="ffile" type="file" name="file"><span class="hint">An upload is used instead of the choice above. Up to <%= maxMb %> MB, saved in the “Final report” folder.</span></div>
+  <div class="field"><label for="ftitle">Report title</label><input id="ftitle" name="final_title" maxlength="200" value="<%= topic.final_title || '' %>" placeholder="e.g. Final report — <%= topic.title %>"></div>
+  <div class="field"><label for="fnote">A note for the record (optional)</label><textarea id="fnote" name="final_note" rows="3" maxlength="3000" placeholder="What was delivered, where it was submitted, thanks to the team…"><%= topic.final_note || '' %></textarea></div>
+  <div class="split"><span class="hint" style="flex:1">Everyone in the topic is notified and can open the report from the topic any time.</span><button class="btn btn-p"><%= topic.status === 'completed' ? 'Save final report' : '🎉 Finish project' %></button></div>
+</form>

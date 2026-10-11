@@ -2,9 +2,9 @@
 <div class="page-head">
   <div><h1><%= isMemberOnly ? 'My topics' : (isAdmin ? 'All topics' : 'Research topics') %></h1><p><%= isMemberOnly ? 'Only the topics you’ve been added to.' : isAdmin ? 'Every topic on the platform.' : 'Topics you lead or belong to.' %></p></div>
 </div>
-<div class="chips"><a class="chip<%= show === 'current' ? ' on' : '' %>" href="/topics">Current</a><a class="chip<%= show === 'archived' ? ' on' : '' %>" href="/topics?show=archived">Archived</a></div>
+<div class="chips"><a class="chip<%= show === 'current' ? ' on' : '' %>" href="/topics">Current</a><a class="chip<%= show === 'completed' ? ' on' : '' %>" href="/topics?show=completed">🏆 Completed</a><a class="chip<%= show === 'archived' ? ' on' : '' %>" href="/topics?show=archived">Archived</a></div>
 <% if (!topics.length) { %>
-  <section class="card"><div class="empty"><b><%= show === 'archived' ? 'No archived topics' : 'You’re not in any topics yet' %></b><span><%= canCreate ? 'Create a topic to start, or ask to join one below.' : 'A topic leader can add you, or you can ask to join one below.' %></span><% if (canCreate && show !== 'archived') { %><a class="btn btn-p" href="/topics/new">Create a topic</a><% } %></div></section>
+  <section class="card"><div class="empty"><b><%= show === 'archived' ? 'No archived topics' : show === 'completed' ? 'No completed projects yet' : 'You’re not in any topics yet' %></b><span><%= canCreate ? 'Create a topic to start, or ask to join one below.' : 'A topic leader can add you, or you can ask to join one below.' %></span><% if (canCreate && show !== 'archived') { %><a class="btn btn-p" href="/topics/new">Create a topic</a><% } %></div></section>
 <% } %>
 <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">
   <% topics.forEach((t) => { const c = u.color(t.color); %>
@@ -16,6 +16,7 @@
       <div class="bar"><span style="width:<%= t.pct %>%;background:<%= c[0] %>"></span></div>
       <div class="split" style="font-size:12px;color:var(--text-2)"><span><%= t.done %>/<%= t.total %> tasks · <%= countOf[t.id] || 0 %> members</span><span class="right"><%= t.due_date ? 'Due ' + u.fmtDate(t.due_date, { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span></div>
     </a>
+    <% if (t.status === 'completed') { %><a class="mini" href="/topics/<%= t.id %>/finish" style="align-self:flex-start">🏆 Final report<%= t.final_title ? ': ' + t.final_title.slice(0, 40) : '' %></a><% } %>
     <% if (roleOf[t.id] === 'leader' || isAdmin) { %>
       <div class="inline-actions" style="border-top:1px solid var(--line-2);padding-top:10px">
         <a class="mini" href="/topics/<%= t.id %>/settings"><%- u.icon('edit') %>Edit</a>

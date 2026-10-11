@@ -56,6 +56,12 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
   - Every topic has channels, and anyone can create a private room across topics.
   - Messages arrive live without reloading.
   - @mentions notify the person mentioned.
+- **Finish a project:**
+  - Leaders and admins get a **🎉 Finish project** button, which opens a congratulations page showing the team's results.
+  - The leader chooses the **final report**: an approved submission, approved task work, any file in the project, or a new upload. It's saved with the topic.
+  - Everyone in the topic is notified. The report stays one click away from the topic, from **Topics → 🏆 Completed**, and from **🏆 Final report** in the topic header. It can't be deleted by accident.
+  - A leader can change the report or reopen the project at any time.
+- **Expertise when assigning:** the people picker for a new task and the Plan & assign suggestions show each person's top skills with their level (1–5). Skills that match the part are highlighted.
 - **Meeting rooms:**
   - Every topic gets a **project room** automatically: an always-open video room (free Jitsi link, or paste your own Zoom/Meet/Teams room) for everyone in the topic, linked to its chat.
   - Anyone can add **team rooms**. Pick a part or task and its people are filled in for you, then add or remove anyone. Each team room can have its own group chat.
@@ -114,7 +120,7 @@ You need [Node.js](https://nodejs.org) 20 or newer.
 ```bash
 npm install
 npm run dev          # http://localhost:3000, uses a local SQLite file in data/
-npm test             # 29 automated tests (sign-in, permissions, workflows)
+npm test             # 30 automated tests (sign-in, permissions, workflows)
 npm run reset-demo   # wipe the database and reload the demo data
 ```
 

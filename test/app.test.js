@@ -510,6 +510,44 @@ test('meeting rooms: automatic project room, team rooms from a part, scoped invi
   assert.match((await aisha.get('/meetings')).text, /Your rooms/);
 });
 
+test('finish project: leader picks the final report; members can open it later', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  // Task assignment shows each person's expertise
+  assert.match((await leader.get('/topics/' + tid + '/tasks/new')).text, /class="skill-chips"/);
+  assert.strictEqual((await aisha.get('/topics/' + tid + '/finish')).status, 302, 'members can’t open finish before completion');
+  assert.strictEqual((await aisha.post('/topics/' + tid + '/finish').field('_csrf', aisha.csrf).field('file_id', '1')).status, 403);
+  const page = await leader.get('/topics/' + tid + '/finish');
+  assert.strictEqual(page.status, 200);
+  assert.match(page.text, /Choose the final report/);
+  await leader.post('/topics/' + tid + '/finish').field('_csrf', leader.csrf).field('final_title', 'Medog dam — final report').field('final_note', 'Submitted to the journal.').attach('file', Buffer.from('final text'), 'final.txt');
+  const t = await db('topics').where({ id: tid }).first();
+  assert.strictEqual(t.status, 'completed');
+  assert.strictEqual(t.final_title, 'Medog dam — final report');
+  assert.ok(t.final_file_id && t.completed_at);
+  assert.ok(await db('notifications').where({ user_id: ids.aisha }).where('title', 'like', '%is complete%').first());
+  const view = await aisha.get('/topics/' + tid + '/finish');
+  assert.match(view.text, /Congratulations, team!/);
+  assert.match(view.text, /Medog dam — final report/);
+  assert.doesNotMatch(view.text, /Change the final report/, 'only leaders can change it');
+  assert.match((await aisha.get('/topics/' + tid)).text, /Open final report/);
+  assert.match((await aisha.get('/topics?show=completed')).text, /Final report/);
+  // The final report can't be deleted while it is the final report
+  await leader.post('/topics/' + tid + '/files/' + t.final_file_id + '/delete').type('form').send({ _csrf: leader.csrf });
+  assert.ok(await db('files').where({ id: t.final_file_id }).first());
+  // Change to another file, then reopen
+  const other = await db('files').where({ topic_id: tid }).whereNot('id', t.final_file_id).first();
+  if (other) {
+    await leader.post('/topics/' + tid + '/finish').field('_csrf', leader.csrf).field('file_id', String(other.id)).field('final_title', 'v2');
+    assert.strictEqual((await db('topics').where({ id: tid }).first()).final_file_id, other.id);
+  }
+  await leader.post('/topics/' + tid + '/finish/reopen').type('form').send({ _csrf: leader.csrf });
+  const r = await db('topics').where({ id: tid }).first();
+  assert.strictEqual(r.status, 'active');
+  assert.ok(r.final_file_id, 'report kept after reopening');
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

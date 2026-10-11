@@ -3,7 +3,7 @@ const express = require('express');
 const db = require('../db');
 const auth = require('../lib/auth');
 const { notify, audit } = require('../lib/events');
-const { now, matchScore, detectPlatform, safeUrl, toDate } = require('../lib/util');
+const { now, matchScore, detectPlatform, safeUrl, toDate, topSkills } = require('../lib/util');
 const rooms = require('../lib/rooms');
 
 const r = express.Router();
@@ -33,7 +33,7 @@ r.get('/topics/:tid/plan', auth.loadTopic('member'), async (req, res) => {
   const parts = await db('parts').where({ topic_id: t.id }).orderBy('id');
   const taskCounts = Object.fromEntries((await db('tasks').where({ topic_id: t.id }).whereNotNull('part_id').groupBy('part_id').select('part_id').count({ n: '*' })).map((x) => [x.part_id, Number(x.n)]));
   const view = parts.map((p) => {
-    const suggestions = people.map((m) => ({ ...m, score: matchScore(p.skills, exp.filter((e) => e.user_id === m.id)), load: load[m.id] || 0 })).sort((a, b) => b.score - a.score || a.load - b.load);
+    const suggestions = people.map((m) => ({ ...m, score: matchScore(p.skills, exp.filter((e) => e.user_id === m.id)), load: load[m.id] || 0, top: topSkills(exp.filter((e) => e.user_id === m.id), p.skills, 3) })).sort((a, b) => b.score - a.score || a.load - b.load);
     return { ...p, suggestions, owner: people.find((m) => m.id === p.proposed_user_id) || null, tasks: taskCounts[p.id] || 0 };
   });
   res.render('pages/plan', { title: 'Plan & assign · ' + t.code, active: 'topics', tab: 'Plan & assign', crumb: crumb(t, 'Plan & assign'), parts: view, people, load });

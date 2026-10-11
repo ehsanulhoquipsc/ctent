@@ -193,6 +193,7 @@ r.post('/topics/:tid/files/:fid/delete', auth.loadTopic('member'), writable, asy
   const f = await db('files').where({ id: parseInt(req.params.fid, 10), topic_id: t.id }).first();
   if (!f) return auth.notFound(res);
   if (f.uploaded_by !== req.user.id && req.topicRole !== 'leader') return auth.forbidden(res, 'Only the uploader or a leader can delete this file.');
+  if (t.final_file_id === f.id) { req.flash('error', 'This is the project’s final report. Choose a different final report first.'); return res.redirect('/topics/' + t.id + '/files'); }
   const used = await db('submission_versions').where({ file_id: f.id }).first();
   if (used) { req.flash('error', 'This file is part of a submission and can’t be deleted.'); return res.redirect('/topics/' + t.id + '/files'); }
   await db('files').where({ id: f.id }).del();

@@ -1,5 +1,10 @@
 <%- include('../partials/top') %>
 <%- include('../partials/topic-header') %>
+<% if (topic.status === 'completed') { %>
+  <a class="final-banner" href="/topics/<%= topic.id %>/finish"><span style="font-size:30px">🏆</span><span style="flex:1;min-width:0"><span class="mono">Project complete<%= topic.completed_at ? ' · ' + u.fmtDate(topic.completed_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span><br><b style="font-size:17px"><%= topic.final_title || 'Final report' %></b></span><span class="btn btn-p btn-sm">Open final report</span></a>
+<% } else if (isTopicLeader && prog.total > 0 && prog.done === prog.total && topic.status !== 'archived') { %>
+  <a class="final-banner ready" href="/topics/<%= topic.id %>/finish"><span style="font-size:30px">🎉</span><span style="flex:1;min-width:0"><span class="mono">All <%= prog.total %> tasks are done</span><br><b style="font-size:17px">Finish the project and choose the final report</b></span><span class="btn btn-p btn-sm">Finish project</span></a>
+<% } %>
 <div class="grid">
   <div class="card stat"><span class="text-2">Progress</span><b><%= prog.pct %>%</b><div class="bar"><span style="width:<%= prog.pct %>%"></span></div></div>
   <div class="card stat"><span class="text-2">Tasks done</span><b><%= prog.done %> / <%= prog.total %></b><span>on the board</span></div>
