@@ -113,6 +113,29 @@
     });
   });
 
+  document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });
+
+  // Agents: keep progress bars live and reload when an agent changes state
+  var poll = document.querySelector('[data-agent-poll]');
+  if (poll) {
+    var seen = null;
+    var tick = function () {
+      fetch(poll.getAttribute('data-agent-poll'), { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
+        var now = {}; (d.parts || []).forEach(function (p) { now[p.id] = p.status; });
+        if (seen) { for (var k in now) { if (seen[k] !== now[k]) { window.location.reload(); return; } } }
+        seen = now;
+        (d.parts || []).forEach(function (p) {
+          document.querySelectorAll('[data-agent="' + p.id + '"]').forEach(function (el) {
+            var bar = el.querySelector('[data-progress] .bar > span'); if (bar) bar.style.width = (p.progress || 0) + '%';
+            var st = el.querySelector('[data-step]'); if (st && p.step) st.textContent = p.step;
+            var pc = el.querySelector('[data-pct]'); if (pc) pc.textContent = (p.progress || 0) + '%';
+          });
+        });
+      }).catch(function () {});
+    };
+    tick(); setInterval(tick, 4000);
+  }
+
   // Kanban drag and drop (buttons work without JS too)
   var board = document.querySelector('[data-board]');
   if (board) {

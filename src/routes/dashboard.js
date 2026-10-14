@@ -11,11 +11,19 @@ async function topicProgress(ids) {
   if (!ids.length) return [];
   const topics = await db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc');
   const counts = await db('tasks').whereIn('topic_id', ids).groupBy('topic_id', 'status').select('topic_id', 'status').count({ n: '*' });
+  const pc = await db('parts').whereIn('topic_id', ids).groupBy('topic_id', 'agent_status').select('topic_id', 'agent_status').count({ n: '*' });
   return topics.map((t) => {
+    // Progress = parts whose agent findings are accepted; topics without parts fall back to board tasks.
+    const parts = pc.filter((c) => c.topic_id === t.id);
+    if (parts.length) {
+      const total = parts.reduce((a, c) => a + Number(c.n), 0);
+      const done = parts.filter((c) => c.agent_status === 'accepted').reduce((a, c) => a + Number(c.n), 0);
+      return { ...t, total, done, unit: 'parts', pct: total ? Math.round((done / total) * 100) : 0 };
+    }
     const mine = counts.filter((c) => c.topic_id === t.id);
     const total = mine.reduce((a, c) => a + Number(c.n), 0);
     const done = mine.filter((c) => c.status === 'done').reduce((a, c) => a + Number(c.n), 0);
-    return { ...t, total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+    return { ...t, total, done, unit: 'tasks', pct: total ? Math.round((done / total) * 100) : 0 };
   });
 }
 
@@ -31,7 +39,8 @@ r.get('/', async (req, res) => {
   const progress = await topicProgress(ids);
   // Tasks completed per week, last 8 weeks
   const since = new Date(Date.now() - 56 * 86400000);
-  const done = ids.length ? await db('tasks').whereIn('topic_id', ids).where('status', 'done').whereNotNull('completed_at').select('completed_at') : [];
+  const runsDone0 = wids.length ? await db('agent_runs').whereIn('topic_id', wids).where('status', 'done').whereNotNull('finished_at').select('finished_at') : [];
+  const done = runsDone0.map((x) => ({ completed_at: x.finished_at }));
   const weeks = Array.from({ length: 8 }, (_, i) => ({ n: 0, label: 'W' + (i + 1) }));
   for (const t of done) {
     const d = toDate(t.completed_at);
@@ -43,11 +52,15 @@ r.get('/', async (req, res) => {
   const max = Math.max(1, ...weeks.map((w) => w.n));
   const activity = wids.length ? await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').leftJoin('topics', 'topics.id', 'audit_log.topic_id')
     .whereIn('audit_log.topic_id', wids).orderBy('audit_log.id', 'desc').limit(7).select('audit_log.*', 'users.name', 'users.color', 'users.id as uid', 'topics.code') : [];
+  const agents = wids.length ? await db('parts').join('topics', 'topics.id', 'parts.topic_id').whereIn('parts.topic_id', wids).whereNot('topics.status', 'archived').whereNot('parts.agent_status', 'draft')
+    .orderByRaw("case parts.agent_status when 'review' then 0 when 'failed' then 1 when 'running' then 2 when 'queued' then 3 else 4 end").orderBy('parts.id', 'desc').limit(8)
+    .select('parts.id', 'parts.title', 'parts.topic_id', 'parts.agent_name', 'parts.agent_status', 'parts.agent_progress', 'topics.code') : [];
+  const toReview = wids.length ? Number((await db('parts').whereIn('topic_id', wids).where('agent_status', 'review').count({ n: '*' }).first()).n) : 0;
   const actions = await actionItems(me);
   const weekEnd = todayStr(7);
   const dueSoon = await db('tasks').where({ assignee_id: me.id }).whereNot('status', 'done').where('due_date', '<=', weekEnd).count({ n: '*' }).first();
   res.render('pages/dashboard', {
-    title: 'Dashboard', active: 'dashboard', myTasks, meetings, progress, weeks, max, activity, actions: actions.slice(0, 4), actionTotal: actions.length,
+    title: 'Dashboard', active: 'dashboard', myTasks, agents, toReview, meetings, progress, weeks, max, activity, actions: actions.slice(0, 4), actionTotal: actions.length,
     stats: { topics: progress.length, dueSoon: Number(dueSoon.n), meetings: meetings.length, actions: actions.length },
     hour: Number(new Date().toLocaleString('en-AU', { hour: 'numeric', hour12: false, timeZone: 'Australia/Sydney' })),
     cta: auth.atLeast(me, 'leader') ? { href: '/topics/new', label: 'New topic' } : null

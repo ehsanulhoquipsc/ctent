@@ -1,0 +1,120 @@
+<%- include('../partials/top') %>
+<%
+  const B = '/topics/' + topic.id + '/agents';
+  const s = u.agentStatus(part.agent_status);
+  const ro = !isTopicLeader || topic.status === 'archived';
+  const working = ['queued', 'running'].includes(s.key);
+  const latestDone = runs.find((x) => x.status === 'done');
+  const viewingOld = run && runs[0] && run.id !== runs[0].id;
+  const canEdit = !ro && run && latestDone && run.id === latestDone.id && s.key !== 'accepted';
+  const srcBy = Object.fromEntries(sources.map((x) => [x.n, x]));
+  const kept = findings.filter((f) => f.kept).length;
+%>
+<a href="/topics/<%= topic.id %>/findings" style="font-size:13px;font-weight:500;text-decoration:none">← Back to findings board</a>
+<section class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:22px 24px" data-agent="<%= part.id %>">
+  <span class="agent-ico lg" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('bot', 26) %></span>
+  <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:6px">
+    <div class="mono">Part <%= String(n).padStart(2, '0') %> · <span data-i18n-skip><%= part.agent_name || 'Research agent' %></span><%= run && run.finished_at ? ' · finished ' + u.ago(run.finished_at) : '' %><%= sources.length ? ' · ' + sources.length + ' sources' : '' %></div>
+    <div class="split" style="flex-wrap:wrap"><h1 style="font-size:24px"><%= part.title %></h1><span class="tag dotted" style="background:<%= s.c[1] %>;color:<%= s.c[0] %>"><%= s.label %></span></div>
+    <% if (part.description) { %><span class="text-2" style="font-size:14px"><%= part.description %></span><% } %>
+  </div>
+  <% if (!ro && !working) { %><form method="post" action="<%= B %>/<%= part.id %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-s" data-confirm-btn="Run this agent again from scratch? Its current findings stay in the history.">Run again</button></form><% } %>
+  <% if (!ro && s.key === 'accepted') { %><form method="post" action="<%= B %>/<%= part.id %>/findings" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="reopen"><button class="btn btn-s">Change what’s kept</button></form><a class="btn btn-p" href="/topics/<%= topic.id %>/paper">Use in the paper →</a><% } %>
+</section>
+
+<% if (working) { %>
+  <section class="card" style="display:flex;flex-direction:column;gap:10px" data-agent="<%= part.id %>">
+    <div class="split"><span class="spinner" aria-hidden="true"></span><b style="flex:1"><%= runs[0] && runs[0].followup ? 'Digging deeper: ' + runs[0].followup : 'The agent is working' %></b><span class="mono" data-pct><%= part.agent_progress || 0 %>%</span></div>
+    <div data-progress><div class="bar"><span style="width:<%= part.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= part.agent_step %></span></div>
+    <span class="hint">This page updates by itself. You’ll get a notification when the findings are ready.</span>
+  </section>
+<% } %>
+<% if (viewingOld) { %><div class="alert info">You’re looking at an earlier run. <a href="<%= B %>/<%= part.id %>">Show the latest</a></div><% } %>
+<% if (run && run.status === 'failed') { %><div class="alert err" style="align-items:flex-start"><span><b>This run stopped.</b> <%= run.error %></span></div><% } %>
+
+<% if (!run || (!findings.length && run.status !== 'failed' && !working)) { %>
+  <% if (!working) { %><section class="card"><div class="empty"><b>No findings yet</b><span><%= ro ? 'The agent hasn’t run yet.' : 'Launch the agent to start researching this part.' %></span><% if (!ro) { %><form method="post" action="<%= B %>/<%= part.id %>/launch"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-p">Launch agent</button></form><% } %></div></section><% } %>
+<% } %>
+
+<% if (findings.length) { %>
+<div class="cols">
+  <div class="wide">
+    <section class="card" style="display:flex;flex-direction:column;gap:10px">
+      <div class="split" style="flex-wrap:wrap"><h2 style="flex:1">Summary</h2><%- u.confTag(run.confidence) %></div>
+      <p style="font-size:15px;line-height:1.65;white-space:pre-wrap"><%= run.summary %></p>
+      <span class="hint">Written by <%= run.model && run.model !== 'none' ? run.model : 'no AI (key sentences from sources only)' %> · from the numbered sources below only.</span>
+    </section>
+
+    <form method="post" action="<%= B %>/<%= part.id %>/findings" class="card" style="display:flex;flex-direction:column;gap:4px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="split" style="flex-wrap:wrap;padding-bottom:8px"><h2 style="flex:1">Key findings</h2><span class="mono"><%= kept %> of <%= findings.length %> kept for the paper</span></div>
+      <% findings.forEach((f) => { %>
+        <label class="finding<%= f.kept ? '' : ' off' %>">
+          <input type="checkbox" name="keep" value="<%= f.id %>"<%= f.kept ? ' checked' : '' %><%= canEdit ? '' : ' disabled' %>>
+          <span style="display:flex;flex-direction:column;gap:8px;min-width:0">
+            <span style="font-size:15px;line-height:1.55"><%= f.text %></span>
+            <span class="split" style="flex-wrap:wrap;gap:6px"><%- u.confTag(f.confidence) %><% String(f.cites || '').split(',').filter(Boolean).forEach((c) => { const sc = srcBy[c]; %><a class="cite" href="#src<%= c %>" title="<%= sc ? sc.title : '' %>">[<%= c %>]</a><% }) %></span>
+          </span>
+        </label>
+      <% }) %>
+      <% if (canEdit) { %>
+        <div class="split" style="flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line-2)"><span class="hint" style="flex:1 1 240px">Untick anything you don’t want in the paper. Only kept findings can be inserted.</span><button class="btn btn-s" name="action" value="save">Save</button><button class="btn btn-p" name="action" value="accept">Accept kept findings</button></div>
+      <% } %>
+    </form>
+
+    <% const gaps = String(run.gaps || '').split('\n').filter(Boolean); if (gaps.length) { %>
+      <section class="card" style="display:flex;flex-direction:column;gap:8px"><h2>Gaps — what it couldn’t find</h2><% gaps.forEach((g) => { %><div class="text-2" style="font-size:14px">• <%= g %></div><% }) %></section>
+    <% } %>
+
+    <section class="card flush" id="sources">
+      <div class="card-head" style="padding:16px 20px 4px"><h2>Sources</h2><span class="mono"><%= sources.length %> · open each to check</span></div>
+      <div class="list">
+        <% sources.forEach((x) => { %>
+          <div class="row" id="src<%= x.n %>" style="padding:12px 20px;align-items:flex-start;flex-wrap:wrap">
+            <span class="mono" style="width:32px;color:var(--pri-text);flex:none">[<%= x.n %>]</span>
+            <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <% if (x.url) { %><a href="<%= u.safeUrl(x.url) || '#' %>" target="_blank" rel="noopener noreferrer" style="font-weight:500;color:var(--text)"><%= x.title %></a><% } else { %><b style="font-weight:500"><%= x.title %></b><% } %>
+              <span class="hint"><%= [x.authors, x.year, x.venue].filter(Boolean).join(' · ') %><%= x.cited_by ? ' · cited ' + x.cited_by + '×' : '' %></span>
+              <% if (x.abstract) { %><details><summary class="hint" style="cursor:pointer">Abstract</summary><p class="text-2" style="font-size:13px;margin-top:6px"><%= x.abstract %></p></details><% } %>
+            </div>
+            <span class="tag" style="background:<%= x.kind === 'wiki' ? 'var(--amber-soft)' : 'var(--green-soft)' %>;color:<%= x.kind === 'wiki' ? 'var(--amber)' : 'var(--green)' %>"><%= x.kind === 'wiki' ? 'Background' : 'Scholarly' %></span>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  </div>
+  <aside class="narrow">
+    <% if (!ro) { %>
+    <form method="post" action="<%= B %>/<%= part.id %>/ask" class="card" style="display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h3>Ask the agent to dig deeper</h3>
+      <label class="sr" for="fu">Follow-up</label>
+      <textarea class="in" id="fu" name="followup" rows="3" maxlength="1000" placeholder="e.g. Find studies on dry-season flow in Bangladesh after 2018"<%= working ? ' disabled' : '' %>></textarea>
+      <button class="btn btn-p btn-sm"<%= working ? ' disabled' : '' %>>Send to agent</button>
+      <span class="hint">It runs again with your question. Earlier findings stay in the history.</span>
+    </form>
+    <% } %>
+    <section class="card" style="display:flex;flex-direction:column;gap:4px">
+      <h3 style="margin-bottom:6px">How the agent worked</h3>
+      <% logs.forEach((l) => { %><div class="split" style="align-items:flex-start;padding:6px 0"><span class="tick" aria-hidden="true">✓</span><div style="min-width:0"><div style="font-size:13px;line-height:1.45"><%= l.text %></div><div class="mono" style="text-transform:none"><%= u.fmtTime(l.created_at) %></div></div></div><% }) %>
+    </section>
+    <% if (runs.length > 1) { %>
+    <section class="card" style="display:flex;flex-direction:column;gap:6px">
+      <h3 style="margin-bottom:4px">Run history</h3>
+      <% runs.forEach((x, i) => { %><a class="split" href="?run=<%= x.id %>" style="text-decoration:none;color:var(--text);padding:6px 8px;border-radius:8px;<%= run && run.id === x.id ? 'background:var(--pri-soft)' : '' %>"><span style="flex:1;font-size:13px"><%= i === 0 ? 'Latest' : 'Run ' + (runs.length - i) %><%= x.followup ? ' · follow-up' : '' %></span><span class="hint"><%= u.ago(x.started_at) %></span></a><% }) %>
+    </section>
+    <% } %>
+    <section class="card" id="comments" style="display:flex;flex-direction:column;gap:10px">
+      <div class="split"><h3 style="flex:1">Comments</h3><span class="mono"><%= comments.length %></span></div>
+      <% if (!comments.length) { %><span class="hint">Co-authors can comment on these findings here.</span><% } %>
+      <% comments.forEach((c) => { %><div class="split" style="align-items:flex-start"><%- u.avatar({ id: c.uid, name: c.name || '?', color: c.color }, 'sm') %><div style="flex:1;min-width:0"><div class="split"><b style="font-size:13px"><%= c.name || 'Former member' %></b><span class="mono" style="text-transform:none"><%= u.ago(c.created_at) %></span><% if (c.uid === me.id || isTopicLeader) { %><span style="margin-left:auto"><%- u.delForm(B + '/' + part.id + '/comments', csrf, 'Delete this comment?', 'Delete', { action: 'delete', id: c.id }) %></span><% } %></div><p style="font-size:14px;line-height:1.5;white-space:pre-wrap"><%= c.body %></p></div></div><% }) %>
+      <% if (!isGuest && topic.status !== 'archived') { %><form method="post" action="<%= B %>/<%= part.id %>/comments" class="split"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="cm">Comment</label><input class="in" id="cm" name="body" maxlength="2000" required placeholder="Comment on these findings…" style="flex:1"><button class="btn btn-s btn-sm" style="height:40px">Post</button></form><% } %>
+    </section>
+  </aside>
+</div>
+<% } else if (logs.length) { %>
+  <section class="card" style="display:flex;flex-direction:column;gap:4px"><h3 style="margin-bottom:6px">What the agent did</h3><% logs.forEach((l) => { %><div class="text-2" style="font-size:13px;padding:4px 0">• <%= l.text %></div><% }) %></section>
+<% } %>
+<% if (prev || next) { %><div class="split" style="flex-wrap:wrap"><% if (prev) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= prev.id %>">← <%= prev.title %></a><% } %><span style="flex:1"></span><% if (next) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= next.id %>"><%= next.title %> →</a><% } %></div><% } %>
+<% if (working) { %><span hidden data-agent-poll="/topics/<%= topic.id %>/agents/status.json"></span><% } %>
+<%- include('../partials/bottom') %>

@@ -6,8 +6,9 @@
   <a class="final-banner ready" href="/topics/<%= topic.id %>/finish"><span style="font-size:30px">🎉</span><span style="flex:1;min-width:0"><span class="mono">All <%= prog.total %> tasks are done</span><br><b style="font-size:17px">Finish the project and choose the final report</b></span><span class="btn btn-p btn-sm">Finish project</span></a>
 <% } %>
 <div class="grid">
-  <div class="card stat"><span class="text-2">Progress</span><b><%= prog.pct %>%</b><div class="bar"><span style="width:<%= prog.pct %>%"></span></div></div>
-  <div class="card stat"><span class="text-2">Tasks done</span><b><%= prog.done %> / <%= prog.total %></b><span>on the board</span></div>
+  <% const acc = parts.filter((p) => p.agent_status === 'accepted').length; const pct = parts.length ? Math.round(acc / parts.length * 100) : 0; %>
+  <div class="card stat"><span class="text-2">Progress</span><b><%= pct %>%</b><div class="bar"><span style="width:<%= pct %>%"></span></div></div>
+  <div class="card stat"><span class="text-2">Findings accepted</span><b><%= acc %> / <%= parts.length %></b><span>parts ready for the paper</span></div>
   <div class="card stat"><span class="text-2">Members</span><b><%= memberCount %></b><span>incl. guests</span></div>
   <div class="card stat"><span class="text-2">Submissions</span><b><%= subs.reduce((a, s) => a + Number(s.n), 0) %></b><span><%= (subs.find((s) => s.status === 'in_review') || { n: 0 }).n %> in review</span></div>
 </div>
@@ -16,13 +17,14 @@
     <section class="card"><h2 style="margin-bottom:8px">About this topic</h2><p class="text-2" style="white-space:pre-wrap"><%= topic.description || 'No description yet.' %></p>
       <div class="split" style="margin-top:12px;font-size:13px;color:var(--text-2)"><span>Target end: <b style="color:var(--text)"><%= topic.due_date ? u.fmtDate(topic.due_date, { day: 'numeric', month: 'long', year: 'numeric' }) : 'not set' %></b></span></div>
     </section>
+    <% if (topic.question) { %><section class="card"><span class="mono">Research question</span><p style="font-size:16px;line-height:1.55;margin-top:6px"><%= topic.question %></p></section><% } %>
     <section class="card flush">
-      <div class="card-head" style="padding:18px 20px 4px"><h2>Parts & owners</h2><% if (!isGuest) { %><a href="/topics/<%= topic.id %>/plan" style="font-size:13px">Plan & assign →</a><% } %></div>
+      <div class="card-head" style="padding:18px 20px 4px"><h2>Parts &amp; agents</h2><% if (!isGuest) { %><a href="/topics/<%= topic.id %>/findings" style="font-size:13px">Findings →</a><% } %></div>
       <div class="list">
-        <% if (!parts.length) { %><div class="empty">No parts yet.<% if (isTopicLeader) { %> <a href="/topics/<%= topic.id %>/plan">Split the topic into parts</a><% } %></div><% } %>
-        <% parts.forEach((p) => { %>
-          <div class="row"><span style="flex:1;min-width:0"><b style="font-weight:500"><%= p.title %></b><br><span class="hint"><%= p.skills || '' %></span></span>
-          <% if (p.owner && p.status === 'approved') { %><%- u.avatar({ id: p.owner_id, name: p.owner, color: p.owner_color }, 'sm', true) %><span style="font-size:13px"><%= p.owner %></span><% } %><%- u.tag(p.status) %></div>
+        <% if (!parts.length) { %><div class="empty">No parts yet.<% if (isTopicLeader) { %> <a href="/topics/<%= topic.id %>/agents">Split the topic into parts</a><% } %></div><% } %>
+        <% parts.forEach((p) => { const s = u.agentStatus(p.agent_status); %>
+          <div class="row" style="padding:12px 20px"><span class="agent-ico sm" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('bot', 16) %></span><span style="flex:1;min-width:0"><% if (!isGuest) { %><a href="/topics/<%= topic.id %>/agents/<%= p.id %>" style="font-weight:500;color:var(--text);text-decoration:none"><%= p.title %></a><% } else { %><b style="font-weight:500"><%= p.title %></b><% } %><br><span class="hint" data-i18n-skip><%= p.agent_name || 'Research agent' %></span></span>
+          <span class="tag dotted" style="background:<%= s.c[1] %>;color:<%= s.c[0] %>"><%= s.label %></span></div>
         <% }) %>
       </div>
     </section>

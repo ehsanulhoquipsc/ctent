@@ -25,6 +25,12 @@ services:
         value: "true"
       - key: MAX_UPLOAD_MB
         value: "10"
+      # Free AI for the research agents — paste your key from https://aistudio.google.com/apikey
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional: a free OpenAlex key raises the daily search budget (https://openalex.org/settings/api)
+      - key: OPENALEX_API_KEY
+        sync: false
 
 databases:
   - name: ctent-db

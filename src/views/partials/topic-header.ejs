@@ -1,13 +1,16 @@
 <%
   const base = '/topics/' + topic.id;
   let G = [
-    ['Work', 'burgundy', [['Overview', base], ['Plan & assign', base + '/plan'], ['Board', base + '/board']]],
-    ['Discuss', 'indigo', [['Channels', base + '/channels'], ['Meetings', base + '/meetings'], ['Members', base + '/members']]],
-    ['Review', 'teal', [['Submissions', base + '/submissions']]],
+    ['Work', 'burgundy', [['Overview', base], ['Plan & agents', base + '/agents'], ['Findings', base + '/findings']]],
+    ['Write', 'teal', [['Final paper', base + '/paper'], ['Submissions', base + '/submissions']]],
+    ['Discuss', 'indigo', [['Channels', base + '/channels'], ['Meetings', base + '/meetings'], ['Co-authors', base + '/members']]],
     ['Files', 'amber', [['Files', base + '/files']]],
     ['Manage', 'violet', [['Activity', base + '/activity'], ['Settings', base + '/settings']]]
   ];
-  if (isGuest) G = [['Work', 'burgundy', [['Overview', base]]], ['Review', 'teal', [['Submissions', base + '/submissions']]], ['Files', 'amber', [['Files', base + '/files']]]];
+  // Older people-and-tasks pages still work; they sit under Work.
+  if (['Plan & assign', 'Board'].includes(tab)) G[0][2].push([tab, tab === 'Board' ? base + '/board' : base + '/plan']);
+  if (tab === 'Members') tab = 'Co-authors';
+  if (isGuest) G = [['Work', 'burgundy', [['Overview', base]]], ['Write', 'teal', [['Submissions', base + '/submissions']]], ['Files', 'amber', [['Files', base + '/files']]]];
   if (!isTopicLeader && !isGuest) G[4][2] = [['Activity', base + '/activity']];
   const cur = G.find((g) => g[2].some((t) => t[0] === tab)) || G[0];
   const c = u.color(topic.color);
@@ -20,8 +23,8 @@
     </div>
     <div class="stack"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
     <% if (topic.status === 'completed') { %><a class="btn btn-finish" href="<%= base %>/finish">🏆 Final report</a><% } else if (isTopicLeader && topic.status !== 'archived') { %><a class="btn btn-finish" href="<%= base %>/finish">🎉 Finish project</a><% } %>
-    <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/settings"><%- u.icon('edit', 16) %>Edit topic</a><a class="btn btn-s" href="<%= base %>/members">Invite</a><% } %>
-    <% if (!isGuest) { %><a class="btn btn-p" href="<%= base %>/submissions/new"><%- u.icon('upload') %>New submission</a><% } %>
+    <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/settings"><%- u.icon('edit', 16) %>Edit topic</a><a class="btn btn-s" href="<%= base %>/members">Invite co-author</a><% } %>
+    <% if (isTopicLeader && topic.status !== 'archived' && topic.status !== 'completed') { %><a class="btn btn-p" href="<%= base %>/agents"><%- u.icon('bot') %>Agents</a><% } %>
   </div>
   <nav aria-label="Topic sections">
     <div class="groups">

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="<%= typeof lang !== 'undefined' ? lang : 'en' %>">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; background: #F7F6F4; color: #1F1D1B; font: 17px/1.75 'Source Serif 4', Georgia, serif; }
+.page { max-width: 760px; margin: 32px auto; background: #fff; padding: 56px 64px; border: 1px solid #E4E1DD; }
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 21px; margin: 32px 0 8px; }
+.q { font-style: italic; color: #5C5A57; margin: 0 0 24px; }
+sup.ref a { color: #8E2433; text-decoration: none; font-size: 12px; }
+ol { padding-left: 22px; font-size: 14px; line-height: 1.6; }
+.bar { max-width: 760px; margin: 16px auto 0; display: flex; gap: 8px; justify-content: flex-end; font-family: system-ui, sans-serif; }
+.bar button { height: 40px; padding: 0 16px; border-radius: 8px; border: 0; background: #8E2433; color: #fff; font: 500 14px system-ui, sans-serif; cursor: pointer; }
+@media print { body { background: #fff; } .page { border: 0; margin: 0; padding: 0; } .bar { display: none; } }
+@media (max-width: 700px) { .page { padding: 28px 20px; margin: 0; } }
+</style>
+</head>
+<body>
+<div class="bar"><button type="button" data-print>Print or save as PDF</button></div>
+<div class="page">
+  <h1><%= topic.title %></h1>
+  <% if (topic.question) { %><p class="q"><%= topic.question %></p><% } %>
+  <% sections.forEach((s) => { %><h2><%= s.title %></h2><%- s.html %><% }) %>
+  <% if (refs.length) { %><h2>References</h2><ol><% refs.forEach((x) => { %><li id="ref<%= x.n %>"><%= x.text %></li><% }) %></ol><% } %>
+</div>
+<script src="/static/js/app.js?v=<%= assetV %>"></script>
+</body>
+</html>

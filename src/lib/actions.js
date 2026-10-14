@@ -9,13 +9,14 @@ async function actionItems(user) {
   else led = (await db('topic_members').where({ user_id: user.id, role: 'leader' }).select('topic_id')).map((r) => r.topic_id);
   const items = [];
   if (led.length) {
-    const parts = await db('parts').join('topics', 'topics.id', 'parts.topic_id').leftJoin('users', 'users.id', 'parts.proposed_user_id')
-      .whereIn('parts.topic_id', led).where('parts.status', 'open')
-      .select('parts.id', 'parts.title', 'parts.topic_id', 'parts.created_at', 'topics.code', 'users.name as proposed');
+    // Agents whose findings need the researcher, or that stopped
+    const parts = await db('parts').join('topics', 'topics.id', 'parts.topic_id')
+      .whereIn('parts.topic_id', led).whereIn('parts.agent_status', ['review', 'failed']).whereNot('topics.status', 'archived')
+      .select('parts.id', 'parts.title', 'parts.topic_id', 'parts.agent_status', 'parts.agent_name', 'parts.agent_step', 'parts.created_at', 'topics.code');
     for (const p of parts) {
-      items.push(p.proposed
-        ? { type: 'Approval', title: 'Approve owner for “' + p.title + '”', detail: p.proposed + ' is proposed for this part.', topic: p.code, href: '/topics/' + p.topic_id + '/plan', urgent: false, at: p.created_at }
-        : { type: 'Approval', title: 'Choose an owner for “' + p.title + '”', detail: 'Nobody is assigned to this part yet.', topic: p.code, href: '/topics/' + p.topic_id + '/plan', urgent: true, at: p.created_at });
+      items.push(p.agent_status === 'review'
+        ? { type: 'Findings', title: 'Review findings: “' + p.title + '”', detail: (p.agent_name || 'The agent') + ' finished. Keep what holds up and accept it.', topic: p.code, href: '/topics/' + p.topic_id + '/agents/' + p.id, urgent: false, at: p.created_at }
+        : { type: 'Agent', title: 'Agent stopped: “' + p.title + '”', detail: p.agent_step || 'Open it to see why, then run it again.', topic: p.code, href: '/topics/' + p.topic_id + '/agents/' + p.id, urgent: true, at: p.created_at });
     }
     const subs = await db('submissions').join('topics', 'topics.id', 'submissions.topic_id').leftJoin('users', 'users.id', 'submissions.created_by')
       .whereIn('submissions.topic_id', led).where('submissions.status', 'in_review').whereNot('submissions.created_by', user.id)

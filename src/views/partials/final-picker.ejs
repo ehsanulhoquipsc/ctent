@@ -2,7 +2,7 @@
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <% const G = [['approved', 'Approved submissions', 'green'], ['task', 'Approved task work', 'teal'], ['subs', 'Other submissions (not approved)', 'amber'], ['other', 'Other files in this project', 'grey']];
      const firstId = (groups.approved[0] || groups.task[0] || groups.subs[0] || groups.other[0] || {}).id;
-     const sel = topic.final_file_id || firstId; const any = G.some((g) => groups[g[0]].length); %>
+     const sel = (typeof preselect !== 'undefined' && preselect) || topic.final_file_id || firstId; const any = G.some((g) => groups[g[0]].length); %>
   <% if (!any) { %><div class="alert info">No files in this project yet — upload the final report below.</div><% } %>
   <% G.forEach(([k, label, c]) => { if (!groups[k].length) return; const cc = u.color(c); %>
     <fieldset class="final-group"><legend><span class="dot" style="background:<%= cc[0] %>"></span><%= label %> <span class="mono"><%= groups[k].length %></span></legend>

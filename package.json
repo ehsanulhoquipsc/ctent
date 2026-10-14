@@ -1,7 +1,7 @@
 {
   "name": "ctent",
   "version": "0.1.0",
-  "description": "CTENT \u2014 Conducting from Interior: a workspace for research groups to plan, discuss, submit and review work.",
+  "description": "CTENT — Conducting from Interior: a workspace for research groups to plan, discuss, submit and review work.",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -13,6 +13,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.2",
+    "docx": "^9.11.0",
     "ejs": "^7.0.1",
     "express": "^5.3.0",
     "express-session": "^1.19.0",

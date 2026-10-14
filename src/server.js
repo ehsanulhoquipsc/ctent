@@ -10,6 +10,8 @@ async function main() {
   }
   await db.migrate.latest();
   if (await ensureSeeded()) console.log('Demo data loaded. Sign in with any @ctent.demo account (password: demo1234).');
+  await require('./lib/agent').recover();
+  console.log('AI agents: ' + require('./lib/llm').label());
   const port = process.env.PORT || 3000;
   createApp().listen(port, () => console.log('CTENT running on http://localhost:' + port + (db.isPg ? ' (PostgreSQL)' : ' (SQLite)')));
 }

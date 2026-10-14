@@ -25,6 +25,30 @@ On the sign-in page, click any **demo account** to sign in as that person. Each 
 
 Every demo account uses the password `demo1234`. Everyone trying the demo shares the same data.
 
+## How research works now: AI agents
+
+1. **Ask the question.** Create a topic and write the research question.
+2. **Split it into parts.** Each part gets its own agent with a brief, the sources it may use and how deep to go. Templates and **Suggest parts** do this for you.
+3. **Agents research.** Each agent plans searches and searches [OpenAlex](https://openalex.org) (250M+ scholarly works) and Wikipedia. It keeps the most relevant sources, then writes findings that cite **only** those sources. Two agents run at a time.
+4. **Review the findings.** You get a summary, findings with confidence levels and source numbers, gaps, and the full source list with links. Untick anything you don't want, ask the agent to dig deeper, or run it again. Then **accept**. Co-authors can comment.
+5. **Write the final paper.** There's a section per part plus an introduction and conclusion.
+   - Insert accepted findings, which keep their citations, or click **Draft from findings**.
+   - The reference list (Harvard) builds itself.
+   - Export to Word or PDF, or save the paper as the project's **final report**.
+
+### Connect a free AI service
+
+Agents work without any key, but in that case they only list the key lines from each source. For written summaries and findings, add **one** free key on Render under **ctent → Environment**:
+
+| Service | Key name | Get it |
+|---|---|---|
+| Google Gemini (recommended) | `GEMINI_API_KEY` | https://aistudio.google.com/apikey |
+| Groq (alternative) | `GROQ_API_KEY` | https://console.groq.com/keys |
+
+Optional: an `OPENALEX_API_KEY` (free, from https://openalex.org/settings/api) raises the daily search budget. Without it OpenAlex allows roughly 100 searches a day, and each agent uses 2–5 searches.
+
+Free AI tiers have per-minute limits. Agents retry when they hit one. If a run still fails, click **Run again** a minute later.
+
 ## What works in this version
 
 - **Sign-in and roles:** Admin > Leader > Member > Guest.
@@ -124,7 +148,7 @@ You need [Node.js](https://nodejs.org) 20 or newer.
 ```bash
 npm install
 npm run dev          # http://localhost:3000, uses a local SQLite file in data/
-npm test             # 31 automated tests (sign-in, permissions, workflows)
+npm test             # 34 automated tests (sign-in, permissions, workflows)
 npm run reset-demo   # wipe the database and reload the demo data
 ```
 

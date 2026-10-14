@@ -37,27 +37,28 @@ r.get('/topics', async (req, res) => {
 // ----- Create (leaders and admins only) -----
 const TEMPLATES = {
   blank: { name: 'Blank topic', parts: [] },
-  paper: { name: 'Journal paper', parts: [['Literature review', 'Literature review'], ['Methods & data', 'Statistics, Survey design'], ['Analysis', 'Statistics'], ['Writing & submission', 'Writing']] },
-  field: { name: 'Field study', parts: [['Ethics approval', 'Research ethics'], ['Sampling & instruments', 'Survey design, Sampling'], ['Data collection', 'Fieldwork, Interviews'], ['Analysis & report', 'Statistics']] },
-  policy: { name: 'Policy analysis', parts: [['Background & context', 'Policy analysis'], ['Stakeholder mapping', 'Interviews'], ['Comparative cases', 'Policy analysis'], ['Recommendations', 'Writing']] },
-  grant: { name: 'Grant application', parts: [['Aims & significance', 'Writing'], ['Methods', 'Mixed methods'], ['Budget & timeline', 'Project management']] }
+  paper: { name: 'Journal paper', parts: [['Literature review', 'What has already been published on this question? Main findings, key authors and how thinking has changed.'], ['Methods in earlier studies', 'Which methods and data have other researchers used on this question, and what were their limits?'], ['Evidence & data', 'What data, statistics and case evidence exist on this question?'], ['Debates & gaps', 'Where do studies disagree, and what is still unknown?']] },
+  field: { name: 'Field study', parts: [['Context & background', 'Background on the place, people and issue being studied.'], ['Earlier field studies', 'What have similar field studies found, and where were they done?'], ['Methods, sampling & ethics', 'Common methods, sampling approaches and ethical issues in similar field studies.'], ['Expected findings & gaps', 'What results would earlier work predict, and what is still unknown?']] },
+  policy: { name: 'Policy analysis', parts: [['Background & context', 'How did this policy issue develop, and what rules apply today?'], ['Stakeholders & interests', 'Who is affected or involved, and what do they want?'], ['Comparative cases', 'How have other countries or regions handled the same issue?'], ['Policy options & evidence', 'Which options have been proposed, and what evidence supports each?']] },
+  grant: { name: 'Grant application', parts: [['Significance & gap', 'Why does this research matter, and what gap does it fill?'], ['Evidence for the approach', 'What evidence supports the proposed methods?'], ['Similar funded projects', 'Which similar projects have been funded, and what did they achieve?']] }
 };
 r.get('/topics/new', auth.requireRole('leader'), (req, res) => {
   res.render('pages/topic-new', { title: 'New topic', active: 'topics', templates: TEMPLATES, colors: COLOR_NAMES, error: null, v: { template: 'blank', color: 'burgundy', visibility: 'private' } });
 });
 r.post('/topics/new', auth.requireRole('leader'), async (req, res) => {
-  const v = { title: clean(req.body.title), description: clean(req.body.description, 2000), field: clean(req.body.field, 120), due_date: validDate(req.body.due_date),
+  const v = { title: clean(req.body.title), description: clean(req.body.description, 2000), question: clean(req.body.question, 2000), field: clean(req.body.field, 120), due_date: validDate(req.body.due_date),
     color: COLOR_NAMES.includes(req.body.color) ? req.body.color : 'burgundy', visibility: ['private', 'institution', 'open'].includes(req.body.visibility) ? req.body.visibility : 'private', template: TEMPLATES[req.body.template] ? req.body.template : 'blank' };
   if (v.title.length < 4) return res.status(400).render('pages/topic-new', { title: 'New topic', active: 'topics', templates: TEMPLATES, colors: COLOR_NAMES, error: 'Give the topic a title of at least 4 characters.', v });
   const code = await nextCode();
-  const id = await db.insertId('topics', { code, title: v.title, description: v.description, field: v.field, due_date: v.due_date, color: v.color, visibility: v.visibility, status: 'active', created_by: req.user.id, created_at: now() });
+  const id = await db.insertId('topics', { code, title: v.title, description: v.description, question: v.question || null, field: v.field, due_date: v.due_date, color: v.color, visibility: v.visibility, status: 'active', created_by: req.user.id, created_at: now() });
   await db('topic_members').insert({ topic_id: id, user_id: req.user.id, role: 'leader', joined_at: now() });
   await db('channels').insert({ topic_id: id, name: 'general', kind: 'topic', purpose: 'Everything about ' + code, created_by: req.user.id, created_at: now() });
   await require('../lib/rooms').ensureProjectRoom(await db('topics').where({ id }).first(), req.user.id);
-  for (const [title, skills] of TEMPLATES[v.template].parts) await db('parts').insert({ topic_id: id, title, skills, status: 'open', created_at: now() });
+  let pos = 0;
+  for (const [title, brief] of TEMPLATES[v.template].parts) await db('parts').insert({ topic_id: id, title, description: brief, agent_name: title.split(/ [&,]/)[0] + ' agent', agent_sources: 'papers,wiki', agent_depth: 'standard', agent_status: 'draft', position: ++pos, status: 'open', created_at: now() });
   await audit(req.user.id, id, 'topic.created', 'Created topic ' + code + (v.template !== 'blank' ? ' from the “' + TEMPLATES[v.template].name + '” template' : ''));
-  req.flash('ok', 'Topic ' + code + ' created. Next: invite members and plan the parts.');
-  res.redirect('/topics/' + id);
+  req.flash('ok', 'Topic ' + code + ' created. Next: check the research question and each agent’s brief, then launch the agents.');
+  res.redirect('/topics/' + id + '/agents');
 });
 
 // ----- Join requests -----

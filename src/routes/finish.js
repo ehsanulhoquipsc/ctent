@@ -54,7 +54,7 @@ r.get('/topics/:tid/finish', auth.loadTopic(), async (req, res) => {
   const final = t.final_file_id ? await db('files').where({ id: t.final_file_id, topic_id: t.id }).select('id', 'name', 'size', 'mime', 'created_at').first() : null;
   const by = t.completed_by ? await db('users').where({ id: t.completed_by }).select('id', 'name', 'color').first() : null;
   res.render('pages/finish', { title: (t.status === 'completed' ? 'Final report · ' : 'Finish · ') + t.code, active: 'topics', tab: 'Overview', crumb: crumb(t), sum, final, by,
-    groups: leader ? await candidates(t.id) : null, maxMb: MAX / 1024 / 1024 });
+    groups: leader ? await candidates(t.id) : null, maxMb: MAX / 1024 / 1024, preselect: parseInt(req.query.file, 10) || null });
 });
 
 r.post('/topics/:tid/finish', auth.loadTopic('leader'), upload.single('file'), auth.csrfAfterUpload, async (req, res) => {

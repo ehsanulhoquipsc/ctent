@@ -113,6 +113,18 @@ const STATUS = {
   planning: ['Planning', 'indigo'], active: ['Active', 'green'], archived: ['Archived', 'grey'], completed: ['Completed', 'teal'],
   open: ['Needs owner', 'amber'], pending: ['Pending', 'amber']
 };
+// Agent status → [label, colour name, short help]
+const AGENT = {
+  draft: ['Not launched', 'grey', 'Set the brief and sources, then launch.'],
+  queued: ['Waiting to start', 'indigo', 'Queued — it starts as soon as a slot is free.'],
+  running: ['Researching…', 'indigo', 'Searching and reading sources now.'],
+  review: ['Findings ready', 'amber', 'Findings are in. Check them before they go into the paper.'],
+  accepted: ['Accepted', 'green', 'You accepted these findings. They’re ready for the paper.'],
+  failed: ['Needs attention', 'red', 'The last run stopped. Open it to see why, then run it again.']
+};
+function agentStatus(key) { const a = AGENT[key] || AGENT.draft; return { label: a[0], c: color(a[1]), help: a[2], key: AGENT[key] ? key : 'draft' }; }
+const CONF = { High: 'green', Medium: 'amber', Low: 'red' };
+function confTag(c) { if (!c) return ''; const col = color(CONF[c] || 'grey'); return '<span class="tag" style="background:' + col[1] + ';color:' + col[0] + '">' + esc(c) + ' confidence</span>'; }
 function status(key) { const s = STATUS[key] || [key, 'grey']; return { label: s[0], c: color(s[1]) }; }
 
 function humanSize(n) {
@@ -142,6 +154,8 @@ function roleTag(role) {
 
 const ICONS = {
   home: 'm3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10',
+  bot: 'M12 3v4M7 7h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3ZM9.5 12h.01M14.5 12h.01M9.5 15.5h5M1.5 12.5h2.5M20 12.5h2.5',
+  spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6',
   globe: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z',
   inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
   chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
@@ -177,4 +191,4 @@ function delForm(action, csrf, confirmText, label, hidden) {
 }
 function editSummary(label) { return '<summary class="mini">' + icon('edit') + esc(label || 'Edit') + '</summary>'; }
 
-module.exports = { topSkills, skillChips, delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };
+module.exports = { agentStatus, confTag, topSkills, skillChips, delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };

@@ -14,7 +14,7 @@
       <b style="font-size:16px;line-height:1.35"><%= t.title %></b>
       <span class="text-2" style="font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"><%= t.description || 'No description yet.' %></span>
       <div class="bar"><span style="width:<%= t.pct %>%;background:<%= c[0] %>"></span></div>
-      <div class="split" style="font-size:12px;color:var(--text-2)"><span><%= t.done %>/<%= t.total %> tasks · <%= countOf[t.id] || 0 %> members</span><span class="right"><%= t.due_date ? 'Due ' + u.fmtDate(t.due_date, { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span></div>
+      <div class="split" style="font-size:12px;color:var(--text-2)"><span><%= t.unit === 'parts' ? t.done + '/' + t.total + ' parts accepted' : t.done + '/' + t.total + ' tasks' %> · <%= countOf[t.id] || 0 %> people</span><span class="right"><%= t.due_date ? 'Due ' + u.fmtDate(t.due_date, { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span></div>
     </a>
     <% if (t.status === 'completed') { %><a class="mini" href="/topics/<%= t.id %>/finish" style="align-self:flex-start">🏆 Final report<%= t.final_title ? ': ' + t.final_title.slice(0, 40) : '' %></a><% } %>
     <% if (roleOf[t.id] === 'leader' || isAdmin) { %>

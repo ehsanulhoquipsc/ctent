@@ -4,6 +4,7 @@
 <form method="post" action="/topics/new" class="card" style="display:flex;flex-direction:column;gap:18px;max-width:880px">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <div class="field"><label for="title">Topic title</label><input id="title" name="title" required minlength="4" maxlength="240" value="<%= v.title || '' %>" placeholder="e.g. How China’s Medog dam affects the geopolitics of Asia"></div>
+  <div class="field"><label for="question">Research question</label><textarea id="question" name="question" rows="2" maxlength="2000" placeholder="The question you want answered — your agents work from this"><%= v.question || '' %></textarea></div>
   <div class="field"><label for="description">Short description</label><textarea id="description" name="description" rows="3" maxlength="2000" placeholder="What question are you answering, and why does it matter?"><%= v.description || '' %></textarea></div>
   <div class="form-grid">
     <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= v.field || '' %>" placeholder="e.g. Geopolitics"></div>
@@ -17,7 +18,7 @@
   <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px"><legend class="label" style="margin-bottom:8px">Start from a template</legend>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
       <% Object.entries(templates).forEach(([k, t]) => { %>
-        <label class="card" style="padding:14px;display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="radio" name="template" value="<%= k %>"<%= v.template === k ? ' checked' : '' %>><span><b style="font-weight:600"><%= t.name %></b><br><span class="hint"><%= t.parts.length ? t.parts.length + ' parts ready to assign' : 'Start empty' %></span></span></label>
+        <label class="card" style="padding:14px;display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="radio" name="template" value="<%= k %>"<%= v.template === k ? ' checked' : '' %>><span><b style="font-weight:600"><%= t.name %></b><br><span class="hint"><%= t.parts.length ? t.parts.length + ' agents ready to launch' : 'Start empty' %></span></span></label>
       <% }) %>
     </div>
   </fieldset>

@@ -1,0 +1,49 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<%
+  const B = '/topics/' + topic.id + '/agents';
+  const cnt = (k) => parts.filter((p) => (k === 'running' ? ['queued', 'running'].includes(p.agent_status) : p.agent_status === k)).length;
+  const total = parts.length || 1;
+  const C = [['draft', 'Not launched', 'grey'], ['running', 'Researching', 'indigo'], ['review', 'Ready for your review', 'amber'], ['accepted', 'Accepted', 'green'], ['failed', 'Needs attention', 'red']];
+  const TINT = ['teal', 'indigo', 'violet', 'amber', 'burgundy', 'green'];
+  const inCol = (p, k) => (k === 'running' ? ['queued', 'running'].includes(p.agent_status) : p.agent_status === k);
+  const visible = (p) => show === 'all' || (show === 'review' && p.agent_status === 'review') || (show === 'running' && ['queued', 'running'].includes(p.agent_status));
+%>
+<section class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:20px">
+  <div style="flex:2 1 360px;min-width:0;display:flex;flex-direction:column;gap:10px">
+    <b style="font-size:18px"><%= cnt('accepted') %> of <%= parts.length %> parts ready for the paper</b>
+    <div style="display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--line-2)" aria-hidden="true"><% [['accepted', 'var(--green)'], ['review', 'var(--amber)'], ['running', 'var(--indigo)'], ['failed', 'var(--red)']].forEach(([k, c]) => { %><span style="width:<%= Math.round(cnt(k) / total * 100) %>%;background:<%= c %>"></span><% }) %></div>
+    <div class="split" style="flex-wrap:wrap;gap:14px;font-size:13px;color:var(--text-2)"><span><%= cnt('accepted') %> accepted</span><span><%= cnt('review') %> waiting for your review</span><span data-busy-label><%= cnt('running') %> researching</span><span><%= cnt('draft') %> not launched</span><% if (cnt('failed')) { %><span style="color:var(--red)"><%= cnt('failed') %> need attention</span><% } %></div>
+  </div>
+  <div class="split"><a class="btn btn-s" href="<%= B %>">Edit agents</a><a class="btn btn-p" href="/topics/<%= topic.id %>/paper">Write the paper</a></div>
+</section>
+<div class="chips" role="group" aria-label="Filter"><a class="chip<%= show === 'all' ? ' on' : '' %>" href="?">All parts</a><a class="chip<%= show === 'review' ? ' on' : '' %>" href="?show=review">Needs my review <span class="mono"><%= cnt('review') %></span></a><a class="chip<%= show === 'running' ? ' on' : '' %>" href="?show=running">Still researching <span class="mono"><%= cnt('running') %></span></a></div>
+<% if (!parts.length) { %><section class="card"><div class="empty"><b>No agents yet</b><span>Split the topic into parts on Plan &amp; agents, then launch them.</span><a class="btn btn-p" href="<%= B %>">Plan &amp; agents</a></div></section><% } else { %>
+<div class="board-cols">
+  <% C.forEach(([k, label, c]) => { if (k === 'failed' && !cnt('failed')) return; const list = parts.map((p, i) => ({ p, i })).filter(({ p }) => inCol(p, k) && visible(p)); const cc = u.color(c); %>
+    <section class="fcol" aria-label="<%= label %>">
+      <div class="split" style="padding:2px 4px"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:<%= cc[0] %>"></span><b style="flex:1;font-size:14px"><%= label %></b><span class="mono"><%= list.length %></span></div>
+      <% list.forEach(({ p, i }) => { const tc = u.color(TINT[i % TINT.length]); const link = k === 'draft' ? B + '#part' + p.id : B + '/' + p.id; %>
+        <article class="fcard" data-agent="<%= p.id %>">
+          <div class="split"><span class="agent-ico sm" style="background:<%= tc[1] %>;color:<%= tc[0] %>"><%- u.icon('bot', 16) %></span><div style="min-width:0"><div class="mono">Part <%= String(i + 1).padStart(2, '0') %></div><b style="font-size:13px" data-i18n-skip><%= p.agent_name || 'Research agent' %></b></div></div>
+          <b style="font-size:15px;line-height:1.35"><%= p.title %></b>
+          <% if (k === 'running') { %><div data-progress><div class="bar"><span style="width:<%= p.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= p.agent_step || 'Waiting to start' %></span></div><% } %>
+          <% if (k === 'failed') { %><span class="hint" style="color:var(--red)"><%= p.agent_step %></span><% } %>
+          <% if (p.run && ['review', 'accepted'].includes(k)) { %><div class="split" style="flex-wrap:wrap;gap:6px"><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= p.sources %> sources</span><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= k === 'accepted' ? p.kept + ' kept' : p.findings + ' findings' %></span><%- u.confTag(p.run.confidence) %></div><% } %>
+          <a class="btn <%= k === 'review' ? 'btn-p' : 'btn-s' %> btn-sm" href="<%= link %>"><%= k === 'review' ? 'Review findings →' : k === 'accepted' ? 'Open findings' : k === 'running' ? 'Watch progress' : k === 'failed' ? 'See what happened' : 'Set up & launch' %></a>
+        </article>
+      <% }) %>
+      <% if (!list.length) { %><div class="hint" style="padding:6px 4px">None</div><% } %>
+    </section>
+  <% }) %>
+</div>
+<% } %>
+<section class="card flush">
+  <div class="card-head" style="padding:16px 20px 4px"><h2>Agent activity</h2><span class="mono">Latest</span></div>
+  <div class="list">
+    <% if (!log.length) { %><div class="empty" style="padding:16px">Nothing yet. Launch an agent to see what it’s doing.</div><% } %>
+    <% log.forEach((l) => { %><div class="row" style="padding:10px 20px;flex-wrap:wrap"><span class="mono" style="width:90px;flex:none;text-transform:none"><%= u.ago(l.created_at) %></span><b style="font-weight:600" data-i18n-skip><%= l.agent_name || 'Agent' %></b><span class="text-2" style="flex:1 1 300px"><%= l.text %></span></div><% }) %>
+  </div>
+</section>
+<span hidden data-agent-poll="/topics/<%= topic.id %>/agents/status.json"></span>
+<%- include('../partials/bottom') %>

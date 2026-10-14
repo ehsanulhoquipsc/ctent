@@ -574,6 +574,174 @@ test('language switch: Bengali interface, user content kept as typed', async () 
   assert.strictEqual((await leader.get('/lang/xx?next=//evil.com')).headers.location, '/', 'no open redirects');
 });
 
+// ---------- AI agents (external services are mocked) ----------
+function mockServices({ failSearch = false } = {}) {
+  const real = global.fetch;
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    calls.push(u);
+    const ok = (obj) => ({ ok: true, status: 200, json: async () => obj, text: async () => JSON.stringify(obj) });
+    if (u.startsWith('https://api.openalex.org/')) {
+      if (failSearch) return { ok: false, status: 500, json: async () => ({}), text: async () => 'down' };
+      const q = new URL(u).searchParams.get('search');
+      return ok({ results: [1, 2, 3, 4].map((i) => ({ id: 'https://openalex.org/W' + q.length + i, doi: 'https://doi.org/10.1000/' + q.length + '.' + i, display_name: 'Study ' + i + ' on ' + q, publication_year: 2019 + i, cited_by_count: 10 * i,
+        authorships: [{ author: { display_name: 'A. Author' + i } }], primary_location: { source: { display_name: 'Journal of Water' } },
+        abstract_inverted_index: { This: [0], study: [1], finds: [2], that: [3], flow: [4], matters: [5], 'downstream.': [6], It: [7], also: [8], 'notes gaps.': [9] } })) });
+    }
+    if (u.startsWith('https://en.wikipedia.org/')) {
+      if (failSearch) return { ok: false, status: 500, json: async () => ({}), text: async () => 'down' };
+      if (u.includes('list=search')) return ok({ query: { search: [{ title: 'Brahmaputra River' }] } });
+      return ok({ query: { pages: { 1: { title: 'Brahmaputra River', extract: 'The Brahmaputra is a trans-boundary river. It flows through Tibet, India and Bangladesh.', fullurl: 'https://en.wikipedia.org/wiki/Brahmaputra_River' } } } });
+    }
+    if (u.startsWith('https://generativelanguage.googleapis.com/')) {
+      const body = JSON.parse(opts.body || '{}');
+      const prompt = body.contents[0].parts[0].text;
+      let out;
+      if (prompt.includes('search queries')) out = { queries: ['dam downstream flow', 'brahmaputra water security'] };
+      else if (prompt.includes('Suggest 3 to 6 parts')) out = { parts: [{ title: 'Hydrology baseline', brief: 'How much water flows and when.', agent: 'Hydrology agent' }, { title: 'Treaties and law', brief: 'Which agreements apply.', agent: 'Legal agent' }] };
+      else if (prompt.includes('Accepted findings with citation markers')) { const m = prompt.match(/\[src:\d+\]/); out = { text: 'Drafted paragraph one ' + (m ? m[0] : '') + ' and a fake one [src:999999].\n\nSecond paragraph.' }; }
+      else out = { summary: 'Flow downstream is affected.', confidence: 'Medium', findings: [{ text: 'Finding A about flow.', confidence: 'High', cites: [1, 2] }, { text: 'Finding B about floods.', confidence: 'Low', cites: [3] }, { text: 'Uncited claim.', confidence: 'Low', cites: [99] }], gaps: ['No dam design data.'] };
+      return ok({ candidates: [{ content: { parts: [{ text: JSON.stringify(out) }] } }] });
+    }
+    return real(url, opts);
+  };
+  return { calls, restore: () => { global.fetch = real; } };
+}
+const agentLib = require('../src/lib/agent');
+function waitForRun() { return new Promise((resolve) => agentLib._onFinish(resolve)); }
+
+test('AI agents: plan, launch, findings cite real sources, accept, follow-up', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  process.env.GEMINI_API_KEY = 'test-key';
+  const m = mockServices();
+  try {
+    assert.strictEqual((await leader.get('/topics/' + tid + '/agents')).status, 200);
+    assert.strictEqual((await aisha.post('/topics/' + tid + '/agents/question').type('form').send({ _csrf: aisha.csrf, question: 'x' })).status, 403, 'only the owner plans');
+    await leader.post('/topics/' + tid + '/agents/question').type('form').send({ _csrf: leader.csrf, question: 'How will the Medog dam affect downstream water security?', since: '2018' });
+    assert.strictEqual((await db('topics').where({ id: tid }).first()).agent_since, '2018');
+    await leader.post('/topics/' + tid + '/agents/suggest').type('form').send({ _csrf: leader.csrf });
+    assert.ok(await db('parts').where({ topic_id: tid, title: 'Hydrology baseline', agent_name: 'Hydrology agent' }).first(), 'suggested parts added');
+    await leader.post('/topics/' + tid + '/agents/parts').type('form').send({ _csrf: leader.csrf, title: 'Downstream flow', brief: 'How flow changes downstream', agent_name: 'Water agent', sources: ['papers', 'wiki'], depth: 'quick' });
+    const part = await db('parts').where({ topic_id: tid, title: 'Downstream flow' }).first();
+    const done = waitForRun();
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/launch').type('form').send({ _csrf: leader.csrf });
+    await done;
+    const p2 = await db('parts').where({ id: part.id }).first();
+    assert.strictEqual(p2.agent_status, 'review');
+    const run = await db('agent_runs').where({ part_id: part.id }).orderBy('id', 'desc').first();
+    assert.strictEqual(run.status, 'done');
+    assert.match(run.model, /Gemini/);
+    const srcs = await db('agent_sources').where({ run_id: run.id });
+    assert.ok(srcs.length >= 3 && srcs.some((x) => x.kind === 'wiki') && srcs.some((x) => x.doi), 'papers and wikipedia saved');
+    assert.ok(m.calls.some((c) => c.includes('from_publication_date%3A2018-01-01') || c.includes('from_publication_date:2018-01-01')), 'year filter sent');
+    const fs = await db('agent_findings').where({ run_id: run.id }).orderBy('position');
+    assert.strictEqual(fs.length, 2, 'findings without valid citations are dropped');
+    assert.ok(await db('notifications').where({ user_id: ids.ehsan }).where('title', 'like', '%finished “Downstream flow”%').first());
+    // Review page: co-authors can read and comment, not accept
+    const page = await aisha.get('/topics/' + tid + '/agents/' + part.id);
+    assert.match(page.text, /Finding A about flow/);
+    assert.strictEqual((await aisha.post('/topics/' + tid + '/agents/' + part.id + '/findings').type('form').send({ _csrf: aisha.csrf, action: 'accept', keep: [fs[0].id] })).status, 403);
+    await aisha.post('/topics/' + tid + '/agents/' + part.id + '/comments').type('form').send({ _csrf: aisha.csrf, body: 'Check source 2' });
+    assert.ok(await db('agent_comments').where({ part_id: part.id, body: 'Check source 2' }).first());
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/findings').type('form').send({ _csrf: leader.csrf, action: 'accept', keep: [fs[0].id] });
+    assert.strictEqual((await db('parts').where({ id: part.id }).first()).agent_status, 'accepted');
+    assert.deepStrictEqual((await db('agent_findings').where({ run_id: run.id }).orderBy('position')).map((f) => !!f.kept), [true, false]);
+    const st = await leader.get('/topics/' + tid + '/agents/status.json');
+    assert.ok(st.body.parts.some((x) => x.id === part.id && x.status === 'accepted'));
+    assert.match((await leader.get('/topics/' + tid + '/findings')).text, /Downstream flow/);
+    // Follow-up runs again and keeps the history
+    const again = waitForRun();
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/ask').type('form').send({ _csrf: leader.csrf, followup: 'Focus on Bangladesh' });
+    await again;
+    const runs = await db('agent_runs').where({ part_id: part.id });
+    assert.strictEqual(runs.length, 2);
+    assert.strictEqual(runs.find((x) => x.followup).followup, 'Focus on Bangladesh');
+    // accept the new run too so the paper test has findings
+    const newest = await db('agent_findings').where({ run_id: Math.max(...runs.map((x) => x.id)) }).orderBy('position');
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/findings').type('form').send({ _csrf: leader.csrf, action: 'accept', keep: newest.map((f) => f.id) });
+  } finally { m.restore(); delete process.env.GEMINI_API_KEY; }
+});
+
+test('AI agents: work without an AI key, and report failures', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  delete process.env.GEMINI_API_KEY;
+  let m = mockServices();
+  try {
+    assert.match((await leader.get('/topics/' + tid + '/agents')).text, /sources-only mode/);
+    const part = await db('parts').where({ topic_id: tid, title: 'Treaties and law' }).first();
+    const done = waitForRun();
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/launch').type('form').send({ _csrf: leader.csrf });
+    await done;
+    const run = await db('agent_runs').where({ part_id: part.id }).orderBy('id', 'desc').first();
+    assert.strictEqual(run.status, 'done');
+    assert.strictEqual(run.model, 'none');
+    assert.strictEqual(run.confidence, 'Low');
+    assert.ok((await db('agent_findings').where({ run_id: run.id })).length >= 1);
+  } finally { m.restore(); }
+  m = mockServices({ failSearch: true });
+  try {
+    const part = await db('parts').where({ topic_id: tid, title: 'Hydrology baseline' }).first();
+    const done = waitForRun();
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/launch').type('form').send({ _csrf: leader.csrf });
+    await done;
+    const p = await db('parts').where({ id: part.id }).first();
+    assert.strictEqual(p.agent_status, 'failed');
+    assert.match((await leader.get('/topics/' + tid + '/agents/' + part.id)).text, /This run stopped/);
+    assert.match((await leader.get('/actions')).text, /Agent stopped/);
+  } finally { m.restore(); }
+});
+
+test('final paper: sections, insert findings with citations, draft, Word export, final report', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  const page = await leader.get('/topics/' + tid + '/paper');
+  assert.strictEqual(page.status, 200);
+  const part = await db('parts').where({ topic_id: tid, title: 'Downstream flow' }).first();
+  const sec = await db('paper_sections').where({ topic_id: tid, part_id: part.id }).first();
+  assert.ok(sec, 'a section for each part');
+  assert.ok(await db('paper_sections').where({ topic_id: tid, title: 'Introduction' }).first());
+  const pg = await leader.get('/topics/' + tid + '/paper?s=' + sec.id);
+  assert.match(pg.text, /Finding A about flow/);
+  const f = await db('agent_findings').where({ part_id: part.id, kept: true }).orderBy('id', 'desc').first();
+  assert.strictEqual((await aisha.post('/topics/' + tid + '/paper/sections/' + sec.id).type('form').send({ _csrf: aisha.csrf, action: 'insert', finding: f.id })).status, 403, 'co-authors suggest, the owner edits');
+  await leader.post('/topics/' + tid + '/paper/sections/' + sec.id).type('form').send({ _csrf: leader.csrf, action: 'insert', finding: f.id });
+  const body = (await db('paper_sections').where({ id: sec.id }).first()).body;
+  assert.match(body, /\[src:\d+\]/);
+  const view = await leader.get('/topics/' + tid + '/paper?s=' + sec.id);
+  assert.match(view.text, /<sup class="ref">\[<a href="#ref1">1<\/a>/);
+  assert.match(view.text, /A\. Author/);
+  // Draft from findings with AI: invented citation markers are removed
+  process.env.GEMINI_API_KEY = 'test-key';
+  const m = mockServices();
+  try {
+    await leader.post('/topics/' + tid + '/paper/sections/' + sec.id).type('form').send({ _csrf: leader.csrf, action: 'draft' });
+  } finally { m.restore(); delete process.env.GEMINI_API_KEY; }
+  const b2 = (await db('paper_sections').where({ id: sec.id }).first()).body;
+  assert.match(b2, /Drafted paragraph one/);
+  assert.doesNotMatch(b2, /src:999999/);
+  // Co-author suggestion
+  await aisha.post('/topics/' + tid + '/paper/sections/' + sec.id + '/comments').type('form').send({ _csrf: aisha.csrf, body: 'Shorten this' });
+  assert.ok(await db('paper_comments').where({ section_id: sec.id, body: 'Shorten this' }).first());
+  // Save edits
+  await leader.post('/topics/' + tid + '/paper/sections/' + sec.id).type('form').send({ _csrf: leader.csrf, action: 'save', title: 'Downstream flow', body: b2 + '\n\nMy own words.' });
+  // Word export and print view
+  const doc = await leader.get('/topics/' + tid + '/paper.docx').buffer(true).parse((res, cb) => { const ch = []; res.on('data', (c) => ch.push(c)); res.on('end', () => cb(null, Buffer.concat(ch))); });
+  assert.strictEqual(doc.status, 200);
+  assert.strictEqual(doc.body.slice(0, 2).toString(), 'PK');
+  assert.match((await leader.get('/topics/' + tid + '/paper/print')).text, /References/);
+  // Save as final report → file created and preselected on the finish page
+  const fin = await leader.post('/topics/' + tid + '/paper/final').type('form').send({ _csrf: leader.csrf });
+  assert.match(fin.headers.location, /\/finish\?file=\d+/);
+  const fid = parseInt(fin.headers.location.match(/file=(\d+)/)[1], 10);
+  assert.ok(await db('files').where({ id: fid, folder: 'Final report' }).first());
+  assert.match((await leader.get(fin.headers.location.replace('#report', ''))).text, new RegExp('value="' + fid + '" checked'));
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

@@ -117,6 +117,8 @@ function createApp() {
   app.use(auth.requireUser);
   app.use(require('./routes/dashboard'));
   app.use(require('./routes/finish'));
+  app.use(require('./routes/agents'));
+  app.use(require('./routes/paper'));
   app.use(require('./routes/topics'));
   app.use(require('./routes/tasks'));
   app.use(require('./routes/work'));
