@@ -45,13 +45,25 @@ async function partsOf(topicId) {
 }
 
 // ---------- Plan parts & agents ----------
-r.get('/topics/:tid/agents', auth.loadTopic('member'), async (req, res) => {
+async function researchPage(req, res) {
   const t = req.topic;
   const parts = await partsOf(t.id);
-  const people = await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where('topic_members.topic_id', t.id)
-    .orderByRaw("case topic_members.role when 'leader' then 0 when 'member' then 1 else 2 end").select('users.id', 'users.name', 'users.color', 'users.title', 'topic_members.role');
-  res.render('pages/agents', { title: 'Plan & agents · ' + t.code, active: 'topics', tab: 'Plan & agents', crumb: crumb(t, 'Plan & agents'),
-    parts, people, SOURCE_TYPES, GROUPS, DEPTHS, DEPTH: agent.DEPTH, OPTIONS: agent.OPTIONS, DEFAULT_SOURCES: research.DEFAULT_SOURCES, available: research.available, normalizeKeys: research.normalizeKeys, label: research.label, aiOn: llm.available(), aiLabel: llm.label(), busy: parts.filter((p) => ['queued', 'running'].includes(p.agent_status)).length });
+  res.render('pages/agents', { title: 'Research · ' + t.code, active: 'topics', tab: 'Plan & agents', crumb: crumb(t, 'Research'),
+    parts, SOURCE_TYPES, GROUPS, DEPTHS, DEPTH: agent.DEPTH, OPTIONS: agent.OPTIONS, DEFAULT_SOURCES: research.DEFAULT_SOURCES, available: research.available, normalizeKeys: research.normalizeKeys, label: research.label,
+    templates: require('./topics').TEMPLATES, aiOn: llm.available(), aiLabel: llm.label(), busy: parts.filter((p) => ['queued', 'running'].includes(p.agent_status)).length });
+}
+r.get('/topics/:tid/agents', auth.loadTopic('member'), researchPage);
+// Add a template's parts (when starting from scratch on the Research page).
+r.post('/topics/:tid/agents/template', auth.loadTopic('leader'), writable, async (req, res) => {
+  const t = req.topic;
+  const tpl = require('./topics').TEMPLATES[req.body.template];
+  if (!tpl || !tpl.parts.length) { req.flash('error', 'Choose a template.'); return res.redirect(base(t)); }
+  const max = Number((await db('parts').where({ topic_id: t.id }).max({ m: 'position' }).first()).m) || 0;
+  let pos = max;
+  for (const [title, brief] of tpl.parts) await db('parts').insert({ topic_id: t.id, title, description: brief, agent_name: title.split(/ [&,]/)[0] + ' agent', agent_sources: research.DEFAULT_SOURCES, agent_depth: 'standard', agent_status: 'draft', position: ++pos, status: 'open', created_at: now() });
+  await audit(req.user.id, t.id, 'agent.template', 'Added ' + tpl.parts.length + ' parts from the “' + tpl.name + '” template');
+  req.flash('ok', tpl.parts.length + ' parts added. Edit any brief, then launch the agents.');
+  res.redirect(base(t) + '#parts');
 });
 r.post('/topics/:tid/agents/question', auth.loadTopic('leader'), writable, async (req, res) => {
   const t = req.topic;
@@ -93,7 +105,7 @@ r.post('/topics/:tid/agents/launch-all', auth.loadTopic('leader'), writable, asy
   for (const p of parts) await agent.launch(t, p, req.user.id);
   if (parts.length) await audit(req.user.id, t.id, 'agent.launched', 'Launched ' + parts.length + ' agents');
   req.flash(parts.length ? 'ok' : 'error', parts.length ? parts.length + ' agents launched. Findings arrive as each one finishes.' : 'There are no agents waiting to launch.');
-  res.redirect('/topics/' + t.id + '/findings');
+  res.redirect(base(t) + '#parts');
 });
 r.get('/topics/:tid/agents/status.json', auth.loadTopic('member'), async (req, res) => {
   await agent.watchdog();
@@ -128,7 +140,7 @@ r.post('/topics/:tid/agents/:pid/launch', auth.loadTopic('leader'), writable, lo
   await agent.launch(t, p, req.user.id);
   await audit(req.user.id, t.id, 'agent.launched', 'Launched ' + (p.agent_name || 'agent') + ' for “' + p.title + '”');
   req.flash('ok', (p.agent_name || 'Agent') + ' launched.');
-  res.redirect(req.body.back === 'review' ? base(t) + '/' + p.id : '/topics/' + t.id + '/findings');
+  res.redirect(req.body.back === 'review' ? base(t) + '/' + p.id : base(t) + '#part' + p.id);
 });
 
 r.post('/topics/:tid/agents/:pid/stop', auth.loadTopic('leader'), loadPart, async (req, res) => {
@@ -140,15 +152,8 @@ r.post('/topics/:tid/agents/:pid/stop', auth.loadTopic('leader'), loadPart, asyn
 });
 
 // ---------- Findings board ----------
-r.get('/topics/:tid/findings', auth.loadTopic('member'), async (req, res) => {
-  const t = req.topic;
-  await agent.watchdog();
-  const parts = await partsOf(t.id);
-  const runIds = parts.filter((p) => p.run).map((p) => p.run.id);
-  const log = runIds.length ? await db('agent_logs').join('agent_runs', 'agent_runs.id', 'agent_logs.run_id').join('parts', 'parts.id', 'agent_runs.part_id')
-    .where('agent_runs.topic_id', t.id).orderBy('agent_logs.id', 'desc').limit(12).select('agent_logs.*', 'parts.agent_name', 'parts.title as part_title') : [];
-  res.render('pages/findings', { title: 'Findings · ' + t.code, active: 'topics', tab: 'Findings', crumb: crumb(t, 'Findings'), parts, log, show: ['review', 'running'].includes(req.query.show) ? req.query.show : 'all' });
-});
+// The old findings board is now part of the Research page.
+r.get('/topics/:tid/findings', auth.loadTopic('member'), async (req, res, next) => { await agent.watchdog(); next(); }, researchPage);
 
 // ---------- Review one agent: evidence cards, agreement map, research gaps, overview ----------
 const obj = (v, d) => { try { return v ? JSON.parse(v) : d; } catch (e) { return d; } };
@@ -178,7 +183,7 @@ r.get('/topics/:tid/agents/:pid', auth.loadTopic('member'), loadPart, async (req
     sources: C(cards.flatMap((c) => (c.found_in.length ? c.found_in : [c.source]))).slice(0, 10).map(([k, n]) => [research.label(k), n]),
     types: C(cards.map((c) => c.type))
   };
-  res.render('pages/agent', { title: p.title + ' · ' + t.code, active: 'topics', tab: 'Findings', crumb: crumb(t, '<a href="/topics/' + t.id + '/findings">Findings</a> / Part ' + String(idx + 1).padStart(2, '0')),
+  res.render('pages/agent', { title: p.title + ' · ' + t.code, active: 'topics', tab: 'Plan & agents', crumb: crumb(t, '<a href="/topics/' + t.id + '/agents">Research</a> / Part ' + String(idx + 1).padStart(2, '0')),
     part: p, run, runs, cards, logs, liveLogs, comments, n: idx + 1, prev: parts[idx - 1] || null, next: parts[idx + 1] || null, aiOn: llm.available(), synthesis, gapData, plan, lang, overview,
     ev: evidence, label: research.label, questions: [...new Set((plan.questions || []).map((q) => q.question).concat(cards.map((c) => c.question).filter(Boolean)))] });
 });

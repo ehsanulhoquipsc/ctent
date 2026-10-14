@@ -96,6 +96,7 @@ function loadTopic(minRole) {
     res.locals.topic = topic; res.locals.topicRole = role;
     res.locals.isTopicLeader = role === 'leader';
     res.locals.isGuest = role === 'guest';
+    res.locals.journey = await require('./journey').journeyOf(topic, role);
     res.locals.topicMembersPreview = await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where('topic_members.topic_id', topic.id).orderByRaw("case topic_members.role when 'leader' then 0 when 'member' then 1 else 2 end").limit(5).select('users.id', 'users.name', 'users.color');
     next();
   };

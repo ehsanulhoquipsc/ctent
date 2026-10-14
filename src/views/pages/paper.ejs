@@ -20,7 +20,7 @@
   </details>
   <% if (!ro) { %><form method="post" action="<%= P %>/final" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p">Save as final report →</button></form><% } %>
 </section>
-<% if (!accepted) { %><div class="alert info"><span>No findings are accepted yet. <a href="/topics/<%= topic.id %>/findings">Review your agents’ findings</a> — accepted findings appear on the right, ready to insert with their citations.</span></div><% } %>
+<% if (!accepted) { %><div class="alert info"><span>No findings are accepted yet. <a href="/topics/<%= topic.id %>/agents">Review your agents’ evidence</a> — accepted findings appear on the right, ready to insert with their citations.</span></div><% } %>
 <div class="paper-cols">
   <nav class="card" aria-label="Paper outline" style="flex:1 1 220px;max-width:290px;min-width:0;display:flex;flex-direction:column;gap:2px;padding:12px">
     <span class="mono" style="padding:4px 8px 8px">Outline</span>

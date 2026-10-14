@@ -1,30 +1,53 @@
-<%- include('../partials/top', { crumb: '<a href="/topics">Topics</a> / New topic' }) %>
-<div class="page-head"><div><h1>Create a research topic</h1><p>You’ll be the topic leader. You can invite people and plan parts next.</p></div></div>
+<%- include('../partials/top', { crumb: '<a href="/topics">Topics</a> / New project' }) %>
+<div class="page-head"><div><h1>Start a research project</h1><p>Three quick steps. You can change everything later.</p></div></div>
 <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
-<form method="post" action="/topics/new" class="card" style="display:flex;flex-direction:column;gap:18px;max-width:880px">
+<form method="post" action="/topics/new" class="wizard" data-wizard>
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <div class="field"><label for="title">Topic title</label><input id="title" name="title" required minlength="4" maxlength="240" value="<%= v.title || '' %>" placeholder="e.g. How China’s Medog dam affects the geopolitics of Asia"></div>
-  <div class="field"><label for="question">Research question</label><textarea id="question" name="question" rows="2" maxlength="2000" placeholder="The question you want answered — your agents work from this"><%= v.question || '' %></textarea></div>
-  <div class="field"><label for="description">Short description</label><textarea id="description" name="description" rows="3" maxlength="2000" placeholder="What question are you answering, and why does it matter?"><%= v.description || '' %></textarea></div>
-  <div class="form-grid">
-    <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= v.field || '' %>" placeholder="e.g. Geopolitics"></div>
-    <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= v.due_date || '' %>"></div>
-    <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility">
-      <option value="private"<%= v.visibility === 'private' ? ' selected' : '' %>>Private — invited people only</option>
-      <option value="institution"<%= v.visibility === 'institution' ? ' selected' : '' %>>Institution — others can ask to join</option>
-      <option value="open"<%= v.visibility === 'open' ? ' selected' : '' %>>Open — anyone signed in can ask to join</option>
-    </select></div>
-  </div>
-  <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px"><legend class="label" style="margin-bottom:8px">Start from a template</legend>
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
-      <% Object.entries(templates).forEach(([k, t]) => { %>
-        <label class="card" style="padding:14px;display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="radio" name="template" value="<%= k %>"<%= v.template === k ? ' checked' : '' %>><span><b style="font-weight:600"><%= t.name %></b><br><span class="hint"><%= t.parts.length ? t.parts.length + ' agents ready to launch' : 'Start empty' %></span></span></label>
+  <ol class="wiz-steps" aria-hidden="true"><li class="on" data-wstep="1"><span>1</span>Question</li><li data-wstep="2"><span>2</span>Parts</li><li data-wstep="3"><span>3</span>Team</li></ol>
+
+  <section class="card wiz-pane" data-pane="1">
+    <h2>What do you want to find out?</h2>
+    <div class="field"><label for="title">Project title</label><input id="title" name="title" required minlength="4" maxlength="240" value="<%= v.title || '' %>" placeholder="e.g. How China’s Medog dam affects the geopolitics of Asia"></div>
+    <div class="field"><label for="question">Research question</label><textarea id="question" name="question" rows="3" maxlength="2000" placeholder="The question you want answered. Your research agents work from this. English or Bangla."><%= v.question || '' %></textarea><span class="hint">One or two sentences is enough.</span></div>
+    <details class="adv"><summary>More details <span class="hint">field, description, dates, colour, visibility</span></summary>
+      <div class="adv-body">
+        <div class="field"><label for="description">Short description</label><textarea id="description" name="description" rows="2" maxlength="2000" placeholder="Why does this question matter?"><%= v.description || '' %></textarea></div>
+        <div class="form-grid">
+          <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= v.field || '' %>" placeholder="e.g. Geopolitics"></div>
+          <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= v.due_date || '' %>"></div>
+          <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility">
+            <option value="private"<%= v.visibility === 'private' ? ' selected' : '' %>>Private — invited people only</option>
+            <option value="institution"<%= v.visibility === 'institution' ? ' selected' : '' %>>Institution — others can ask to join</option>
+            <option value="open"<%= v.visibility === 'open' ? ' selected' : '' %>>Open — anyone signed in can ask to join</option>
+          </select></div>
+        </div>
+        <fieldset style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:8px">Colour</legend>
+          <div class="split" style="flex-wrap:wrap"><% colors.forEach((c) => { %><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="color" value="<%= c %>"<%= v.color === c ? ' checked' : '' %>><span class="dot" style="width:16px;height:16px;border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= c %></label><% }) %></div>
+        </fieldset>
+      </div>
+    </details>
+    <div class="form-actions"><a class="btn btn-s" href="/topics">Cancel</a><button type="button" class="btn btn-p" data-wnext="2">Next: parts →</button></div>
+  </section>
+
+  <section class="card wiz-pane" data-pane="2">
+    <h2>How should the research be split?</h2>
+    <p class="text-2">Each part gets its own AI research agent that finds evidence for it.</p>
+    <div class="pick-grid">
+      <label class="pick-card"><input type="radio" name="template" value="ai"<%= v.template === 'ai' ? ' checked' : '' %><%= aiOn ? '' : ' disabled' %>><span class="start-ico" style="background:var(--pri-soft);color:var(--pri-text)"><%- u.icon('spark', 20) %></span><b>Let AI suggest parts</b><span class="hint"><%= aiOn ? 'From your research question. Recommended.' : 'Needs an AI service.' %></span></label>
+      <% Object.entries(templates).filter(([k]) => k !== 'blank').forEach(([k, t]) => { %>
+        <label class="pick-card"><input type="radio" name="template" value="<%= k %>"<%= v.template === k ? ' checked' : '' %>><span class="start-ico" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('layers', 20) %></span><b><%= t.name %></b><span class="hint"><%= t.parts.map((x) => x[0]).join(' · ') %></span></label>
       <% }) %>
+      <label class="pick-card"><input type="radio" name="template" value="blank"<%= v.template === 'blank' ? ' checked' : '' %>><span class="start-ico" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('plus', 20) %></span><b>I’ll add parts myself</b><span class="hint">Start with an empty plan.</span></label>
     </div>
-  </fieldset>
-  <fieldset style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:8px">Colour</legend>
-    <div class="split"><% colors.forEach((c) => { %><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="color" value="<%= c %>"<%= v.color === c ? ' checked' : '' %>><span class="dot" style="width:16px;height:16px;border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= c %></label><% }) %></div>
-  </fieldset>
-  <div class="form-actions"><a class="btn btn-s" href="/topics">Cancel</a><button class="btn btn-p">Create topic</button></div>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-wnext="1">← Back</button><button type="button" class="btn btn-p" data-wnext="3">Next: team →</button></div>
+  </section>
+
+  <section class="card wiz-pane" data-pane="3">
+    <h2>Who else is involved? <span class="hint" style="font-weight:400">Optional</span></h2>
+    <p class="text-2">Co-authors can read the evidence, comment and suggest edits to the paper. You can invite people later too.</p>
+    <% if (!people.length) { %><div class="empty">No one else has an account yet. Invite people later from Team → People.</div><% } %>
+    <div class="people-pick"><% people.forEach((m) => { %><label class="person-opt"><input type="checkbox" name="invite" value="<%= m.id %>"<%= (v.invite || []).includes(String(m.id)) ? ' checked' : '' %>><%- u.avatar(m, 'sm') %><span style="min-width:0"><b style="font-weight:500"><%= m.name %></b><br><span class="hint"><%= m.title || m.institution || m.email %></span></span></label><% }) %></div>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-wnext="2">← Back</button><button class="btn btn-p">Create project</button></div>
+  </section>
 </form>
 <%- include('../partials/bottom') %>

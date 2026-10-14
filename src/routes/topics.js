@@ -42,22 +42,40 @@ const TEMPLATES = {
   policy: { name: 'Policy analysis', parts: [['Background & context', 'How did this policy issue develop, and what rules apply today?'], ['Stakeholders & interests', 'Who is affected or involved, and what do they want?'], ['Comparative cases', 'How have other countries or regions handled the same issue?'], ['Policy options & evidence', 'Which options have been proposed, and what evidence supports each?']] },
   grant: { name: 'Grant application', parts: [['Significance & gap', 'Why does this research matter, and what gap does it fill?'], ['Evidence for the approach', 'What evidence supports the proposed methods?'], ['Similar funded projects', 'Which similar projects have been funded, and what did they achieve?']] }
 };
-r.get('/topics/new', auth.requireRole('leader'), (req, res) => {
-  res.render('pages/topic-new', { title: 'New topic', active: 'topics', templates: TEMPLATES, colors: COLOR_NAMES, error: null, v: { template: 'blank', color: 'burgundy', visibility: 'private' } });
-});
+async function newPage(req, res, v, error) {
+  const people = await db('users').where({ status: 'active' }).whereNot('id', req.user.id).orderBy('name').select('id', 'name', 'color', 'title', 'institution', 'email', 'platform_role');
+  res.status(error ? 400 : 200).render('pages/topic-new', { title: 'New project', active: 'topics', templates: TEMPLATES, colors: COLOR_NAMES, error, v, people, aiOn: require('../lib/llm').available() });
+}
+r.get('/topics/new', auth.requireRole('leader'), (req, res) => newPage(req, res, { template: require('../lib/llm').available() ? 'ai' : 'paper', color: 'burgundy', visibility: 'private' }, null));
 r.post('/topics/new', auth.requireRole('leader'), async (req, res) => {
+  const tplKey = req.body.template === 'ai' || TEMPLATES[req.body.template] ? req.body.template : 'blank';
   const v = { title: clean(req.body.title), description: clean(req.body.description, 2000), question: clean(req.body.question, 2000), field: clean(req.body.field, 120), due_date: validDate(req.body.due_date),
-    color: COLOR_NAMES.includes(req.body.color) ? req.body.color : 'burgundy', visibility: ['private', 'institution', 'open'].includes(req.body.visibility) ? req.body.visibility : 'private', template: TEMPLATES[req.body.template] ? req.body.template : 'blank' };
-  if (v.title.length < 4) return res.status(400).render('pages/topic-new', { title: 'New topic', active: 'topics', templates: TEMPLATES, colors: COLOR_NAMES, error: 'Give the topic a title of at least 4 characters.', v });
+    color: COLOR_NAMES.includes(req.body.color) ? req.body.color : 'burgundy', visibility: ['private', 'institution', 'open'].includes(req.body.visibility) ? req.body.visibility : 'private', template: tplKey, invite: [].concat(req.body.invite || []).map(String) };
+  if (v.title.length < 4) return newPage(req, res, v, 'Give the project a title of at least 4 characters.');
   const code = await nextCode();
   const id = await db.insertId('topics', { code, title: v.title, description: v.description, question: v.question || null, field: v.field, due_date: v.due_date, color: v.color, visibility: v.visibility, status: 'active', created_by: req.user.id, created_at: now() });
   await db('topic_members').insert({ topic_id: id, user_id: req.user.id, role: 'leader', joined_at: now() });
   await db('channels').insert({ topic_id: id, name: 'general', kind: 'topic', purpose: 'Everything about ' + code, created_by: req.user.id, created_at: now() });
   await require('../lib/rooms').ensureProjectRoom(await db('topics').where({ id }).first(), req.user.id);
+  const sources = require('../lib/research').DEFAULT_SOURCES;
+  let list = [], note = '';
+  if (tplKey === 'ai') {
+    if (v.question) {
+      try { list = (await require('../lib/agent').suggestParts(v.question, v.title)).map((p) => [p.title, p.brief, p.agent]); }
+      catch (e) { note = ' The AI couldn’t suggest parts just now — add them on the Research page.'; }
+    } else note = ' Write the research question, then let the AI suggest parts.';
+  } else if (TEMPLATES[tplKey]) list = TEMPLATES[tplKey].parts;
   let pos = 0;
-  for (const [title, brief] of TEMPLATES[v.template].parts) await db('parts').insert({ topic_id: id, title, description: brief, agent_name: title.split(/ [&,]/)[0] + ' agent', agent_sources: 'papers,wiki', agent_depth: 'standard', agent_status: 'draft', position: ++pos, status: 'open', created_at: now() });
-  await audit(req.user.id, id, 'topic.created', 'Created topic ' + code + (v.template !== 'blank' ? ' from the “' + TEMPLATES[v.template].name + '” template' : ''));
-  req.flash('ok', 'Topic ' + code + ' created. Next: check the research question and each agent’s brief, then launch the agents.');
+  for (const [title, brief, agentName] of list) await db('parts').insert({ topic_id: id, title, description: brief, agent_name: agentName || title.split(/ [&,]/)[0] + ' agent', agent_sources: sources, agent_depth: 'standard', agent_status: 'draft', position: ++pos, status: 'open', created_at: now() });
+  // Co-authors chosen in step 3
+  const people = v.invite.length ? await db('users').whereIn('id', v.invite.map((x) => parseInt(x, 10)).filter(Boolean)).where({ status: 'active' }) : [];
+  for (const u of people) {
+    if (u.id === req.user.id) continue;
+    await db('topic_members').insert({ topic_id: id, user_id: u.id, role: u.platform_role === 'guest' ? 'guest' : 'member', joined_at: now() });
+    await notify(u.id, { kind: 'access', title: req.user.name + ' added you to ' + code, body: v.title, link: '/topics/' + id }, req.user.id);
+  }
+  await audit(req.user.id, id, 'topic.created', 'Created project ' + code + (list.length ? ' with ' + list.length + ' parts' : '') + (people.length ? ' and ' + people.length + ' co-author' + (people.length === 1 ? '' : 's') : ''));
+  req.flash(note ? 'error' : 'ok', 'Project ' + code + ' created.' + (list.length ? ' Check the ' + list.length + ' parts, then launch the agents.' : '') + note);
   res.redirect('/topics/' + id + '/agents');
 });
 
@@ -102,7 +120,7 @@ r.post('/requests/:rid', async (req, res) => {
 r.get('/topics/:tid', auth.loadTopic(), async (req, res) => {
   const t = req.topic;
   const [prog] = await topicProgress([t.id]);
-  const parts = await db('parts').leftJoin('users', 'users.id', 'parts.proposed_user_id').where('parts.topic_id', t.id).orderBy('parts.id').select('parts.*', 'users.name as owner', 'users.color as owner_color', 'users.id as owner_id');
+  const parts = await db('parts').leftJoin('users', 'users.id', 'parts.proposed_user_id').where('parts.topic_id', t.id).orderBy('parts.position').orderBy('parts.id').select('parts.*', 'users.name as owner', 'users.color as owner_color', 'users.id as owner_id');
   const meetings = await db('meetings').where({ topic_id: t.id }).where('starts_at', '>=', new Date(Date.now() - 3600000).toISOString()).orderBy('starts_at').limit(3);
   const activity = await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').where('audit_log.topic_id', t.id).orderBy('audit_log.id', 'desc').limit(6).select('audit_log.*', 'users.name', 'users.color', 'users.id as uid');
   const subs = await db('submissions').where({ topic_id: t.id }).groupBy('status').select('status').count({ n: '*' });
@@ -200,3 +218,4 @@ r.get('/topics/:tid/activity', auth.loadTopic('member'), async (req, res) => {
 });
 
 module.exports = r;
+module.exports.TEMPLATES = TEMPLATES;

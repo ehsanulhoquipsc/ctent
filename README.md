@@ -27,6 +27,8 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
 
 ## How research works now: AI agents
 
+Every project follows five steps, shown as a bar at the top of each project page: **Question → Research → Review → Write → Finish**. The project's home page (**Journey**) always shows the one next step with a button for it. Each project has five tabs: **Journey**, **Research** (parts and agents), **Paper**, **Team** (chat, meetings, people, activity) and **Files** (files and submissions), plus **Settings** for leaders. New projects are created in a three-step wizard: question, how to split it (AI suggestion or a template), and co-authors.
+
 1. **Ask the question.** Create a topic and write the research question.
 2. **Split it into parts.** Each part gets its own agent with a brief, the sources it may use and how deep to go. Templates and **Suggest parts** do this for you.
 3. **Agents research.** Each part's agent (merged from the standalone CTENT Research Agent):

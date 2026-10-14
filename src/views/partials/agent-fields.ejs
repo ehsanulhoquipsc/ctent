@@ -5,6 +5,9 @@
 %>
 <div class="field"><label for="<%= idp %>t">Part title</label><input id="<%= idp %>t" name="title" required minlength="3" maxlength="240" value="<%= p.title || '' %>" placeholder="e.g. Downstream water security — India & Bangladesh"></div>
 <div class="field"><label for="<%= idp %>b">What should this agent find out?</label><textarea id="<%= idp %>b" name="brief" rows="3" maxlength="1500" placeholder="The question for this part, what to focus on, anything to avoid (English or Bangla)"><%= p.description || '' %></textarea></div>
+<details class="adv">
+<summary>Advanced settings <span class="hint"><%= (DEPTH[p.agent_depth] || DEPTH.standard).label %> · <%= langOn === 'bn' ? 'বাংলা' : 'English' %> · <%= srcOn.length %> sources</span></summary>
+<div class="adv-body">
 <div class="field"><label for="<%= idp %>a">Agent name</label><input id="<%= idp %>a" name="agent_name" maxlength="100" value="<%= p.agent_name || '' %>" placeholder="e.g. Water security agent"></div>
 <div class="agent-settings">
   <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">How deep</legend>
@@ -28,3 +31,5 @@
     <% }) %>
   </div>
 </fieldset>
+</div>
+</details>

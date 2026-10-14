@@ -1,99 +1,112 @@
 <%- include('../partials/top') %>
 <%- include('../partials/topic-header') %>
-<% const ro = !isTopicLeader || topic.status === 'archived'; const B = '/topics/' + topic.id + '/agents'; const TINT = ['teal', 'indigo', 'violet', 'amber', 'burgundy', 'green']; %>
+<%
+  const ro = !isTopicLeader || topic.status === 'archived';
+  const B = '/topics/' + topic.id + '/agents';
+  const TINT = ['teal', 'indigo', 'violet', 'amber', 'burgundy', 'green'];
+  const waiting = parts.filter((p) => ['draft', 'failed'].includes(p.agent_status)).length;
+%>
 <% if (!aiOn) { %>
-  <div class="alert info" style="align-items:flex-start"><%- u.icon('spark', 18) %><span><b>Agents are running in sources-only mode.</b> They search real papers, books and reports and turn each one into an evidence card with its key lines, but they can’t extract findings, map agreement or write drafts yet. <%= isAdmin ? 'Add a free GEMINI_API_KEY on the server to turn on written findings — see the README.' : 'Ask your admin to connect a free AI service.' %></span></div>
+  <div class="alert info" style="align-items:flex-start"><%- u.icon('spark', 18) %><span><b>No AI service connected.</b> Agents still collect real sources as evidence cards, but can’t extract findings, map agreement or draft text. <%= isAdmin ? 'Add a free GEMINI_API_KEY on the server (see the README).' : 'Ask your admin to connect one.' %></span></div>
 <% } %>
-<div class="cols">
-  <div class="wide">
-    <section class="card" style="display:flex;flex-direction:column;gap:12px">
-      <div class="split"><h2 style="flex:1">Research question</h2><span class="mono">Every agent works from this</span></div>
-      <% if (ro) { %>
-        <p style="font-size:16px;line-height:1.55"><%= topic.question || 'The researcher hasn’t written the question yet.' %></p>
-      <% } else { %>
-        <form method="post" action="<%= B %>/question" style="display:flex;flex-direction:column;gap:10px">
+
+<div class="research">
+  <section class="card q-card" id="question">
+    <div class="split"><span class="mono" style="flex:1">Research question · every agent works from this</span><% if (topic.agent_since) { %><span class="tag neutral">Sources since <%= topic.agent_since %></span><% } %></div>
+    <% if (ro) { %>
+      <p class="q-text" data-i18n-skip><%= topic.question || 'The researcher hasn’t written the question yet.' %></p>
+    <% } else { %>
+      <details class="q-edit"<%= topic.question ? '' : ' open' %>>
+        <summary><span class="q-text" data-i18n-skip><%= topic.question || 'Write your research question' %></span><span class="mini"><%- u.icon('edit', 14) %>Edit</span></summary>
+        <form method="post" action="<%= B %>/question" style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
           <label class="sr" for="rq">Research question</label>
           <textarea class="in" id="rq" name="question" rows="3" maxlength="2000" placeholder="e.g. How could China’s Medog dam change water security, power and diplomacy in South Asia over the next 20 years?" style="font-size:15px"><%= topic.question || '' %></textarea>
           <div class="split" style="flex-wrap:wrap">
             <label class="split" style="font-size:13px"><span>Only sources since</span><select class="in" name="since" style="width:auto;height:36px"><option value="">Any year</option><% [2010, 2015, 2018, 2020, 2022].forEach((y) => { %><option value="<%= y %>"<%= String(topic.agent_since) === String(y) ? ' selected' : '' %>><%= y %></option><% }) %></select></label>
-            <span style="flex:1"></span>
-            <button class="btn btn-s btn-sm">Save question</button>
+            <span style="flex:1"></span><button class="btn btn-p btn-sm">Save question</button>
           </div>
         </form>
-        <form method="post" action="<%= B %>/suggest" class="split" style="flex-wrap:wrap;border-top:1px solid var(--line-2);padding-top:12px">
-          <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <button class="btn btn-s btn-sm"<%= topic.question ? '' : ' disabled' %>><%- u.icon('spark', 16) %>Suggest parts from this question</button>
-          <span class="hint"><%= aiOn ? 'You can edit, merge or delete anything it suggests.' : 'Needs an AI service — add parts yourself below for now.' %></span>
-        </form>
-      <% } %>
-    </section>
+      </details>
+    <% } %>
+  </section>
 
-    <div class="split"><h2 style="flex:1">Parts &amp; their agents <span class="mono" style="margin-left:6px"><%= parts.length %></span></h2><% if (!ro) { %><a class="btn btn-s btn-sm" href="#add-part">+ Add a part</a><% } %></div>
-    <% if (!parts.length) { %><section class="card"><div class="empty"><b>No parts yet</b><span><%= ro ? 'The researcher hasn’t split this topic yet.' : 'Split the question into parts. Each part gets its own agent.' %></span></div></section><% } %>
-    <% parts.forEach((p, i) => { const s = u.agentStatus(p.agent_status); const tc = u.color(TINT[i % TINT.length]); const src = normalizeKeys(p.agent_sources || DEFAULT_SOURCES); const working = ['queued', 'running'].includes(s.key); %>
-      <article class="card agent-card" id="part<%= p.id %>" data-agent="<%= p.id %>" style="padding:0;overflow:hidden">
-        <div class="split" style="padding:16px 20px;border-bottom:1px solid var(--line-2);flex-wrap:wrap">
+  <section id="parts" style="display:flex;flex-direction:column;gap:12px">
+    <div class="split" style="flex-wrap:wrap">
+      <h2 style="flex:1">Parts <span class="mono" style="margin-left:6px"><%= parts.length %></span></h2>
+      <% if (!ro && parts.length) { %>
+        <% if (aiOn && topic.question) { %><form method="post" action="<%= B %>/suggest" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm"><%- u.icon('spark', 15) %>Suggest more</button></form><% } %>
+        <a class="btn btn-s btn-sm" href="#add-part" data-open="#add-part">+ Add a part</a>
+        <% if (waiting) { %><form method="post" action="<%= B %>/launch-all" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm">Launch <%= waiting === 1 ? 'agent' : 'all ' + waiting + ' agents' %></button></form><% } %>
+      <% } %>
+    </div>
+
+    <% if (!parts.length) { %>
+      <section class="card" style="display:flex;flex-direction:column;gap:14px">
+        <div><h3>Split the question into parts</h3><p class="text-2" style="margin-top:4px"><%= ro ? 'The project leader hasn’t planned the parts yet.' : 'Each part gets its own research agent. Pick a way to start — you can edit everything afterwards.' %></p></div>
+        <% if (!ro) { %>
+        <div class="start-grid">
+          <form method="post" action="<%= B %>/suggest" class="start-opt"><input type="hidden" name="_csrf" value="<%= csrf %>">
+            <span class="start-ico" style="background:var(--pri-soft);color:var(--pri-text)"><%- u.icon('spark', 20) %></span><b>Let AI suggest parts</b><span class="hint"><%= !aiOn ? 'Needs an AI service.' : topic.question ? 'From your research question.' : 'Write the question first.' %></span>
+            <button class="btn btn-p btn-sm"<%= aiOn && topic.question ? '' : ' disabled' %>>Suggest parts</button></form>
+          <form method="post" action="<%= B %>/template" class="start-opt"><input type="hidden" name="_csrf" value="<%= csrf %>">
+            <span class="start-ico" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('layers', 20) %></span><b>Use a template</b>
+            <label class="sr" for="tpl">Template</label><select class="in" id="tpl" name="template" style="height:36px"><% Object.entries(templates).filter(([k]) => k !== 'blank').forEach(([k, t]) => { %><option value="<%= k %>"><%= t.name %> (<%= t.parts.length %> parts)</option><% }) %></select>
+            <button class="btn btn-s btn-sm">Add these parts</button></form>
+          <div class="start-opt"><span class="start-ico" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('plus', 20) %></span><b>Add parts yourself</b><span class="hint">Write a title and a short brief for each.</span><a class="btn btn-s btn-sm" href="#add-part" data-open="#add-part">Add a part</a></div>
+        </div>
+        <% } %>
+      </section>
+    <% } %>
+
+    <% parts.forEach((p, i) => { const s = u.agentStatus(p.agent_status); const tc = u.color(TINT[i % TINT.length]); const working = ['queued', 'running'].includes(s.key); %>
+      <article class="card pcard" id="part<%= p.id %>" data-agent="<%= p.id %>">
+        <div class="pcard-top">
           <span class="agent-ico" style="background:<%= tc[1] %>;color:<%= tc[0] %>"><%- u.icon('bot', 20) %></span>
-          <div style="flex:1 1 260px;min-width:0"><div class="mono">Part <%= String(i + 1).padStart(2, '0') %> · <span data-i18n-skip><%= p.agent_name || 'Research agent' %></span></div><b style="font-size:16px;line-height:1.35"><%= p.title %></b></div>
-          <span class="tag dotted" data-status style="background:<%= s.c[1] %>;color:<%= s.c[0] %>"><%= s.label %></span>
+          <div style="flex:1 1 240px;min-width:0">
+            <div class="mono">Part <%= String(i + 1).padStart(2, '0') %> · <span data-i18n-skip><%= p.agent_name || 'Research agent' %></span></div>
+            <b class="pcard-title" data-i18n-skip><%= p.title %></b>
+          </div>
+          <span class="tag dotted" style="background:<%= s.c[1] %>;color:<%= s.c[0] %>"><%= s.label %></span>
         </div>
-        <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px">
-          <div><div class="label" style="margin-bottom:4px">What this agent should find out</div><p class="text-2" style="white-space:pre-wrap"><%= p.description || 'No brief yet.' %></p></div>
-          <div class="split" style="flex-wrap:wrap;gap:6px"><span class="tag" style="background:var(--indigo-soft);color:var(--indigo)"><%= (DEPTH[p.agent_depth] || DEPTH.standard).label %></span><% if (p.agent_lang === 'bn') { %><span class="tag" style="background:var(--green-soft);color:var(--green)" data-i18n-skip>বাংলা</span><% } %><% src.slice(0, 6).forEach((k) => { %><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= label(k) %></span><% }) %><% if (src.length > 6) { %><span class="tag" style="background:var(--line-2);color:var(--text-2)">+<%= src.length - 6 %> more</span><% } %></div>
-          <div data-progress<%= working ? '' : ' hidden' %>><div class="bar"><span style="width:<%= p.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= p.agent_step || '' %></span></div>
-        </div>
-        <div class="split" style="flex-wrap:wrap;padding:12px 20px;background:var(--surface-2);border-top:1px solid var(--line-2)">
-          <span class="hint" style="flex:1 1 220px"><%= s.key === 'failed' && p.agent_step ? p.agent_step : (p.run && p.sources ? p.sources + ' evidence cards' + (p.kept ? ' · ' + p.kept + ' selected' : '') + ' · ' + s.help : s.help) %></span>
+        <% if (p.description) { %><p class="text-2 clamp2" data-i18n-skip><%= p.description %></p><% } %>
+        <div data-progress<%= working ? '' : ' hidden' %>><div class="bar"><span style="width:<%= p.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= p.agent_step || '' %></span></div>
+        <div class="pcard-foot">
+          <span class="hint" style="flex:1 1 220px"><% if (s.key === 'failed') { %><span style="color:var(--red)"><%= p.agent_step || 'The last run stopped.' %></span><% } else if (p.run && p.sources) { %><%= p.sources %> evidence cards<%= p.kept ? ' · ' + p.kept + ' selected' : '' %><% } else { %><%= (DEPTH[p.agent_depth] || DEPTH.standard).label %><%= p.agent_lang === 'bn' ? ' · বাংলা' : '' %> · <%= normalizeKeys(p.agent_sources || DEFAULT_SOURCES).length %> sources<% } %></span>
           <% if (!ro) { %>
-            <details class="ed"><%- u.editSummary('Edit agent') %>
+            <details class="ed"><%- u.editSummary('Edit') %>
               <form method="post" action="<%= B %>/<%= p.id %>" class="ed-pop wide">
-                <input type="hidden" name="_csrf" value="<%= csrf %>"><h3>Edit part &amp; agent</h3>
-                <%- include('../partials/agent-fields', { p, SOURCE_TYPES, DEPTHS, idp: 'e' + p.id }) %>
-                <button class="btn btn-p btn-sm">Save</button>
+                <input type="hidden" name="_csrf" value="<%= csrf %>"><h3>Edit part</h3>
+                <%- include('../partials/agent-fields', { p, idp: 'e' + p.id }) %>
+                <div class="split"><button class="btn btn-p btn-sm">Save</button><span style="flex:1"></span><button class="mini del" name="action" value="delete" data-confirm-btn="Delete the part “<%= p.title %>” and everything its agent found?"><%- u.icon('trash') %>Delete part</button></div>
               </form>
             </details>
-            <%- u.delForm(B + '/' + p.id, csrf, 'Delete the part “' + p.title + '” and everything its agent found?', 'Delete', { action: 'delete' }) %>
           <% } %>
-          <% if (p.run) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= p.id %>"><%= ['review', 'accepted'].includes(s.key) ? 'Open evidence' : 'Open' %></a><% } %>
           <% if (!ro && working) { %><form method="post" action="<%= B %>/<%= p.id %>/stop" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm">Stop</button></form><% } %>
-          <% if (!ro && !working) { %><form method="post" action="<%= B %>/<%= p.id %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm"><%= p.run ? 'Run again' : 'Launch agent' %></button></form><% } %>
+          <% if (s.key === 'review') { %><a class="btn btn-p btn-sm" href="<%= B %>/<%= p.id %>">Review evidence →</a>
+          <% } else if (p.run && !working) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= p.id %>"><%= s.key === 'accepted' ? 'Open evidence' : 'Open' %></a><% } else if (working) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= p.id %>">Watch</a><% } %>
+          <% if (!ro && !working && s.key !== 'review') { %><form method="post" action="<%= B %>/<%= p.id %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn <%= p.run ? 'btn-s' : 'btn-p' %> btn-sm"><%= p.run ? 'Run again' : 'Launch' %></button></form><% } %>
         </div>
       </article>
     <% }) %>
 
     <% if (!ro) { %>
-    <form method="post" action="<%= B %>/parts" class="card" id="add-part" style="display:flex;flex-direction:column;gap:12px">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <h2>Add a part</h2>
-      <%- include('../partials/agent-fields', { p: { agent_sources: DEFAULT_SOURCES, agent_depth: 'standard' }, SOURCE_TYPES, DEPTHS, idp: 'n' }) %>
-      <div><button class="btn btn-p">Add part</button></div>
-    </form>
+    <details class="card add-part" id="add-part">
+      <summary><h3>+ Add a part</h3><span class="hint">Title, a short brief, and optional advanced settings</span></summary>
+      <form method="post" action="<%= B %>/parts" style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <%- include('../partials/agent-fields', { p: { agent_sources: DEFAULT_SOURCES, agent_depth: 'standard' }, idp: 'n' }) %>
+        <div><button class="btn btn-p">Add part</button></div>
+      </form>
+    </details>
     <% } %>
-  </div>
-  <aside class="narrow">
-    <section class="card" style="display:flex;flex-direction:column;gap:12px;border:2px solid var(--pri)">
-      <h2>Agents</h2>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-        <div style="padding:12px;border-radius:10px;background:var(--surface-2)"><div class="mono">Parts</div><b style="font-size:22px"><%= parts.length %></b></div>
-        <div style="padding:12px;border-radius:10px;background:var(--surface-2)"><div class="mono">Working</div><b style="font-size:22px" data-busy><%= busy %></b></div>
-      </div>
-      <p class="hint">Agents work two at a time and you’re notified as each one finishes. You can leave this page.</p>
-      <% if (!ro) { %><form method="post" action="<%= B %>/launch-all"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p" style="width:100%"<%= parts.some((p) => ['draft', 'failed'].includes(p.agent_status)) ? '' : ' disabled' %>>Launch all waiting agents</button></form><% } %>
-      <a class="btn btn-s" href="/topics/<%= topic.id %>/findings">Open findings board</a>
-    </section>
-    <section class="card" style="display:flex;flex-direction:column;gap:10px">
-      <h3>How agents work</h3>
-      <ol class="hint" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px"><li>Splits its part into sub-questions</li><li>Searches up to 21 free sources: papers, books, reports, Wikipedia, web and news</li><li>Merges duplicates, ranks, follows citation trails and checks for retractions</li><li>Reads abstracts and open-access full texts, and turns each source into an evidence card with findings, data and a citation</li><li>Maps where sources agree or disagree, and finds research gaps</li></ol><p class="hint">You tick the cards you want; the paper cites only those.</p>
-      <p class="hint">AI: <b><%= aiLabel %></b></p>
-    </section>
-    <section class="card" style="display:flex;flex-direction:column;gap:10px">
-      <div class="split"><h3 style="flex:1">Co-authors</h3><span class="mono">Optional</span></div>
-      <p class="hint">People you add can read findings, comment and suggest edits to the paper.</p>
-      <% people.forEach((m) => { %><div class="split"><%- u.avatar(m, 'sm', true) %><span style="flex:1;min-width:0;font-size:14px"><%= m.name %><br><span class="hint"><%= m.role === 'leader' ? 'Owner' : m.role === 'guest' ? 'Guest · read only' : 'Co-author' %></span></span></div><% }) %>
-      <% if (isTopicLeader) { %><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/members">+ Invite a co-author</a><% } %>
-    </section>
-  </aside>
+  </section>
+
+  <details class="card how">
+    <summary><h3>How the agents work</h3><span class="hint">AI: <%= aiLabel %></span></summary>
+    <ol class="hint" style="margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px"><li>Splits its part into sub-questions</li><li>Searches up to 21 free sources: papers, books, reports, Wikipedia, web and news</li><li>Merges duplicates, ranks, follows citation trails and checks for retractions</li><li>Reads abstracts and open-access full texts, and turns each source into an evidence card with findings, data and a citation</li><li>Maps where sources agree or disagree, and finds research gaps</li></ol>
+    <p class="hint" style="margin-top:8px">Two agents work at a time, and you’re notified as each finishes. You tick the cards you want; the paper cites only those.</p>
+  </details>
 </div>
 <% if (busy) { %><span hidden data-agent-poll="/topics/<%= topic.id %>/agents/status.json"></span><% } %>
 <%- include('../partials/bottom') %>

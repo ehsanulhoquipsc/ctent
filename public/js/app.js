@@ -394,6 +394,32 @@
     r.addEventListener('change', function () { if (!r.checked) return; var f = r.closest('form'); if (f) f.querySelectorAll('input[data-bd]').forEach(function (b) { b.checked = true; }); });
   });
 
+
+  // ===== New project wizard: one step at a time (all steps show without JS) =====
+  var wiz = document.querySelector('[data-wizard]');
+  if (wiz) {
+    wiz.classList.add('js');
+    var go = function (n) {
+      wiz.querySelectorAll('[data-pane]').forEach(function (p) { p.classList.toggle('on', p.getAttribute('data-pane') === String(n)); });
+      wiz.querySelectorAll('[data-wstep]').forEach(function (li) { var k = +li.getAttribute('data-wstep'); li.classList.toggle('on', k === n); li.classList.toggle('past', k < n); });
+      var first = wiz.querySelector('[data-pane="' + n + '"] input:not([type=hidden]), [data-pane="' + n + '"] textarea'); if (first && n === 1) first.focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    wiz.querySelectorAll('[data-wnext]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var n = +b.getAttribute('data-wnext');
+        var t = wiz.querySelector('#title');
+        if (n > 1 && t && !t.checkValidity()) { go(1); t.reportValidity(); return; }
+        go(n);
+      });
+    });
+    go(wiz.querySelector('.alert.err') ? 1 : 1);
+  }
+  // Links that open a <details> section (e.g. "Add a part")
+  document.querySelectorAll('[data-open]').forEach(function (a) {
+    a.addEventListener('click', function () { var d = document.querySelector(a.getAttribute('data-open')); if (d) { d.open = true; setTimeout(function () { var i = d.querySelector('input:not([type=hidden])'); if (i) i.focus(); }, 50); } });
+  });
+
   // Fade out flash messages
   var flash = document.querySelector('.alert[role=status]');
   if (flash) setTimeout(function () { flash.style.transition = 'opacity .4s'; flash.style.opacity = '0'; setTimeout(function () { flash.remove(); }, 400); }, 4000);

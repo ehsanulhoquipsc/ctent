@@ -722,7 +722,7 @@ test('AI agents: work without an AI key, and report failures', async () => {
   delete process.env.GEMINI_API_KEY;
   let m = mockServices();
   try {
-    assert.match((await leader.get('/topics/' + tid + '/agents')).text, /sources-only mode/);
+    assert.match((await leader.get('/topics/' + tid + '/agents')).text, /No AI service connected/);
     const part = await db('parts').where({ topic_id: tid, title: 'Treaties and law' }).first();
     const done = waitForRun();
     await leader.post('/topics/' + tid + '/agents/' + part.id + '/launch').type('form').send({ _csrf: leader.csrf });
@@ -846,6 +846,39 @@ test('AI backup: Gemini busy falls back to Groq; extra sources are searched', as
     assert.strictEqual(ax[0].title, 'Arxiv & paper');
     assert.deepStrictEqual(ax[0].authors, ['D. Three']);
   } finally { global.fetch = real; delete process.env.GEMINI_API_KEY; delete process.env.GROQ_API_KEY; }
+});
+
+test('project journey: wizard creates parts and team, next step guides the leader', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  assert.match((await leader.get('/topics/new')).text, /Start a research project/);
+  // Wizard: template parts and a co-author in one go
+  const r1 = await leader.post('/topics/new').type('form').send({ _csrf: leader.csrf, title: 'Microplastics in rivers', question: 'Where do river microplastics come from?', template: 'policy', invite: String(ids.aisha) });
+  const tid = parseInt(r1.headers.location.match(/\/topics\/(\d+)\/agents/)[1], 10);
+  assert.strictEqual((await db('parts').where({ topic_id: tid })).length, 4);
+  assert.strictEqual((await db('topic_members').where({ topic_id: tid, user_id: ids.aisha }).first()).role, 'member');
+  // Journey: the next step is launching the agents
+  const home = await leader.get('/topics/' + tid);
+  assert.match(home.text, /Launch the agents/);
+  assert.match(home.text, /class="journey-bar"/);
+  assert.match((await aisha.get('/topics/' + tid)).text, /The project leader takes this step/);
+  // AI suggestion in the wizard
+  process.env.GEMINI_API_KEY = 'test-key';
+  const m = mockServices();
+  try {
+    const r2 = await leader.post('/topics/new').type('form').send({ _csrf: leader.csrf, title: 'Dam diplomacy', question: 'How will the dam change diplomacy?', template: 'ai' });
+    const t2 = parseInt(r2.headers.location.match(/\/topics\/(\d+)\//)[1], 10);
+    assert.ok(await db('parts').where({ topic_id: t2, title: 'Hydrology baseline', agent_name: 'Hydrology agent' }).first(), 'AI parts added');
+  } finally { m.restore(); delete process.env.GEMINI_API_KEY; }
+  // Empty project: template button on the Research page
+  const r3 = await leader.post('/topics/new').type('form').send({ _csrf: leader.csrf, title: 'Empty project', template: 'blank' });
+  const t3 = parseInt(r3.headers.location.match(/\/topics\/(\d+)\//)[1], 10);
+  assert.match((await leader.get('/topics/' + t3)).text, /Write your research question/);
+  assert.match((await leader.get('/topics/' + t3 + '/agents')).text, /Use a template/);
+  await leader.post('/topics/' + t3 + '/agents/template').type('form').send({ _csrf: leader.csrf, template: 'grant' });
+  assert.strictEqual((await db('parts').where({ topic_id: t3 })).length, 3);
+  // Old findings URL shows the Research page
+  assert.match((await leader.get('/topics/' + t3 + '/findings')).text, /Parts/);
 });
 
 test('admin can clear workspace data; accounts are kept', async () => {

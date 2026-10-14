@@ -1,39 +1,44 @@
 <%
+  // One menu for every project page: five tabs, a few sub-tabs where needed, and the journey bar.
   const base = '/topics/' + topic.id;
-  let G = [
-    ['Work', 'burgundy', [['Overview', base], ['Plan & agents', base + '/agents'], ['Findings', base + '/findings']]],
-    ['Write', 'teal', [['Final paper', base + '/paper'], ['Submissions', base + '/submissions']]],
-    ['Discuss', 'indigo', [['Channels', base + '/channels'], ['Meetings', base + '/meetings'], ['Co-authors', base + '/members']]],
-    ['Files', 'amber', [['Files', base + '/files']]],
-    ['Manage', 'violet', [['Activity', base + '/activity'], ['Settings', base + '/settings']]]
-  ];
-  // Older people-and-tasks pages still work; they sit under Work.
-  if (['Plan & assign', 'Board'].includes(tab)) G[0][2].push([tab, tab === 'Board' ? base + '/board' : base + '/plan']);
-  if (tab === 'Members') tab = 'Co-authors';
-  if (isGuest) G = [['Work', 'burgundy', [['Overview', base]]], ['Write', 'teal', [['Submissions', base + '/submissions']]], ['Files', 'amber', [['Files', base + '/files']]]];
-  if (!isTopicLeader && !isGuest) G[4][2] = [['Activity', base + '/activity']];
-  const cur = G.find((g) => g[2].some((t) => t[0] === tab)) || G[0];
-  const c = u.color(topic.color);
+  const MAIN = {
+    Overview: 'Journey', 'Plan & agents': 'Research', Findings: 'Research', 'Plan & assign': 'Research', Board: 'Research',
+    'Final paper': 'Paper', Channels: 'Team', Meetings: 'Team', 'Co-authors': 'Team', Members: 'Team', Activity: 'Team',
+    Files: 'Files', Submissions: 'Files', Settings: 'Settings'
+  };
+  const mainTab = MAIN[tab] || 'Journey';
+  let TABS = [['Journey', base, 'home'], ['Research', base + '/agents', 'bot'], ['Paper', base + '/paper', 'edit'], ['Team', base + '/channels', 'chat'], ['Files', base + '/files', 'folder']];
+  const SUBS = {
+    Team: [['Chat', 'Channels', base + '/channels'], ['Meetings', 'Meetings', base + '/meetings'], ['People', 'Co-authors', base + '/members'], ['Activity', 'Activity', base + '/activity']],
+    Files: [['All files', 'Files', base + '/files'], ['Submissions', 'Submissions', base + '/submissions']]
+  };
+  if (isGuest) { TABS = [['Journey', base, 'home'], ['Files', base + '/files', 'folder']]; SUBS.Files = null; }
+  const subTab = tab === 'Members' ? 'Co-authors' : tab;
+  const subs = SUBS[mainTab] && SUBS[mainTab].some((s) => s[1] === subTab) ? SUBS[mainTab] : null;
+  const J = typeof journey !== 'undefined' ? journey : null;
+  const showNext = J && J.next && isTopicLeader && mainTab !== 'Journey' && J.next.label && topic.status !== 'archived';
 %>
 <div class="topic-head">
   <div class="topic-title">
+    <span class="topic-badge" style="background:<%= u.color(topic.color)[1] %>;color:<%= u.color(topic.color)[0] %>"><%= String(topic.code).replace(/^CT-0*/, '') %></span>
     <div>
-      <span class="mono"><%= topic.code %> · <%= topic.field || 'Research' %> · <%= topic.visibility %></span>
-      <div class="split"><h1><%= topic.title %></h1><%- u.tag(topic.status) %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Guest · read only</span><% } else if (isTopicLeader) { %><span class="tag" style="background:var(--pri-soft);color:var(--pri-text)" title="Your role in this topic"><%= me.platform_role === 'admin' ? 'You: admin (full access)' : 'You: leader of this topic' %></span><% } else { %><span class="tag" style="background:var(--indigo-soft);color:var(--indigo)" title="Your role in this topic">You: member</span><% } %></div>
+      <span class="mono"><%= topic.code %><%= topic.field ? ' · ' + topic.field : '' %></span>
+      <div class="split" style="flex-wrap:wrap"><h1><%= topic.title %></h1><% if (topic.status !== 'active') { %><%- u.tag(topic.status) %><% } %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Read only</span><% } %></div>
     </div>
-    <div class="stack"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></div>
-    <% if (topic.status === 'completed') { %><a class="btn btn-finish" href="<%= base %>/finish">🏆 Final report</a><% } else if (isTopicLeader && topic.status !== 'archived') { %><a class="btn btn-finish" href="<%= base %>/finish">🎉 Finish project</a><% } %>
-    <% if (isTopicLeader) { %><a class="btn btn-s" href="<%= base %>/settings"><%- u.icon('edit', 16) %>Edit topic</a><a class="btn btn-s" href="<%= base %>/members">Invite co-author</a><% } %>
-    <% if (isTopicLeader && topic.status !== 'archived' && topic.status !== 'completed') { %><a class="btn btn-p" href="<%= base %>/agents"><%- u.icon('bot') %>Agents</a><% } %>
+    <a class="stack" href="<%= isGuest ? base : base + '/members' %>" title="People in this project"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></a>
+    <% if (showNext) { %>
+      <% if (J.next.action) { %><form method="post" action="<%= J.next.action %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p" title="<%= J.next.title %>"><%= topic.status === 'completed' ? '' : 'Next: ' %><%= J.next.label %> →</button></form>
+      <% } else if (J.next.href) { %><a class="btn btn-p" href="<%= J.next.href %>" title="<%= J.next.title %>"><%= topic.status === 'completed' ? '' : 'Next: ' %><%= J.next.label %> →</a><% } %>
+    <% } %>
   </div>
-  <nav aria-label="Topic sections">
-    <div class="groups">
-      <% G.forEach((g) => { const on = g === cur; const gc = u.color(g[1]); %>
-        <a class="group<%= on ? ' on' : '' %>" href="<%= g[2][0][1] %>" style="<%= on ? 'border:1.5px solid ' + gc[0] + ';background:' + gc[1] + ';color:' + gc[0] : '' %>"><span class="dot" style="background:<%= gc[0] %>"></span><%= g[0] %></a>
-      <% }) %>
-    </div>
-    <div class="subs">
-      <% cur[2].forEach((t) => { %><a class="<%= t[0] === tab ? 'on' : '' %>" href="<%= t[1] %>"<%- t[0] === tab ? ' aria-current="page"' : '' %>><%= t[0] %></a><% }) %>
-    </div>
+  <% if (J) { %>
+  <ol class="journey-bar" aria-label="Project journey">
+    <% J.steps.forEach((s) => { %><li class="<%= s.done ? 'done' : s.current ? 'cur' : '' %>"><a href="<%= isGuest ? base : s.href %>"<%- s.current ? ' aria-current="step"' : '' %>><span class="n"><%= s.done ? '✓' : s.n %></span><span class="t"><b><%= s.label %></b><span><%= s.detail %></span></span></a></li><% }) %>
+  </ol>
+  <% } %>
+  <nav class="ptabs" aria-label="Project sections">
+    <% TABS.forEach(([label, href, ic]) => { %><a class="<%= label === mainTab ? 'on' : '' %>" href="<%= href %>"<%- label === mainTab ? ' aria-current="page"' : '' %>><%- u.icon(ic, 16) %><%= label %></a><% }) %>
+    <% if (isTopicLeader) { %><a class="gear<%= mainTab === 'Settings' ? ' on' : '' %>" href="<%= base %>/settings" title="Project settings" aria-label="Project settings"><%- u.icon('settings', 16) %><span>Settings</span></a><% } %>
   </nav>
+  <% if (subs) { %><nav class="subs" aria-label="<%= mainTab %>"><% subs.forEach(([label, key, href]) => { %><a class="<%= key === subTab ? 'on' : '' %>" href="<%= href %>"<%- key === subTab ? ' aria-current="page"' : '' %>><%= label %></a><% }) %></nav><% } %>
 </div>

@@ -18,7 +18,7 @@
   const GT = { empirical: 'Empirical', methodological: 'Methodological', contextual: 'Contextual', temporal: 'Temporal', theoretical: 'Theoretical', conflicting: 'Conflicting evidence', practical: 'Practice / policy', author: 'Stated by authors' };
   const chip = (id, con) => byId[id] ? '<a class="cchip' + (con ? ' con' : '') + '" href="#c' + id + '" data-jump="' + id + '" title="' + u.esc(byId[id].title) + '" data-i18n-skip>' + u.esc(byId[id].in_text) + '</a>' : '';
 %>
-<a href="/topics/<%= topic.id %>/findings" style="font-size:13px;font-weight:500;text-decoration:none">← Back to findings board</a>
+<a href="/topics/<%= topic.id %>/agents" style="font-size:13px;font-weight:500;text-decoration:none">← All parts</a>
 <section class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:22px 24px" data-agent="<%= part.id %>">
   <span class="agent-ico lg" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('bot', 26) %></span>
   <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:6px">
