@@ -1,0 +1,8 @@
+{% extends "layout.html" %}
+{% block title %}{{ t("nav_history") }}{% endblock %}
+{% block crumb %}<span class="crumb-path"><a href="/">{{ t("crumb") }}</a> / </span>{{ t("nav_history") }}{% endblock %}
+{% block topcta %}<a class="btn btn-p" href="/">{{ icon('plus') }}{{ t("nav_new") }}</a>{% endblock %}
+{% block body %}
+<div class="page-head"><div><h1>{{ t("nav_history") }}</h1><p>{{ t("history_sub") }}</p></div></div>
+{% if runs %}{% include "_runs_table.html" %}{% else %}<div class="card empty">{{ icon('clock', 28) }}<p>{{ t("no_runs") }}</p></div>{% endif %}
+{% endblock %}

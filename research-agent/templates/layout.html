@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="{{ ui }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ t("crumb") }}{% endblock %} · CTENT</title>
+<link rel="icon" href="/static/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/ctent.css">
+<link rel="stylesheet" href="/static/css/agent.css">
+<script src="/static/js/theme.js"></script>
+{% block head %}{% endblock %}
+</head>
+<body>
+<a class="sr" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="side" id="side" aria-label="Main">
+    <a class="logo" href="/"><img src="/static/img/logo.png" alt="CTENT"></a>
+    <div class="sec mono" style="padding-top:0">{{ t("crumb") }}</div>
+    <a class="nav{{ ' on' if active == 'new' }}" href="/">{{ icon('plus') }}<span>{{ t("nav_new") }}</span></a>
+    <a class="nav{{ ' on' if active == 'history' }}" href="/history">{{ icon('clock') }}<span>{{ t("nav_history") }}</span>{% if recent_runs %}<span class="badge plain">{{ total_runs }}</span>{% endif %}</a>
+    {% if recent_runs %}<div class="sec mono">{{ t("nav_recent") }}</div>{% endif %}
+    {% for r in recent_runs %}
+      <a class="pin{{ ' on' if current_run == r.id }}" href="/run/{{ r.id }}" title="{{ r.topic }}"><span class="dot st-{{ r.status }}"></span><span>{{ r.topic }}</span></a>
+    {% endfor %}
+    <div style="flex:1;min-height:20px"></div>
+    <a class="nav" href="{{ ctent_url }}" target="_blank" rel="noopener">{{ icon('home') }}<span>{{ t("nav_back") }}</span>{{ icon('external', 14) }}</a>
+    <div class="me ai-me">
+      <span class="kind {{ 'ai-on' if ai_on else 'ai-off' }}">{{ icon('spark', 16) }}</span>
+      <div class="who"><b>{{ t("ai_status") }}</b><span class="hint">{{ ai_label if ai_on else t("ai_off_short") }}</span></div>
+    </div>
+  </nav>
+  <div class="main">
+    <header class="top">
+      <button class="icon-btn mobile-only" type="button" data-toggle-side aria-label="{{ t('open_menu') }}">{{ icon('menu') }}</button>
+      <div class="crumb">{% block crumb %}{{ t("crumb") }}{% endblock %}</div>
+      <details class="ed lang-menu"><summary class="icon-btn lang-btn" aria-label="{{ t('language') }}" title="{{ t('language') }}">{{ icon('globe', 16) }}<span>{{ 'EN' if ui == 'en' else 'বাংলা' }}</span></summary>
+        <div class="ed-pop" style="width:200px;gap:4px">
+          <span class="label">{{ t("language") }}</span>
+          <a class="lang-opt{{ ' on' if ui == 'en' }}" href="?ui=en" lang="en">English{{ ' ✓' if ui == 'en' }}</a>
+          <a class="lang-opt{{ ' on' if ui == 'bn' }}" href="?ui=bn" lang="bn">বাংলা{{ ' ✓' if ui == 'bn' }}</a>
+        </div>
+      </details>
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="{{ t('theme') }}" title="{{ t('theme') }}">{{ icon('moon') }}</button>
+      {% block topcta %}{% endblock %}
+    </header>
+    <main id="main" class="content">
+      {% block body %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script src="/static/js/shell.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

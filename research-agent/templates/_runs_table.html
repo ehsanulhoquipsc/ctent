@@ -1,0 +1,21 @@
+<div class="card flush scroll-x">
+  <table class="table">
+    <thead><tr><th>{{ t("col_topic") }}</th><th>{{ t("col_lang") }}</th><th>{{ t("col_depth") }}</th><th>{{ t("col_cards") }}</th>
+      <th>{{ t("col_selected") }}</th><th>{{ t("col_status") }}</th><th>{{ t("col_date") }}</th></tr></thead>
+    <tbody>
+    {% for r in runs %}
+      <tr>
+        <td style="max-width:420px"><a class="task-link" href="/run/{{ r.id }}"><b style="font-weight:600">{{ r.topic }}</b></a></td>
+        <td class="text-2">{{ 'বাংলা' if r.lang == 'bn' else 'English' }}</td>
+        <td class="text-2 nowrap">{{ t("depth_" ~ r.depth) }}</td>
+        <td>{{ r.n_items }}</td>
+        <td>{{ r.n_selected }}</td>
+        <td>{% if r.status == 'done' %}<span class="tag dotted t-high">{{ t("s_done") }}</span>
+            {% elif r.status in ('error', 'interrupted') %}<span class="tag dotted t-low">{{ t("s_" ~ r.status) }}</span>
+            {% else %}<span class="tag dotted t-medium">{{ t("s_" ~ r.status) }}</span>{% endif %}</td>
+        <td class="muted nowrap">{{ r.created }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

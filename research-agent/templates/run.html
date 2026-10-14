@@ -1,0 +1,400 @@
+{% extends "layout.html" %}
+{% block title %}{{ run.topic }}{% endblock %}
+{% block crumb %}<span class="crumb-path"><a href="/">{{ t("crumb") }}</a> / <a href="/history">{{ t("nav_history") }}</a> / </span>{{ run.topic[:60] }}{% endblock %}
+{% block head %}<script src="/static/js/chart.umd.min.js"></script>{% endblock %}
+{% block body %}
+<div class="page-head">
+  <div>
+    <span class="mono">{{ t("crumb") }}</span>
+    <h1>{{ run.topic }}</h1>
+    <div class="meta-line">
+      <span class="tag neutral">{{ t("depth_" ~ run.depth) }}</span>
+      <span class="tag neutral">{{ "বাংলা" if run.lang == "bn" else "English" }}</span>
+      <span class="tag dotted {{ 't-high' if run.status == 'done' else ('t-low' if run.status in ('error', 'interrupted') else 't-medium') }}" id="status">{{ t("s_" ~ run.status) }}</span>
+      <span class="muted">{{ run.created }}</span>
+    </div>
+  </div>
+  <div class="split" id="headActions" style="display:none">
+    <span class="sel-count" id="count"></span>
+    <details class="ed" id="exportMenu"><summary class="btn btn-s">{{ icon('download', 16) }}{{ t("export") }}{{ icon('chevron', 14) }}</summary>
+      <div class="ed-pop" style="width:290px;gap:2px;padding:8px">
+        <a class="lang-opt" href="/run/{{ run.id }}/export/evidence.docx">{{ icon('file', 15) }} {{ t("evidence_pack") }} (.docx)</a>
+        <a class="lang-opt" href="/run/{{ run.id }}/export/evidence.md">{{ icon('file', 15) }} {{ t("evidence_pack") }} (.md)</a>
+        <a class="lang-opt" href="/run/{{ run.id }}/export/matrix.xlsx">{{ icon('board', 15) }} {{ t("matrix") }}</a>
+        <a class="lang-opt" href="/run/{{ run.id }}/export/gaps.docx" id="gapsBrief" style="display:none">{{ icon('target', 15) }} {{ t("gaps_brief") }}</a>
+        <a class="lang-opt needsDraft" href="/run/{{ run.id }}/export/draft.docx" style="display:none">{{ icon('edit', 15) }} {{ t("report_draft") }} (.docx)</a>
+        <a class="lang-opt needsDraft" href="/run/{{ run.id }}/export/draft.md" style="display:none">{{ icon('edit', 15) }} {{ t("report_draft") }} (.md)</a>
+        <span class="hint" style="padding:6px 10px 2px">{{ t("export_hint") }}</span>
+      </div>
+    </details>
+    <button class="btn btn-p" id="draftBtn" onclick="makeDraft()" {{ '' if ai_on else 'disabled title="' ~ t('needs_key') ~ '"' }}>{{ icon('edit', 16) }}<span>{{ t("draft_btn") }}</span></button>
+  </div>
+</div>
+
+<section class="card run-progress" id="progress">
+  <ol class="stepper" id="stepper"></ol>
+  <p class="hint" id="runHint" style="text-align:center">{{ t("running_hint") }}</p>
+  <div>
+    <button class="btn-link log-toggle" type="button" onclick="toggleLog()">{{ icon('terminal', 15) }}<span id="logLabel">{{ t("hide_log") }}</span></button>
+    <pre class="log" id="log" style="margin-top:10px">{{ run.log }}</pre>
+  </div>
+</section>
+
+<div class="workspace" id="results" style="display:none">
+  <nav class="tabs" id="tabs" role="tablist">
+    <a href="#cards" data-tab="cards" class="on" role="tab">{{ icon('layers', 16) }}{{ t("tab_cards") }} <span class="cnt" id="nCards"></span></a>
+    <a href="#agree" data-tab="agree" role="tab">{{ icon('scale', 16) }}{{ t("tab_agree") }} <span class="cnt" id="nClaims">0</span></a>
+    <a href="#gaps" data-tab="gaps" role="tab">{{ icon('target', 16) }}{{ t("tab_gaps") }} <span class="cnt" id="nGaps">0</span></a>
+    <a href="#overview" data-tab="overview" role="tab">{{ icon('chart', 16) }}{{ t("tab_overview") }}</a>
+    <a href="#draft" data-tab="draft" role="tab">{{ icon('edit', 16) }}{{ t("tab_draft") }}</a>
+  </nav>
+
+  <section class="tab" id="tab-cards">
+    <div class="filters">
+      <input class="in" type="text" id="fText" placeholder="{{ t('search_ph') }}" oninput="render()">
+      <select class="in" id="fQuestion" onchange="render()"><option value="">{{ t("all_questions") }}</option></select>
+      <select class="in" id="fSort" onchange="render()">
+        <option value="score">{{ t("sort") }}: {{ t("best") }}</option><option value="year">{{ t("sort") }}: {{ t("newest") }}</option>
+        <option value="citations">{{ t("sort") }}: {{ t("most_cited") }}</option></select>
+    </div>
+    <div class="subbar">
+      <button class="btn-link" onclick="selectVisible(true)">{{ t("select_visible") }}</button>
+      <button class="btn-link" onclick="selectVisible(false)">{{ t("clear_visible") }}</button>
+      <button class="btn-link" onclick="toggleFilters()">{{ icon('filter', 13) }} <span id="moreBtn">{{ t("more_filters") }}</span></button>
+      <span class="muted right" id="shown"></span>
+    </div>
+    <div class="more" id="moreFilters" style="display:none">
+      <div class="filters-2">
+        <select class="in" id="fType" onchange="render()"><option value="">{{ t("all_types") }}</option></select>
+        <select class="in" id="fSource" onchange="render()"><option value="">{{ t("all_sources") }}</option></select>
+      </div>
+      <div class="checks">
+        <span class="label">{{ t("reliability") }}</span>
+        <label><input type="checkbox" class="fTier" value="high" checked onchange="render()"> {{ t("high") }}</label>
+        <label><input type="checkbox" class="fTier" value="medium" checked onchange="render()"> {{ t("medium") }}</label>
+        <label><input type="checkbox" class="fTier" value="low" checked onchange="render()"> {{ t("low") }}</label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="fFlag" checked onchange="render()"> {{ t("hide_flagged") }}</label>
+        <label><input type="checkbox" id="fRel" onchange="render()"> {{ t("hide_rel") }}</label>
+        <label><input type="checkbox" id="fFull" onchange="render()"> {{ t("only_fulltext") }}</label>
+        <label><input type="checkbox" id="fData" onchange="render()"> {{ t("only_data") }}</label>
+        <label><input type="checkbox" id="fSel" onchange="render()"> {{ t("selected_only") }}</label>
+      </div>
+    </div>
+    <div id="cards" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <section class="tab" id="tab-agree" hidden>
+    <p class="text-2">{{ t("synth_hint") }}</p>
+    <div id="synth" style="display:flex;flex-direction:column;gap:10px"><div class="empty">{{ icon('scale', 26) }}<p>{{ t("none_yet") }}</p></div></div>
+  </section>
+
+  <section class="tab" id="tab-gaps" hidden>
+    <div class="alert warn">{{ icon('alert') }}<span id="gapsNote"></span></div>
+    <div class="alert info" id="gapsBasic" style="display:none">{{ icon('spark') }}<span>{{ t("gaps_basic") }}</span></div>
+    <div id="gapList" style="display:flex;flex-direction:column;gap:10px"><div class="empty">{{ icon('target', 26) }}<p>{{ t("none_yet") }}</p></div></div>
+    <div class="split">
+      <button class="btn btn-s btn-sm" id="gapSel" onclick="rerunGaps('selected')">{{ t("gaps_rerun_sel") }}</button>
+      <button class="btn btn-s btn-sm" id="gapAll" onclick="rerunGaps('all')">{{ t("gaps_rerun_all") }}</button>
+    </div>
+    <details class="evid"><summary>{{ t("gaps_evidence") }}</summary>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:12px">
+        <div class="card flush scroll-x"><table class="table" id="cov"></table></div>
+        <div class="charts">
+          <div class="chartbox"><span class="mono">{{ t("chart_methods") }}</span><div class="cv"><canvas id="chMethods"></canvas></div></div>
+          <div class="chartbox"><span class="mono">{{ t("chart_countries") }}</span><div class="cv"><canvas id="chCountries"></canvas></div></div>
+        </div>
+        <p class="hint" id="recent"></p>
+      </div>
+    </details>
+  </section>
+
+  <section class="tab" id="tab-overview" hidden>
+    <div class="stats-row" id="stats"></div>
+    <div class="charts">
+      <div class="chartbox"><span class="mono">{{ t("chart_years") }}</span><div class="cv"><canvas id="chYears"></canvas></div></div>
+      <div class="chartbox"><span class="mono">{{ t("chart_tiers") }}</span><div class="cv"><canvas id="chTiers"></canvas></div></div>
+      <div class="chartbox"><span class="mono">{{ t("chart_venues") }}</span><div class="cv"><canvas id="chVenues"></canvas></div></div>
+      <div class="chartbox"><span class="mono">{{ t("chart_sources") }}</span><div class="cv"><canvas id="chSources"></canvas></div></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-draft" hidden>
+    <div class="empty" id="draftEmpty">{{ icon('edit', 26) }}<p>{{ t("draft_empty") }}</p></div>
+    <div id="draftPanel" style="display:none"><div class="draft" id="draft"></div></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RUN = {{ run.id }};
+const LABELS = {{ labels|tojson }};
+const T = {{ T|tojson }};
+const METHODS = {{ methods|tojson }};
+const ICON = {copy: {{ icon('copy', 14)|tojson }}};
+const TYPES = {paper:T.t_paper, book:T.t_book, report:T.t_report, reference:T.t_reference, religious:T.t_religious, web:T.t_web, news:T.t_news};
+const FLAGS = {retracted:T.f_retracted, preprint:T.f_preprint, check_journal:T.f_check_journal};
+const STEPS = [["planning", "step_plan"], ["searching", "step_search"], ["trail", "step_trail"], ["quality", "step_quality"],
+  ["fulltext", "step_fulltext"], ["extracting", "step_read"], ["synthesis", "step_agree"], ["gaps", "step_gaps"], ["done", "step_done"]];
+let items = [], byId = {}, synthesis = [], gapData = {}, charts = {}, lastStep = 0;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isFlagged = i => (i.flags || []).some(f => f === "retracted" || f === "check_journal");
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = id => document.getElementById(id);
+
+function stepper(status) {
+  let cur = STEPS.findIndex(s => s[0] === status);
+  const failed = ["error", "interrupted"].includes(status), done = status === "done";
+  if (status === "queued") cur = 0;
+  if (failed) cur = lastStep;
+  $("stepper").innerHTML = STEPS.map(([k, label], i) => {
+    const past = done || i < cur, now = !done && i === cur;
+    return `<li class="${past ? "past" : now ? "cur" + (failed ? " red" : "") : ""}"><span class="dot">${past ? "✓" : i + 1}</span><b>${esc(T[label])}</b></li>`;
+  }).join("");
+  if (cur >= 0 && !failed) lastStep = cur;
+}
+
+function setStatus(status) {
+  const el = $("status");
+  el.textContent = T["s_" + status] || status;
+  el.className = "tag dotted " + (status === "done" ? "t-high" : ["error", "interrupted"].includes(status) ? "t-low" : "t-medium");
+}
+
+async function poll() {
+  const r = await fetch(`/api/run/${RUN}`).then(r => r.json());
+  setStatus(r.status); stepper(r.status);
+  const log = $("log"); log.textContent = r.log; log.scrollTop = log.scrollHeight;
+  if (["done", "error", "interrupted"].includes(r.status)) {
+    $("runHint").style.display = "none";
+    if (r.status === "done") { $("progress").style.display = "none"; await loadItems(); }
+    if (r.has_draft) showDraft((await fetch(`/api/run/${RUN}/draft`).then(r => r.json())).draft);
+  } else setTimeout(poll, 2000);
+}
+function toggleLog() {
+  const log = $("log"), hidden = log.style.display === "none";
+  log.style.display = hidden ? "" : "none";
+  $("logLabel").textContent = hidden ? T.hide_log : T.show_log;
+}
+
+async function loadItems() {
+  [items, synthesis, gapData] = await Promise.all([fetch(`/api/run/${RUN}/items`).then(r => r.json()),
+    fetch(`/api/run/${RUN}/synthesis`).then(r => r.json()), fetch(`/api/run/${RUN}/gaps`).then(r => r.json())]);
+  items.forEach(i => byId[i.id] = i);
+  $("results").style.display = ""; $("headActions").style.display = "";
+  fill("fQuestion", [...new Set(items.map(i => i.question))], q => q);
+  fill("fType", [...new Set(items.map(i => i.type))], t => TYPES[t] || t);
+  fill("fSource", [...new Set(items.flatMap(i => i.found_in.length ? i.found_in : [i.source]))], s => LABELS[s] || s);
+  renderStats(); renderSynthesis(); renderGaps(); render();
+  let last = (location.hash || "").slice(1);
+  if (!last) { try { last = localStorage.getItem("ctent-tab") || "cards"; } catch (e) { last = "cards"; } }
+  showTab($("tab-" + last) ? last : "cards");
+}
+
+function fill(id, values, label) {
+  values.sort().forEach(v => $(id).insertAdjacentHTML("beforeend", `<option value="${esc(v)}">${esc(label(v))}</option>`));
+}
+function count(list) { const m = {}; list.forEach(k => { if (k !== "" && k != null) m[k] = (m[k] || 0) + 1; }); return m; }
+
+function renderStats() {
+  const claims = synthesis.reduce((n, s) => n + s.claims.length, 0);
+  const stats = [[items.length, T.stat_cards], [items.filter(i => i.fulltext).length, T.stat_fulltext],
+    [items.filter(i => i.via).length, T.stat_trail], [items.filter(i => (i.flags || []).length).length, T.stat_flagged],
+    [claims, T.stat_claims], [(gapData.gaps || []).length, T.stat_gaps]];
+  $("stats").innerHTML = stats.map(([n, l]) => `<div class="card stat"><b>${n}</b><span>${esc(l)}</span></div>`).join("");
+}
+
+function drawCharts() {
+  if (typeof Chart === "undefined" || !items.length) return;
+  Object.values(charts).forEach(c => c.destroy()); charts = {};
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = cssv("--text-2");
+  Chart.defaults.borderColor = cssv("--line-2");
+  const years = count(items.map(i => +i.year).filter(y => y > 1900));
+  const ys = Object.keys(years).map(Number).sort((a, b) => a - b);
+  charts.years = bar("chYears", ys.map(String), ys.map(y => years[y]), cssv("--pri"));
+  const tiers = count(items.map(i => i.tier));
+  charts.tiers = new Chart($("chTiers"), {type: "doughnut",
+    data: {labels: ["high", "medium", "low"].map(t => T[t]), datasets: [{data: ["high", "medium", "low"].map(t => tiers[t] || 0),
+      backgroundColor: [cssv("--green"), cssv("--amber"), cssv("--red")], borderColor: cssv("--surface"), borderWidth: 2}]},
+    options: {maintainAspectRatio: false, cutout: "62%", plugins: {legend: {position: "right", labels: {boxWidth: 10, boxHeight: 10}}}}});
+  const venues = Object.entries(count(items.filter(i => i.type === "paper").map(i => i.venue))).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  charts.venues = bar("chVenues", venues.map(v => v[0].length > 36 ? v[0].slice(0, 34) + "…" : v[0]), venues.map(v => v[1]), cssv("--violet"), true);
+  const srcs = Object.entries(count(items.flatMap(i => i.found_in.length ? i.found_in : [i.source]))).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  charts.sources = bar("chSources", srcs.map(s => LABELS[s[0]] || s[0]), srcs.map(s => s[1]), cssv("--indigo"), true);
+  const st = gapData && gapData.stats;
+  if (st) {
+    charts.methods = bar("chMethods", st.methods.map(m => METHODS[m[0]] || m[0]), st.methods.map(m => m[1]), cssv("--teal"), true);
+    charts.countries = bar("chCountries", st.countries.slice(0, 10).map(c => c[0]), st.countries.slice(0, 10).map(c => c[1]), cssv("--amber"), true);
+  }
+}
+function bar(id, labels, data, color, horizontal) {
+  return new Chart($(id), {type: "bar", data: {labels, datasets: [{data, backgroundColor: color, borderRadius: 4, maxBarThickness: 26}]},
+    options: {maintainAspectRatio: false, indexAxis: horizontal ? "y" : "x", plugins: {legend: {display: false}},
+      scales: {x: {grid: {display: !horizontal}, ticks: {precision: 0}}, y: {grid: {display: !horizontal}, ticks: {precision: 0, autoSkip: !horizontal}}}}});
+}
+document.addEventListener("ctent-theme", drawCharts);
+
+function chips(ids, cls) {
+  return ids.filter(id => byId[id]).map(id => `<button type="button" class="cchip ${cls}" onclick="jump(${id})" title="${esc(byId[id].title)}">${esc(byId[id].in_text)}</button>`).join("");
+}
+function copyBtn(text) {
+  return `<button type="button" class="mini" onclick='navigator.clipboard.writeText(${esc(JSON.stringify(text))}); ctentToast(T.copied)'>${ICON.copy}${esc(T.copy)}</button>`;
+}
+
+function renderSynthesis() {
+  const n = synthesis.reduce((k, s) => k + s.claims.length, 0);
+  $("nClaims").textContent = n;
+  if (!synthesis.length) return;
+  $("synth").innerHTML = synthesis.map(s => `<div class="sq">${esc(s.question)}</div>` + s.claims.map(c => `
+    <div class="claim ${c.consensus}">
+      <div><span class="tag c-${c.consensus}">${esc(T["c_" + c.consensus] || c.consensus)}</span></div>
+      <div>${esc(c.claim)}</div>
+      ${c.support.length ? `<div class="row">${T.supported_by}: ${chips(c.support, "")}</div>` : ""}
+      ${c.contradict.length ? `<div class="row">${T.contradicted_by}: ${chips(c.contradict, "con")}</div>` : ""}
+      ${c.note ? `<div class="row"><b>${T.why}:</b> ${esc(c.note)}</div>` : ""}
+    </div>`).join("")).join("");
+}
+
+function renderGaps() {
+  if (!gapData || !gapData.stats) return;
+  const st = gapData.stats, gaps = gapData.gaps || [];
+  $("gapsBrief").style.display = gaps.length ? "" : "none";
+  $("nGaps").textContent = gaps.length;
+  $("gapsNote").textContent = T.gaps_note.replace("{n}", st.n_relevant);
+  $("gapsBasic").style.display = gapData.ai ? "none" : "";
+  const max = Math.max(1, ...st.coverage.map(c => c.n));
+  $("cov").innerHTML = `<thead><tr><th>${T.cov_q}</th><th>${T.cov_n}</th><th>${T.cov_high}</th><th>${T.cov_full}</th><th></th></tr></thead><tbody>` +
+    st.coverage.map(c => `<tr><td>${esc(c.question)}</td><td class="nowrap"><span class="bar cov-bar"><span style="width:${Math.round(100 * c.n / max)}%"></span></span>${c.n}</td>
+      <td>${c.high}</td><td>${c.full}</td><td>${c.thin ? `<span class="tag p-high">${T.thin}</span>` : ""}</td></tr>`).join("") + "</tbody>";
+  const y = st.years;
+  $("recent").textContent = y.n ? T.recent.replace("{r}", y.recent).replace("{n}", y.n).replace("{y}", y.recent_from).replace("{m}", y.median) : "";
+  if (!gaps.length) { $("gapList").innerHTML = `<div class="empty"><p>${T.gaps_none}</p></div>`; return; }
+  $("gapList").innerHTML = gaps.map((g, n) => `
+    <article class="gap ${g.priority}">
+      <div class="ev-tags"><span class="tag p-${g.priority}">${esc(T["p_" + g.priority] || g.priority)}</span><span class="tag gtype">${esc(T["gt_" + g.type] || g.type)}</span></div>
+      <h3>${n + 1}. ${esc(g.title)}</h3>
+      ${g.description ? `<p class="text-2">${esc(g.description)}</p>` : ""}
+      ${g.signal ? `<p class="sig">${esc(g.signal)}</p>` : ""}
+      ${g.evidence.length ? `<div class="sig">${T.evidence}: ${chips(g.evidence, "")}</div>` : ""}
+      ${g.research_question ? `<div class="rq"><span><b>${T.rq}</b><br>${esc(g.research_question)}${g.method ? `<br><span class="hint"><b>${T.rq_method}:</b> ${esc(g.method)}</span>` : ""}</span>${copyBtn(g.research_question)}</div>` : ""}
+    </article>`).join("");
+}
+
+async function rerunGaps(scope) {
+  if (scope === "selected" && !items.some(i => i.selected)) { alert(T.select_first); return; }
+  const btn = $(scope === "selected" ? "gapSel" : "gapAll"), label = btn.textContent;
+  btn.disabled = true; btn.textContent = T.gaps_running;
+  let r;
+  try { r = await fetch(`/api/run/${RUN}/gaps`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({scope})}).then(r => r.json()); }
+  catch (e) { r = {ok: false, error: "Server error - check the VS Code terminal for details."}; }
+  btn.disabled = false; btn.textContent = label;
+  if (r.ok) { gapData = r.gaps; renderGaps(); renderStats(); drawCharts(); } else alert(r.error);
+}
+
+function jump(id) {
+  showTab("cards");
+  $("fText").value = ""; $("fQuestion").value = ""; $("fType").value = ""; $("fSource").value = "";
+  document.querySelectorAll(".fTier").forEach(c => c.checked = true);
+  ["fFlag", "fRel", "fFull", "fData", "fSel"].forEach(f => $(f).checked = false);
+  render();
+  const el = $("c" + id);
+  if (el) { el.scrollIntoView({behavior: "smooth", block: "start"}); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+}
+
+function visible() {
+  const t = $("fText").value.toLowerCase(), q = $("fQuestion").value, ty = $("fType").value, src = $("fSource").value;
+  const tiers = [...document.querySelectorAll(".fTier:checked")].map(e => e.value);
+  const flag = $("fFlag").checked, full = $("fFull").checked, rel = $("fRel").checked, data = $("fData").checked;
+  const sel = $("fSel").checked, sort = $("fSort").value;
+  const list = items.filter(i =>
+    (!t || [i.title, i.authors.join(" "), i.findings.join(" "), i.abstract, i.method, i.sample].join(" ").toLowerCase().includes(t)) &&
+    (!q || i.question === q) && (!ty || i.type === ty) && (!src || i.found_in.includes(src) || i.source === src) &&
+    tiers.includes(i.tier) && (!flag || !isFlagged(i)) && (!full || i.fulltext) &&
+    (!rel || i.relevance === null || i.relevance >= 2) && (!data || i.data_points.length) && (!sel || i.selected));
+  const key = {score: i => i.score, year: i => +i.year || 0, citations: i => i.citations || 0}[sort];
+  return list.sort((a, b) => key(b) - key(a));
+}
+
+function card(i) {
+  const authors = i.authors.slice(0, 4).join(", ") + (i.authors.length > 4 ? " et al." : "");
+  const srcs = (i.found_in.length ? i.found_in : [i.source]).map(s => LABELS[s] || s).join(" + ");
+  const flags = (i.flags || []).map(f => `<span class="tag f-${f}">${esc(FLAGS[f] || f)}</span>`).join("");
+  const msl = [["method", i.method], ["sample", i.sample], ["limitations", i.limitations], ["future", i.future]].filter(x => x[1]);
+  const meta = [authors, i.year, i.venue].filter(Boolean).map(esc).join(" · ");
+  return `<article class="ev ${i.selected ? "sel" : ""} ${(i.flags || []).includes("retracted") ? "retracted" : ""}" id="c${i.id}">
+    <input type="checkbox" ${i.selected ? "checked" : ""} onchange="toggle(${i.id}, this.checked)" aria-label="Select">
+    <div class="ev-body">
+      <h3>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>` : esc(i.title)}</h3>
+      <div class="ev-tags">${flags}<span class="tag t-${i.tier}">${esc(T[i.tier])}</span><span class="tag neutral">${esc(TYPES[i.type] || i.type)}</span>
+        ${i.fulltext ? `<span class="tag ft">${T.fulltext_badge}</span>` : ""}${i.via ? `<span class="tag tr">${T.trail_badge}</span>` : ""}
+        ${i.relevance !== null ? `<span class="tag rel">${T.ai_relevance} ${i.relevance}/5</span>` : ""}</div>
+      <div class="ev-meta">${meta}${meta ? " · " : ""}${esc(i.via || srcs)}${i.citations ? ` · ${T.cited_by} ${i.citations}` : ""}</div>
+      ${msl.length ? `<dl class="msl">${msl.map(([k, v]) => `<dt>${T[k]}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}
+      ${i.findings.length ? `<ul>${i.findings.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
+      ${i.data_points.length ? `<ul class="data">${i.data_points.map(d => `<li>${esc(d)}</li>`).join("")}</ul>` : ""}
+      ${i.quote ? `<p class="quote">“${esc(i.quote)}”</p>` : ""}
+      ${i.abstract ? `<details><summary>${T.full_abstract}</summary><p>${esc(i.abstract)}</p></details>` : ""}
+      <div class="cite"><span><b>${esc(i.in_text)}</b> ${esc(i.citation)}</span>${copyBtn(i.citation)}</div>
+    </div></article>`;
+}
+
+function render() {
+  const list = visible(), q = $("fQuestion").value;
+  let html = "", cur = null;
+  const grouped = !q && $("fSort").value === "score";
+  const ordered = grouped ? [...list].sort((a, b) => a.question.localeCompare(b.question) || b.score - a.score) : list;
+  for (const i of ordered) {
+    if (grouped && i.question !== cur) { cur = i.question; html += `<div class="mono qhead">${esc(cur)}</div>`; }
+    html += card(i);
+  }
+  $("cards").innerHTML = html || `<div class="empty"><p>${T.no_match}</p></div>`;
+  $("nCards").textContent = items.length;
+  $("shown").textContent = T.shown.replace("{a}", list.length).replace("{b}", items.length);
+  $("count").textContent = `${items.filter(i => i.selected).length} ${T.selected_n}`;
+}
+
+async function save(ids, selected) {
+  await fetch("/api/select", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ids, selected})});
+}
+async function toggle(id, on) { byId[id].selected = on ? 1 : 0; await save([id], on); render(); }
+async function selectVisible(on) {
+  const ids = visible().map(i => i.id);
+  ids.forEach(id => byId[id].selected = on ? 1 : 0);
+  await save(ids, on); render();
+}
+
+async function makeDraft() {
+  const btn = $("draftBtn"), label = btn.querySelector("span");
+  if (!items.some(i => i.selected)) { alert(T.select_first); return; }
+  btn.disabled = true; label.textContent = T.writing;
+  let r;
+  try { r = await fetch(`/api/run/${RUN}/draft`, {method: "POST"}).then(r => r.json()); }
+  catch (e) { r = {ok: false, error: "Server error - check the VS Code terminal for details."}; }
+  btn.disabled = false; label.textContent = T.draft_btn;
+  if (r.ok) { showDraft(r.draft); showTab("draft"); } else alert(r.error);
+}
+function showDraft(md) {
+  $("draftPanel").style.display = ""; $("draftEmpty").style.display = "none";
+  document.querySelectorAll(".needsDraft").forEach(a => a.style.display = "");
+  $("draft").textContent = md;
+}
+
+function showTab(name) {
+  document.querySelectorAll("#tabs a").forEach(a => { const on = a.dataset.tab === name; a.classList.toggle("on", on); a.setAttribute("aria-selected", on); });
+  document.querySelectorAll("section.tab").forEach(sec => sec.hidden = sec.id !== "tab-" + name);
+  if (name === "overview" || name === "gaps") requestAnimationFrame(drawCharts);
+  try { localStorage.setItem("ctent-tab", name); } catch (e) {}
+  history.replaceState(null, "", "#" + name);
+}
+document.querySelectorAll("#tabs a").forEach(a => a.addEventListener("click", e => { e.preventDefault(); showTab(a.dataset.tab); }));
+document.querySelector(".evid").addEventListener("toggle", () => requestAnimationFrame(drawCharts));
+function toggleFilters() { const m = $("moreFilters"); m.style.display = m.style.display === "none" ? "" : "none"; }
+
+stepper("{{ run.status }}");
+poll();
+</script>
+{% endblock %}

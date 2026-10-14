@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+{% block title %}{{ t("nav_new") }}{% endblock %}
+{% block crumb %}<span class="crumb-path"><a href="/">{{ t("crumb") }}</a> / </span>{{ t("nav_new") }}{% endblock %}
+{% block body %}
+<div class="page-head"><div><h1>{{ t("new_research") }}</h1><p>{{ t("page_new_sub") }}</p></div></div>
+
+{% if not ai_on %}<div class="alert warn" role="status">{{ icon('alert') }}<span><b>{{ t("ai_off") }}</b> {{ t("ai_off_desc") }}</span></div>{% endif %}
+{% if not openalex_key %}<div class="alert info" role="status">{{ icon('spark') }}<span>{{ t("openalex_tip") }}</span></div>{% endif %}
+
+<form method="post" action="/run" class="card form-card">
+  <section>
+    <div class="section-title"><span class="num">1</span><h2>{{ t("sec_topic") }}</h2></div>
+    <div class="field">
+      <label for="topic">{{ t("topic_label") }}</label>
+      <textarea id="topic" name="topic" rows="3" required placeholder="{{ t('topic_ph') }}"></textarea>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span class="num">2</span><h2>{{ t("sec_settings") }}</h2></div>
+    <div class="form-grid">
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend class="label" style="margin-bottom:8px">{{ t("output_lang") }}</legend>
+        <div class="chips">
+          <label class="chip pick"><input type="radio" name="lang" value="en" {{ 'checked' if ui == 'en' }}>English</label>
+          <label class="chip pick"><input type="radio" name="lang" value="bn" {{ 'checked' if ui == 'bn' }}>বাংলা</label>
+        </div>
+        <span class="hint">{{ t("lang_hint") }}</span>
+      </fieldset>
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend class="label" style="margin-bottom:8px">{{ t("depth") }}</legend>
+        <div class="chips">
+          {% for key, d in depths.items() %}
+            <label class="chip pick"><input type="radio" name="depth" value="{{ key }}" {{ 'checked' if key == 'standard' }}>{{ t("depth_" ~ key) }}</label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    </div>
+    <div class="field">
+      <span class="label">{{ t("opt_heading") }}</span>
+      <div class="opt-list">
+        <label class="crit pickable"><input type="checkbox" name="opt_fulltext" checked><span>{{ t("opt_fulltext") }}</span></label>
+        <label class="crit pickable"><input type="checkbox" name="opt_trail" checked><span>{{ t("opt_trail") }}</span></label>
+        <label class="crit pickable"><input type="checkbox" name="opt_synthesis" checked {{ '' if ai_on else 'disabled' }}><span>{{ t("opt_synth") }}</span></label>
+        <label class="crit pickable"><input type="checkbox" name="opt_gaps" checked><span>{{ t("opt_gaps") }}</span></label>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span class="num">3</span><h2>{{ t("sec_sources") }}</h2></div>
+    <div class="src-grid">
+      {% for group, items in groups.items() %}
+        <div class="src-group">
+          <div><span class="mono">{{ t("g_" ~ group) }}</span>{% if group == "Bangladesh sources" %}<div class="hint">{{ t("bd_hint") }}</div>{% endif %}</div>
+          <div class="chips">
+            {% for s in items %}
+              <label class="chip pick teal{{ ' off' if not s.available }}" title="{{ (t('needs') ~ ' ' ~ s.needs) if not s.available else s.label }}">
+                <input type="checkbox" name="sources" value="{{ s.key }}" {{ 'data-bd=1' if s.bd }} {{ 'checked' if s.available and (s.default or (s.bd and ui == 'bn')) }} {{ '' if s.available else 'disabled' }}>{{ s.label }}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="form-actions"><button class="btn btn-p" type="submit">{{ icon('search', 16) }}{{ t("start") }}</button></div>
+</form>
+
+<div class="card-head" style="margin:8px 0 -8px"><h2>{{ t("previous") }}</h2>{% if total_runs > 5 %}<a class="btn-link" href="/history">{{ t("view_all") }}</a>{% endif %}</div>
+{% if runs %}{% include "_runs_table.html" %}{% else %}<div class="card empty">{{ icon('clock', 28) }}<p>{{ t("no_runs") }}</p></div>{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('input[name=lang]').forEach(r => r.addEventListener('change', () => {
+  const bn = document.querySelector('input[name=lang]:checked').value === 'bn';
+  document.querySelectorAll('input[data-bd]').forEach(c => { if (!c.disabled) c.checked = bn; });
+}));
+</script>
+{% endblock %}

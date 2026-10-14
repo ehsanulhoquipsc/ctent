@@ -1,0 +1,4 @@
+.env
+research.db
+__pycache__/
+evidence_run*.md
