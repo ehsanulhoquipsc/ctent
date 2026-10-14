@@ -39,6 +39,8 @@ services:
       # Optional: private Semantic Scholar rate limit (https://www.semanticscholar.org/product/api)
       - key: S2_API_KEY
         sync: false
+      - key: CORE_API_KEY
+        sync: false
       - key: CONTACT_EMAIL
         sync: false
       # Showcase website name and tagline

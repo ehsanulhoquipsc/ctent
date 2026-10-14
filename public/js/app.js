@@ -310,6 +310,90 @@
   }
   document.querySelectorAll('[data-fill]').forEach(function (b) { b.addEventListener('click', function () { var i = b.form.querySelector('input[name=body]'); i.value = b.getAttribute('data-fill'); i.focus(); }); });
 
+
+  // ===== Evidence workspace: tabs, filters, card selection, copy, jump to card =====
+  var ws = document.querySelector('[data-tabs]');
+  if (ws) {
+    var showTab = function (name) {
+      var found = ws.querySelector('[data-panel="' + name + '"]') ? name : 'cards';
+      ws.querySelectorAll('.tabs a').forEach(function (a) { var on = a.getAttribute('data-tab') === found; a.classList.toggle('on', on); a.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      ws.querySelectorAll('[data-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-panel') !== found; });
+      try { history.replaceState(null, '', '#' + found); } catch (e) { /* ignore */ }
+    };
+    ws.querySelectorAll('.tabs a').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); showTab(a.getAttribute('data-tab')); }); });
+    if (location.hash && /^#(cards|agree|gaps|overview|log)$/.test(location.hash)) showTab(location.hash.slice(1));
+    else if (location.hash && /^#c\d+$/.test(location.hash)) showTab('cards');
+
+    var form = ws.querySelector('[data-cards]');
+    var cards = form ? Array.prototype.slice.call(form.querySelectorAll('[data-card]')) : [];
+    var val = function (sel) { var el = ws.querySelector('[data-f="' + sel + '"]'); return el ? (el.type === 'checkbox' ? el.checked : el.value) : ''; };
+    var visible = [];
+    var apply = function () {
+      var t = String(val('text')).toLowerCase().trim(), q = val('q'), ty = val('type'), src = val('source'), sort = val('sort') || 'score';
+      var tiers = Array.prototype.map.call(ws.querySelectorAll('[data-f="tier"]:checked'), function (c) { return c.value; });
+      visible = cards.filter(function (c) {
+        var d = c.dataset, rel = d.rel === '' ? null : +d.rel;
+        return (!t || d.text.indexOf(t) >= 0) && (!q || d.q === q) && (!ty || d.type === ty) && (!src || (' ' + d.src + ' ').indexOf(' ' + src + ' ') >= 0) &&
+          tiers.indexOf(d.tier) >= 0 && (!val('hideflag') || d.flag !== '1') && (!val('rel') || rel === null || rel >= 2) && (!val('full') || d.full === '1') &&
+          (!val('data') || d.data === '1') && (!val('sel') || c.querySelector('input[name=card]').checked);
+      });
+      var grouped = !q && sort === 'score';
+      var key = { score: function (c) { return +c.dataset.score; }, year: function (c) { return +c.dataset.year; }, cited: function (c) { return +c.dataset.cited; } }[sort];
+      var order = cards.slice().sort(function (a, b) { return grouped ? (a.dataset.q.localeCompare(b.dataset.q) || key(b) - key(a)) : key(b) - key(a); });
+      var heads = form.querySelectorAll('[data-qhead]');
+      var foot = form.querySelector('.cards-foot'), none = form.querySelector('[data-nomatch]');
+      order.forEach(function (c) {
+        if (grouped) { var h = form.querySelector('[data-qhead="' + CSS.escape(c.dataset.q) + '"]'); if (h) form.insertBefore(h, none || foot); }
+        form.insertBefore(c, none || foot);
+        c.hidden = visible.indexOf(c) < 0;
+      });
+      heads.forEach(function (h) { h.hidden = !grouped || !visible.some(function (c) { return c.dataset.q === h.getAttribute('data-qhead'); }); });
+      if (none) none.hidden = visible.length > 0;
+      var shown = ws.querySelector('[data-shown]'); if (shown) shown.textContent = visible.length + ' of ' + cards.length + ' shown';
+    };
+    ws.querySelectorAll('[data-f]').forEach(function (el) { el.addEventListener(el.tagName === 'INPUT' && el.type !== 'checkbox' ? 'input' : 'change', apply); });
+    if (form) apply();
+
+    var count = function () { var n = cards.filter(function (c) { return c.querySelector('input[name=card]').checked; }).length; document.querySelectorAll('[data-sel-count]').forEach(function (e) { e.textContent = n; }); };
+    var save = function (ids, on) {
+      if (!form || !ids.length) return;
+      fetch(form.getAttribute('data-select-url'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' }, body: JSON.stringify({ ids: ids, selected: on }) }).catch(function () {});
+    };
+    cards.forEach(function (c) {
+      var box = c.querySelector('input[name=card]');
+      if (!box || box.disabled) return;
+      box.addEventListener('change', function () { c.classList.toggle('sel', box.checked); count(); save([+box.value], box.checked); });
+    });
+    ws.querySelectorAll('[data-select-visible]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var on = b.getAttribute('data-select-visible') === '1', ids = [];
+        visible.forEach(function (c) { var box = c.querySelector('input[name=card]'); if (box && !box.disabled && box.checked !== on) { box.checked = on; c.classList.toggle('sel', on); ids.push(+box.value); } });
+        count(); save(ids, on);
+      });
+    });
+    ws.querySelectorAll('[data-toggle]').forEach(function (b) { b.addEventListener('click', function () { var el = document.querySelector(b.getAttribute('data-toggle')); if (el) el.hidden = !el.hidden; }); });
+    ws.querySelectorAll('[data-jump]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        ws.querySelectorAll('[data-f]').forEach(function (el) { if (el.type === 'checkbox') el.checked = el.getAttribute('data-f') === 'tier'; else if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = ''; });
+        showTab('cards'); apply();
+        var c = document.getElementById('c' + a.getAttribute('data-jump'));
+        if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'start' }); c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); }
+      });
+    });
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var text = b.getAttribute('data-copy');
+      var done = function () { var old = b.lastChild.textContent; b.lastChild.textContent = ' Copied'; setTimeout(function () { b.lastChild.textContent = old; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {}); else done();
+    });
+  });
+  // Bangla research ticks the Bangladesh sources
+  document.querySelectorAll('[data-lang-pick] input[value=bn]').forEach(function (r) {
+    r.addEventListener('change', function () { if (!r.checked) return; var f = r.closest('form'); if (f) f.querySelectorAll('input[data-bd]').forEach(function (b) { b.checked = true; }); });
+  });
+
   // Fade out flash messages
   var flash = document.querySelector('.alert[role=status]');
   if (flash) setTimeout(function () { flash.style.transition = 'opacity .4s'; flash.style.opacity = '0'; setTimeout(function () { flash.remove(); }, 400); }, 4000);

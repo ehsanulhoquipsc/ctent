@@ -61,8 +61,8 @@
       <% if (!findings.length) { %><span class="hint"><%= cur.part ? 'None accepted for this part yet.' : 'Accept findings on the Findings tab to use them here.' %></span><% } %>
       <% findings.forEach((f) => { %>
         <div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--line-2)">
-          <span style="font-size:14px;line-height:1.5"><%= f.text %></span>
-          <div class="split" style="flex-wrap:wrap"><span class="hint" style="flex:1"><% if (!cur.part) { %><%= f.part.title %> · <% } %><%= f.confidence %> · <%= f.srcIds.length %> source<%= f.srcIds.length === 1 ? '' : 's' %></span>
+          <span style="font-size:14px;line-height:1.5" data-i18n-skip><%= f.text %></span>
+          <div class="split" style="flex-wrap:wrap"><span class="hint" style="flex:1"><% if (!cur.part) { %><%= f.part.title %> · <% } %><% if (f.card) { %><span data-i18n-skip><%= f.card.in_text %></span> · <%= f.card.tier %> reliability<%= f.card.data_points.length ? ' · ' + f.card.data_points.length + ' data points' : '' %><% } else { %><%= f.confidence %> · <%= f.srcIds.length %> source<%= f.srcIds.length === 1 ? '' : 's' %><% } %></span>
             <% if (!ro) { %><form method="post" action="<%= S %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="insert"><input type="hidden" name="finding" value="<%= f.id %>"><button class="btn btn-s btn-sm"<%= f.used ? ' disabled' : '' %>><%= f.used ? 'Inserted' : 'Insert' %></button></form><% } %>
           </div>
         </div>

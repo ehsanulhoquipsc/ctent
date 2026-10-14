@@ -2,7 +2,7 @@
 <%- include('../partials/topic-header') %>
 <% const ro = !isTopicLeader || topic.status === 'archived'; const B = '/topics/' + topic.id + '/agents'; const TINT = ['teal', 'indigo', 'violet', 'amber', 'burgundy', 'green']; %>
 <% if (!aiOn) { %>
-  <div class="alert info" style="align-items:flex-start"><%- u.icon('spark', 18) %><span><b>Agents are running in sources-only mode.</b> They search real papers and Wikipedia and list the key lines from each source, but they can’t write summaries yet. <%= isAdmin ? 'Add a free GEMINI_API_KEY on the server to turn on written findings — see the README.' : 'Ask your admin to connect a free AI service.' %></span></div>
+  <div class="alert info" style="align-items:flex-start"><%- u.icon('spark', 18) %><span><b>Agents are running in sources-only mode.</b> They search real papers, books and reports and turn each one into an evidence card with its key lines, but they can’t extract findings, map agreement or write drafts yet. <%= isAdmin ? 'Add a free GEMINI_API_KEY on the server to turn on written findings — see the README.' : 'Ask your admin to connect a free AI service.' %></span></div>
 <% } %>
 <div class="cols">
   <div class="wide">
@@ -31,7 +31,7 @@
 
     <div class="split"><h2 style="flex:1">Parts &amp; their agents <span class="mono" style="margin-left:6px"><%= parts.length %></span></h2><% if (!ro) { %><a class="btn btn-s btn-sm" href="#add-part">+ Add a part</a><% } %></div>
     <% if (!parts.length) { %><section class="card"><div class="empty"><b>No parts yet</b><span><%= ro ? 'The researcher hasn’t split this topic yet.' : 'Split the question into parts. Each part gets its own agent.' %></span></div></section><% } %>
-    <% parts.forEach((p, i) => { const s = u.agentStatus(p.agent_status); const tc = u.color(TINT[i % TINT.length]); const src = String(p.agent_sources || 'papers').split(',').filter(Boolean); const working = ['queued', 'running'].includes(s.key); %>
+    <% parts.forEach((p, i) => { const s = u.agentStatus(p.agent_status); const tc = u.color(TINT[i % TINT.length]); const src = normalizeKeys(p.agent_sources || DEFAULT_SOURCES); const working = ['queued', 'running'].includes(s.key); %>
       <article class="card agent-card" id="part<%= p.id %>" data-agent="<%= p.id %>" style="padding:0;overflow:hidden">
         <div class="split" style="padding:16px 20px;border-bottom:1px solid var(--line-2);flex-wrap:wrap">
           <span class="agent-ico" style="background:<%= tc[1] %>;color:<%= tc[0] %>"><%- u.icon('bot', 20) %></span>
@@ -40,11 +40,11 @@
         </div>
         <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px">
           <div><div class="label" style="margin-bottom:4px">What this agent should find out</div><p class="text-2" style="white-space:pre-wrap"><%= p.description || 'No brief yet.' %></p></div>
-          <div class="split" style="flex-wrap:wrap;gap:6px"><% src.forEach((k) => { %><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= SOURCE_TYPES[k] ? SOURCE_TYPES[k].label : k %></span><% }) %><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= (p.agent_depth || 'standard')[0].toUpperCase() + (p.agent_depth || 'standard').slice(1) %> depth</span></div>
+          <div class="split" style="flex-wrap:wrap;gap:6px"><span class="tag" style="background:var(--indigo-soft);color:var(--indigo)"><%= (DEPTH[p.agent_depth] || DEPTH.standard).label %></span><% if (p.agent_lang === 'bn') { %><span class="tag" style="background:var(--green-soft);color:var(--green)" data-i18n-skip>বাংলা</span><% } %><% src.slice(0, 6).forEach((k) => { %><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= label(k) %></span><% }) %><% if (src.length > 6) { %><span class="tag" style="background:var(--line-2);color:var(--text-2)">+<%= src.length - 6 %> more</span><% } %></div>
           <div data-progress<%= working ? '' : ' hidden' %>><div class="bar"><span style="width:<%= p.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= p.agent_step || '' %></span></div>
         </div>
         <div class="split" style="flex-wrap:wrap;padding:12px 20px;background:var(--surface-2);border-top:1px solid var(--line-2)">
-          <span class="hint" style="flex:1 1 220px"><%= s.key === 'failed' && p.agent_step ? p.agent_step : (p.run && p.findings ? p.findings + ' findings from ' + p.sources + ' sources · ' + s.help : s.help) %></span>
+          <span class="hint" style="flex:1 1 220px"><%= s.key === 'failed' && p.agent_step ? p.agent_step : (p.run && p.sources ? p.sources + ' evidence cards' + (p.kept ? ' · ' + p.kept + ' selected' : '') + ' · ' + s.help : s.help) %></span>
           <% if (!ro) { %>
             <details class="ed"><%- u.editSummary('Edit agent') %>
               <form method="post" action="<%= B %>/<%= p.id %>" class="ed-pop wide">
@@ -55,7 +55,7 @@
             </details>
             <%- u.delForm(B + '/' + p.id, csrf, 'Delete the part “' + p.title + '” and everything its agent found?', 'Delete', { action: 'delete' }) %>
           <% } %>
-          <% if (p.run) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= p.id %>"><%= ['review', 'accepted'].includes(s.key) ? 'Open findings' : 'Open' %></a><% } %>
+          <% if (p.run) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= p.id %>"><%= ['review', 'accepted'].includes(s.key) ? 'Open evidence' : 'Open' %></a><% } %>
           <% if (!ro && working) { %><form method="post" action="<%= B %>/<%= p.id %>/stop" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm">Stop</button></form><% } %>
           <% if (!ro && !working) { %><form method="post" action="<%= B %>/<%= p.id %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm"><%= p.run ? 'Run again' : 'Launch agent' %></button></form><% } %>
         </div>
@@ -66,7 +66,7 @@
     <form method="post" action="<%= B %>/parts" class="card" id="add-part" style="display:flex;flex-direction:column;gap:12px">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <h2>Add a part</h2>
-      <%- include('../partials/agent-fields', { p: { agent_sources: 'papers,wiki', agent_depth: 'standard' }, SOURCE_TYPES, DEPTHS, idp: 'n' }) %>
+      <%- include('../partials/agent-fields', { p: { agent_sources: DEFAULT_SOURCES, agent_depth: 'standard' }, SOURCE_TYPES, DEPTHS, idp: 'n' }) %>
       <div><button class="btn btn-p">Add part</button></div>
     </form>
     <% } %>
@@ -84,7 +84,7 @@
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:10px">
       <h3>How agents work</h3>
-      <p class="hint">Each agent plans searches from its brief, searches <b>OpenAlex</b> (250M+ scholarly works) and <b>Wikipedia</b>, keeps the most relevant sources, then writes findings that cite only those sources.</p>
+      <ol class="hint" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px"><li>Splits its part into sub-questions</li><li>Searches up to 21 free sources: papers, books, reports, Wikipedia, web and news</li><li>Merges duplicates, ranks, follows citation trails and checks for retractions</li><li>Reads abstracts and open-access full texts, and turns each source into an evidence card with findings, data and a citation</li><li>Maps where sources agree or disagree, and finds research gaps</li></ol><p class="hint">You tick the cards you want; the paper cites only those.</p>
       <p class="hint">AI: <b><%= aiLabel %></b></p>
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:10px">

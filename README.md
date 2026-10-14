@@ -29,8 +29,13 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
 
 1. **Ask the question.** Create a topic and write the research question.
 2. **Split it into parts.** Each part gets its own agent with a brief, the sources it may use and how deep to go. Templates and **Suggest parts** do this for you.
-3. **Agents research.** Each agent plans searches and searches [OpenAlex](https://openalex.org) (250M+ scholarly works) and Wikipedia. It keeps the most relevant sources, then writes findings that cite **only** those sources. Two agents run at a time.
-4. **Review the findings.** You get a summary, findings with confidence levels and source numbers, gaps, and the full source list with links. Untick anything you don't want, ask the agent to dig deeper, or run it again. Then **accept**. Co-authors can comment.
+3. **Agents research.** Each part's agent (merged from the standalone CTENT Research Agent):
+   - splits its part into sub-questions and searches every selected source for each one;
+   - merges the same paper found in several databases, ranks the results, follows the **citation trail** of the best papers and checks Crossref for **retractions** and questionable journals;
+   - reads abstracts and free **open-access full texts**, and turns each source into an **evidence card**: key findings, data points, method, sample, limitations, a quote checked against the text, a reliability rating and a ready Harvard citation;
+   - maps where sources **agree and contradict**, and finds **research gaps** with suggested research questions.
+   Findings can be written in English or **Bangla** (বাংলা). Two agents run at a time; Quick takes about 3 minutes, Standard 8, Deep up to 25.
+4. **Review the evidence.** The part's page has five tabs: **Evidence** (cards with search, filters and sorting), **Agreement**, **Gaps**, **Overview** (charts) and **Log**. Tick the cards you want, then **accept** them or click **Write paper section from selected**. Export an evidence pack (.docx/.md), a literature matrix (.xlsx) or a research gaps brief (.docx). Ask the agent to dig deeper, or run it again. Co-authors can comment.
 5. **Write the final paper.** There's a section per part plus an introduction and conclusion.
    - Insert accepted findings, which keep their citations, or click **Draft from findings**.
    - The reference list (Harvard) builds itself.
@@ -47,11 +52,26 @@ Agents work without any key, but in that case they only list the key lines from 
 | OpenRouter (AI backup, free models) | `OPENROUTER_API_KEY` | https://openrouter.ai/keys |
 | OpenAlex (papers, bigger daily budget) | `OPENALEX_API_KEY` | https://openalex.org/settings/api |
 | Semantic Scholar (papers, private rate limit) | `S2_API_KEY` | https://www.semanticscholar.org/product/api |
+| CORE (open-access full texts) | `CORE_API_KEY` | https://core.ac.uk/services/api |
 | Your email (polite use of the free services) | `CONTACT_EMAIL` | — |
 
-Sources the agents search, all free: OpenAlex, Semantic Scholar, Europe PMC (health and life sciences), arXiv (preprints) and Wikipedia. Choose them per part.
+Sources, all free and chosen per part:
 
-A run that takes longer than 12 minutes (`AGENT_MAX_MINUTES`) is stopped automatically. Researchers can also press **Stop** and run it again.
+| Group | Sources |
+|---|---|
+| Academic papers | OpenAlex, Semantic Scholar, CrossRef, DOAJ, arXiv, PubMed, Europe PMC, CORE (key) |
+| Books | Open Library, Google Books |
+| Data & reports | World Bank documents and reports |
+| Reference | Wikipedia (+ Bangla Wikipedia) |
+| Islamic sources | Qur'an (Sahih International + Bangla translation), Hadith (Sunnah.com, HadithBD) |
+| Web & news | DuckDuckGo web and news |
+| Bangladesh | BanglaJOL, Bangladesh Bureau of Statistics, Bangladesh Bank, The Daily Star, Prothom Alo (ticked automatically for Bangla research) |
+
+Web, news, Hadith and Bangladesh sources use DuckDuckGo, which sometimes blocks searches from cloud servers. When that happens the agent notes it in the log and carries on with the other sources. Full-text reading needs `CONTACT_EMAIL` for Unpaywall.
+
+Runs are stopped automatically if they take far too long (Quick 10 minutes, Standard 20, Deep 35; `AGENT_MAX_MINUTES` raises the limit). Researchers can also press **Stop** and run it again.
+
+The standalone Python version of the research agent is kept in `research-agent/` for testing on your own computer (`python app.py`); the website uses the JavaScript version built into CTENT.
 
 ### Showcase website (plain HTML and CSS)
 

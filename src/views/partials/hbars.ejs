@@ -1,0 +1,6 @@
+<% const max = Math.max(1, ...rows.map((r) => r[1])); %>
+<div class="chartbox"><span class="mono"><%= title %></span>
+  <% if (!rows.length) { %><span class="hint">Nothing to show yet.</span><% } else { %>
+  <div class="hbars"><% rows.forEach(([k, v]) => { %><div class="hb"><span class="k" title="<%= k %>" data-i18n-skip><%= k %></span><span class="t"><span class="b" style="width:<%= Math.max(3, Math.round(100 * v / max)) %>%;background:<%= color %>"></span></span><span class="v"><%= v %></span></div><% }) %></div>
+  <% } %>
+</div>

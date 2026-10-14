@@ -1,121 +1,250 @@
 <%- include('../partials/top') %>
 <%
   const B = '/topics/' + topic.id + '/agents';
+  const P = B + '/' + part.id;
   const s = u.agentStatus(part.agent_status);
   const ro = !isTopicLeader || topic.status === 'archived';
   const working = ['queued', 'running'].includes(s.key);
   const latestDone = runs.find((x) => x.status === 'done');
-  const viewingOld = run && runs[0] && run.id !== runs[0].id;
-  const canEdit = !ro && run && latestDone && run.id === latestDone.id && s.key !== 'accepted';
-  const srcBy = Object.fromEntries(sources.map((x) => [x.n, x]));
-  const kept = findings.filter((f) => f.kept).length;
+  const viewingOld = run && latestDone && run.id !== latestDone.id && run.status === 'done';
+  const canEdit = !ro && run && latestDone && run.id === latestDone.id;
+  const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
+  const nSel = cards.filter((c) => c.selected).length;
+  const nClaims = synthesis.reduce((a, x) => a + (x.claims || []).length, 0);
+  const gaps = (gapData && gapData.gaps) || [];
+  const TYPES = { paper: 'Paper', book: 'Book', report: 'Report', reference: 'Reference', religious: 'Religious text', web: 'Web', news: 'News' };
+  const FLAGS = { retracted: 'RETRACTED', preprint: 'Preprint (not peer-reviewed)', check_journal: 'Check journal' };
+  const CONS = { strong: 'Strong', moderate: 'Moderate', mixed: 'Mixed', contested: 'Contested', single: 'Single source' };
+  const GT = { empirical: 'Empirical', methodological: 'Methodological', contextual: 'Contextual', temporal: 'Temporal', theoretical: 'Theoretical', conflicting: 'Conflicting evidence', practical: 'Practice / policy', author: 'Stated by authors' };
+  const chip = (id, con) => byId[id] ? '<a class="cchip' + (con ? ' con' : '') + '" href="#c' + id + '" data-jump="' + id + '" title="' + u.esc(byId[id].title) + '" data-i18n-skip>' + u.esc(byId[id].in_text) + '</a>' : '';
 %>
 <a href="/topics/<%= topic.id %>/findings" style="font-size:13px;font-weight:500;text-decoration:none">← Back to findings board</a>
 <section class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:22px 24px" data-agent="<%= part.id %>">
   <span class="agent-ico lg" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('bot', 26) %></span>
   <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:6px">
-    <div class="mono">Part <%= String(n).padStart(2, '0') %> · <span data-i18n-skip><%= part.agent_name || 'Research agent' %></span><%= run && run.finished_at ? ' · finished ' + u.ago(run.finished_at) : '' %><%= sources.length ? ' · ' + sources.length + ' sources' : '' %></div>
+    <div class="mono">Part <%= String(n).padStart(2, '0') %> · <span data-i18n-skip><%= part.agent_name || 'Research agent' %></span><%= run && run.finished_at ? ' · finished ' + u.ago(run.finished_at) : '' %></div>
     <div class="split" style="flex-wrap:wrap"><h1 style="font-size:24px"><%= part.title %></h1><span class="tag dotted" style="background:<%= s.c[1] %>;color:<%= s.c[0] %>"><%= s.label %></span></div>
     <% if (part.description) { %><span class="text-2" style="font-size:14px"><%= part.description %></span><% } %>
+    <% if (run) { %><div class="split" style="flex-wrap:wrap;gap:6px"><span class="tag neutral"><%= ({ quick: 'Quick (~3 min)', standard: 'Standard (~8 min)', deep: 'Deep (~15–25 min)' })[run.depth || part.agent_depth] || 'Standard (~8 min)' %></span><span class="tag neutral" data-i18n-skip><%= lang === 'bn' ? 'বাংলা' : 'English' %></span><% if (run.model) { %><span class="tag neutral"><%= run.model === 'none' ? 'No AI — keyword mode' : run.model.split(' + ')[0] %></span><% } %></div><% } %>
   </div>
-  <% if (!ro && !working) { %><form method="post" action="<%= B %>/<%= part.id %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-s" data-confirm-btn="Run this agent again from scratch? Its current findings stay in the history.">Run again</button></form><% } %>
-  <% if (!ro && s.key === 'accepted') { %><form method="post" action="<%= B %>/<%= part.id %>/findings" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="reopen"><button class="btn btn-s">Change what’s kept</button></form><a class="btn btn-p" href="/topics/<%= topic.id %>/paper">Use in the paper →</a><% } %>
+  <% if (!ro && !working) { %><form method="post" action="<%= P %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-s" data-confirm-btn="Run this agent again from scratch? Its current evidence stays in the run history.">Run again</button></form><% } %>
 </section>
 
 <% if (working) { %>
-  <section class="card" style="display:flex;flex-direction:column;gap:10px" data-agent="<%= part.id %>">
-    <div class="split"><span class="spinner" aria-hidden="true"></span><b style="flex:1"><%= runs[0] && runs[0].followup ? 'Digging deeper: ' + runs[0].followup : 'The agent is working' %></b><span class="mono" data-pct><%= part.agent_progress || 0 %>%</span></div>
+  <section class="card" style="display:flex;flex-direction:column;gap:12px" data-agent="<%= part.id %>">
+    <div class="split"><span class="spinner" aria-hidden="true"></span><b style="flex:1"><%= runs[0] && runs[0].followup ? 'Digging deeper: ' + runs[0].followup : 'The agent is researching' %></b><span class="mono" data-pct><%= part.agent_progress || 0 %>%</span></div>
     <div data-progress><div class="bar"><span style="width:<%= part.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= part.agent_step %></span></div>
-    <div class="split" style="flex-wrap:wrap"><span class="hint" style="flex:1 1 260px">This page updates by itself. You’ll get a notification when the findings are ready. Most runs take 1–3 minutes.</span><% if (!ro) { %><form method="post" action="<%= B %>/<%= part.id %>/stop" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-s btn-sm" data-confirm-btn="Stop this agent? Anything it found so far is discarded; earlier findings are kept.">Stop</button></form><% } %></div>
-    <% if (logs.length) { %><div style="border-top:1px solid var(--line-2);padding-top:8px;display:flex;flex-direction:column;gap:4px"><% logs.slice(-4).forEach((l) => { %><span class="hint">• <%= l.text %></span><% }) %></div><% } %>
+    <ol class="stepper slim"><% [['Plan', 5], ['Search', 12], ['Citations', 48], ['Quality', 54], ['Full text', 58], ['Read', 68], ['Agreement', 86], ['Gaps', 93]].forEach(([l, at], i, a) => { const pc = part.agent_progress || 0; const next = a[i + 1] ? a[i + 1][1] : 100; %><li class="<%= pc >= next ? 'past' : pc >= at ? 'cur' : '' %>"><span class="dot"><%= pc >= next ? '✓' : i + 1 %></span><b><%= l %></b></li><% }) %></ol>
+    <div class="split" style="flex-wrap:wrap"><span class="hint" style="flex:1 1 260px">You can leave this page; the research keeps running and you’ll get a notification when the evidence is ready. Quick runs take about 3 minutes, Standard about 8, Deep up to 25.</span><% if (!ro) { %><form method="post" action="<%= P %>/stop" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-s btn-sm" data-confirm-btn="Stop this agent? Anything it found so far is discarded; earlier evidence is kept.">Stop</button></form><% } %></div>
+    <% if (liveLogs.length) { %><details class="evid" open><summary>Agent log</summary><pre class="log" data-i18n-skip><% liveLogs.slice(-40).forEach((l) => { %>[<%= u.fmtTime(l.created_at) %>] <%= l.text %>
+<% }) %></pre></details><% } %>
   </section>
 <% } %>
-<% if (viewingOld) { %><div class="alert info">You’re looking at an earlier run. <a href="<%= B %>/<%= part.id %>">Show the latest</a></div><% } %>
-<% if (run && run.status === 'failed') { %><div class="alert err" style="align-items:flex-start"><span><b>This run stopped.</b> <%= run.error %></span></div><% } %>
+<% if (viewingOld) { %><div class="alert info">You’re looking at an earlier run. <a href="<%= P %>">Show the latest</a></div><% } %>
+<% if (run && run.status === 'failed' && !working) { %><div class="alert err" style="align-items:flex-start"><span><b>This run stopped.</b> <%= run.error %></span></div><% } %>
 
-<% if (!run || (!findings.length && run.status !== 'failed' && !working)) { %>
-  <% if (!working) { %><section class="card"><div class="empty"><b>No findings yet</b><span><%= ro ? 'The agent hasn’t run yet.' : 'Launch the agent to start researching this part.' %></span><% if (!ro) { %><form method="post" action="<%= B %>/<%= part.id %>/launch"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-p">Launch agent</button></form><% } %></div></section><% } %>
-<% } %>
+<% if (!cards.length) { %>
+  <% if (!working) { %><section class="card"><div class="empty"><b>No evidence yet</b><span><%= ro ? 'The agent hasn’t run yet.' : 'Launch the agent to start researching this part.' %></span><% if (!ro) { %><form method="post" action="<%= P %>/launch"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="review"><button class="btn btn-p">Launch agent</button></form><% } %></div></section><% } %>
+  <% if (logs.length && !working) { %><section class="card"><details class="evid"><summary>What the agent did</summary><pre class="log" data-i18n-skip><% logs.forEach((l) => { %>[<%= u.fmtTime(l.created_at) %>] <%= l.text %>
+<% }) %></pre></details></section><% } %>
+<% } else { %>
 
-<% if (findings.length) { %>
-<div class="cols">
-  <div class="wide">
-    <section class="card" style="display:flex;flex-direction:column;gap:10px">
-      <div class="split" style="flex-wrap:wrap"><h2 style="flex:1">Summary</h2><%- u.confTag(run.confidence) %></div>
-      <p style="font-size:15px;line-height:1.65;white-space:pre-wrap"><%= run.summary %></p>
-      <span class="hint">Written by <%= run.model && run.model !== 'none' ? run.model : 'no AI (key sentences from sources only)' %> · from the numbered sources below only.</span>
-    </section>
+<section class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 18px">
+  <span style="flex:1 1 300px" class="text-2"><%= run.summary %></span>
+  <span class="sel-count"><b data-sel-count><%= nSel %></b> selected</span>
+  <details class="ed"><summary class="btn btn-s btn-sm"><%- u.icon('download', 16) %>Export</summary>
+    <div class="ed-pop" style="width:300px;gap:2px;padding:8px">
+      <a class="lang-opt" href="<%= P %>/export/evidence.docx">Evidence pack (.docx)</a>
+      <a class="lang-opt" href="<%= P %>/export/evidence.md">Evidence pack (.md)</a>
+      <a class="lang-opt" href="<%= P %>/export/matrix.xlsx">Literature matrix (.xlsx)</a>
+      <% if (gaps.length) { %><a class="lang-opt" href="<%= P %>/export/gaps.docx">Research gaps brief (.docx)</a><% } %>
+      <span class="hint" style="padding:6px 10px 2px">Exports use your selected cards, or all cards if none are selected.</span>
+    </div>
+  </details>
+  <% if (canEdit) { %>
+    <form method="post" action="<%= P %>/draft" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm" title="<%= aiOn ? 'Writes this part’s section of the final paper from the cards you selected, with citations' : 'Adds the selected findings to this part’s section (connect an AI service for a written draft)' %>"><%- u.icon('edit', 16) %>Write paper section from selected</button></form>
+  <% } %>
+  <% if (s.key === 'accepted') { %><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/paper">Open the paper →</a><% } %>
+</section>
 
-    <form method="post" action="<%= B %>/<%= part.id %>/findings" class="card" style="display:flex;flex-direction:column;gap:4px">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <div class="split" style="flex-wrap:wrap;padding-bottom:8px"><h2 style="flex:1">Key findings</h2><span class="mono"><%= kept %> of <%= findings.length %> kept for the paper</span></div>
-      <% findings.forEach((f) => { %>
-        <label class="finding<%= f.kept ? '' : ' off' %>">
-          <input type="checkbox" name="keep" value="<%= f.id %>"<%= f.kept ? ' checked' : '' %><%= canEdit ? '' : ' disabled' %>>
-          <span style="display:flex;flex-direction:column;gap:8px;min-width:0">
-            <span style="font-size:15px;line-height:1.55"><%= f.text %></span>
-            <span class="split" style="flex-wrap:wrap;gap:6px"><%- u.confTag(f.confidence) %><% String(f.cites || '').split(',').filter(Boolean).forEach((c) => { const sc = srcBy[c]; %><a class="cite" href="#src<%= c %>" title="<%= sc ? sc.title : '' %>">[<%= c %>]</a><% }) %></span>
-          </span>
-        </label>
+<div class="workspace" data-tabs>
+  <nav class="tabs" role="tablist">
+    <a href="#cards" data-tab="cards" class="on" role="tab"><%- u.icon('layers', 16) %>Evidence <span class="cnt"><%= cards.length %></span></a>
+    <a href="#agree" data-tab="agree" role="tab"><%- u.icon('scale', 16) %>Agreement <span class="cnt"><%= nClaims %></span></a>
+    <a href="#gaps" data-tab="gaps" role="tab"><%- u.icon('target', 16) %>Gaps <span class="cnt"><%= gaps.length %></span></a>
+    <a href="#overview" data-tab="overview" role="tab"><%- u.icon('chart', 16) %>Overview</a>
+    <a href="#log" data-tab="log" role="tab"><%- u.icon('terminal', 16) %>Log</a>
+  </nav>
+
+  <section class="tab" id="tab-cards" data-panel="cards">
+    <div class="filters">
+      <label class="sr" for="fText">Search</label><input class="in" type="search" id="fText" placeholder="Search titles, findings, authors…" data-f="text">
+      <label class="sr" for="fQ">Sub-question</label><select class="in" id="fQ" data-f="q"><option value="">All sub-questions</option><% questions.forEach((q) => { %><option value="<%= q %>" data-i18n-skip><%= q %></option><% }) %></select>
+      <label class="sr" for="fSort">Sort</label><select class="in" id="fSort" data-f="sort"><option value="score">Sort: best match</option><option value="year">Sort: newest</option><option value="cited">Sort: most cited</option></select>
+    </div>
+    <div class="subbar">
+      <% if (canEdit) { %><button type="button" class="btn-link" data-select-visible="1">Select visible</button><button type="button" class="btn-link" data-select-visible="0">Clear visible</button><% } %>
+      <button type="button" class="btn-link" data-toggle="#moreFilters"><%- u.icon('filter', 13) %> More filters</button>
+      <span class="hint" style="margin-left:auto" data-shown><%= cards.length %> of <%= cards.length %> shown</span>
+    </div>
+    <div class="more" id="moreFilters" hidden>
+      <div class="filters-2">
+        <select class="in" data-f="type" aria-label="Type"><option value="">All types</option><% [...new Set(cards.map((c) => c.type))].forEach((t) => { %><option value="<%= t %>"><%= TYPES[t] || t %></option><% }) %></select>
+        <select class="in" data-f="source" aria-label="Source"><option value="">All sources</option><% [...new Set(cards.flatMap((c) => c.found_in.length ? c.found_in : [c.source]))].forEach((k) => { %><option value="<%= k %>"><%= label(k) %></option><% }) %></select>
+      </div>
+      <div class="checks"><span class="label">Reliability:</span><% ['high', 'medium', 'low'].forEach((t) => { %><label><input type="checkbox" data-f="tier" value="<%= t %>" checked> <%= t %></label><% }) %></div>
+      <div class="checks">
+        <label><input type="checkbox" data-f="hideflag" checked> hide retracted &amp; questionable</label>
+        <label><input type="checkbox" data-f="rel"> hide AI relevance &lt; 2</label>
+        <label><input type="checkbox" data-f="full"> only read in full</label>
+        <label><input type="checkbox" data-f="data"> only cards with data</label>
+        <label><input type="checkbox" data-f="sel"> selected only</label>
+      </div>
+    </div>
+    <form method="post" action="<%= P %>/findings" data-cards data-select-url="<%= P %>/select">
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="cards_present" value="1">
+      <% let curQ = null; cards.slice().sort((a, b) => String(a.question || '').localeCompare(String(b.question || '')) || (b.score || 0) - (a.score || 0)).forEach((c) => {
+        const flagged = c.flags.includes('retracted') || c.flags.includes('check_journal');
+        const meta = [c.authorsList.slice(0, 4).join(', ') + (c.authorsList.length > 4 ? ' et al.' : ''), c.year, c.venue].filter(Boolean).join(' · ');
+        const srcs = (c.found_in.length ? c.found_in : [c.source]).map(label).join(' + ');
+        if (c.question !== curQ) { curQ = c.question; %><div class="mono qhead" data-qhead="<%= c.question || '' %>" data-i18n-skip><%= c.question || 'Sources' %></div><% } %>
+        <article class="ev<%= c.selected ? ' sel' : '' %><%= c.flags.includes('retracted') ? ' retracted' : '' %>" id="c<%= c.id %>" data-card
+          data-q="<%= c.question || '' %>" data-type="<%= c.type %>" data-tier="<%= c.tier %>" data-src="<%= (c.found_in.length ? c.found_in : [c.source]).join(' ') %>" data-flag="<%= flagged ? 1 : 0 %>"
+          data-rel="<%= c.relevance === null ? '' : c.relevance %>" data-full="<%= c.fulltext ? 1 : 0 %>" data-data="<%= c.data_points.length ? 1 : 0 %>" data-score="<%= c.score || 0 %>" data-year="<%= c.year || 0 %>" data-cited="<%= c.cited_by || 0 %>"
+          data-text="<%= [c.title, c.authors, c.findings.join(' '), c.abstract, c.method, c.sample].join(' ').toLowerCase().slice(0, 4000) %>">
+          <input type="checkbox" name="card" value="<%= c.id %>" aria-label="Use this card"<%= c.selected ? ' checked' : '' %><%= canEdit ? '' : ' disabled' %>>
+          <div class="ev-body">
+            <h3 data-i18n-skip><% if (c.url) { %><a href="<%= u.safeUrl(c.url) || '#' %>" target="_blank" rel="noopener noreferrer"><%= c.title %></a><% } else { %><%= c.title %><% } %></h3>
+            <div class="ev-tags"><% c.flags.forEach((f) => { %><span class="tag f-<%= f %>"><%= FLAGS[f] || f %></span><% }) %><span class="tag t-<%= c.tier %>"><%= c.tier %></span><span class="tag neutral"><%= TYPES[c.type] || c.type %></span><% if (c.fulltext) { %><span class="tag ft">Read in full</span><% } %><% if (c.via) { %><span class="tag tr">Citation trail</span><% } %><% if (c.relevance !== null) { %><span class="tag rel">AI relevance <%= c.relevance %>/5</span><% } %></div>
+            <div class="ev-meta" data-i18n-skip><%= meta %><%= meta ? ' · ' : '' %><%= c.via || srcs %><%= c.cited_by ? ' · cited by ' + c.cited_by : '' %></div>
+            <% const msl = [['Method', c.method], ['Sample', c.sample], ['Limitations', c.limitations], ['Future research', c.future]].filter((x) => x[1]); if (msl.length) { %><dl class="msl"><% msl.forEach(([k, v]) => { %><dt><%= k %></dt><dd data-i18n-skip><%= v %></dd><% }) %></dl><% } %>
+            <% if (c.findings.length) { %><ul data-i18n-skip><% c.findings.forEach((f) => { %><li><%= f %></li><% }) %></ul><% } %>
+            <% if (c.data_points.length) { %><ul class="data" data-i18n-skip><% c.data_points.forEach((d) => { %><li><%= d %></li><% }) %></ul><% } %>
+            <% if (c.quote) { %><p class="quote" data-i18n-skip>“<%= c.quote %>”</p><% } %>
+            <% if (c.abstract) { %><details><summary>Full abstract / description</summary><p data-i18n-skip><%= c.abstract %></p></details><% } %>
+            <div class="cite"><span data-i18n-skip><b><%= c.in_text %></b> <%= (c.citation || '').replace(/\*/g, '') %></span><button type="button" class="mini" data-copy="<%= (c.citation || '').replace(/\*/g, '') %>"><%- u.icon('copy', 14) %>Copy</button></div>
+          </div>
+        </article>
       <% }) %>
+      <div class="empty" data-nomatch hidden><span>No cards match these filters.</span></div>
       <% if (canEdit) { %>
-        <div class="split" style="flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line-2)"><span class="hint" style="flex:1 1 240px">Untick anything you don’t want in the paper. Only kept findings can be inserted.</span><button class="btn btn-s" name="action" value="save">Save</button><button class="btn btn-p" name="action" value="accept">Accept kept findings</button></div>
+        <div class="split cards-foot"><span class="hint" style="flex:1 1 240px">Tick the cards you want in the paper. Accepting makes them available on the Final paper page, where each one can be inserted with its citation.</span><button class="btn btn-s" name="action" value="save">Save selection</button><button class="btn btn-p" name="action" value="accept"><%= s.key === 'accepted' ? 'Update accepted cards' : 'Accept selected cards' %></button></div>
       <% } %>
     </form>
+  </section>
 
-    <% const gaps = String(run.gaps || '').split('\n').filter(Boolean); if (gaps.length) { %>
-      <section class="card" style="display:flex;flex-direction:column;gap:8px"><h2>Gaps — what it couldn’t find</h2><% gaps.forEach((g) => { %><div class="text-2" style="font-size:14px">• <%= g %></div><% }) %></section>
+  <section class="tab" id="tab-agree" data-panel="agree" hidden>
+    <p class="text-2">Main claims for each sub-question, with the sources that support or contradict them. Click a citation to jump to its card.</p>
+    <% if (!synthesis.length) { %><div class="empty"><%- u.icon('scale', 26) %><span><%= aiOn ? 'No claims were mapped. This needs at least two relevant cards per sub-question.' : 'The agreement map needs an AI service (GEMINI_API_KEY).' %></span></div><% } %>
+    <% synthesis.forEach((sq) => { %>
+      <div class="sq" data-i18n-skip><%= sq.question %></div>
+      <% (sq.claims || []).forEach((c) => { %>
+        <div class="claim <%= c.consensus %>">
+          <div><span class="tag c-<%= c.consensus %>"><%= CONS[c.consensus] || c.consensus %></span></div>
+          <div data-i18n-skip><%= c.claim %></div>
+          <% if ((c.support || []).length) { %><div class="row">Supported by: <%- c.support.map((id) => chip(id)).join('') %></div><% } %>
+          <% if ((c.contradict || []).length) { %><div class="row">Contradicted by: <%- c.contradict.map((id) => chip(id, true)).join('') %></div><% } %>
+          <% if (c.note) { %><div class="row"><b>Why:</b> <span data-i18n-skip><%= c.note %></span></div><% } %>
+        </div>
+      <% }) %>
+    <% }) %>
+  </section>
+
+  <section class="tab" id="tab-gaps" data-panel="gaps" hidden>
+    <% if (gapData) { %>
+      <div class="alert warn"><span>Based on the <%= gapData.stats.n_relevant %> sources collected by this agent, not the whole literature. Check a gap in a library database before claiming it in your work.</span></div>
+      <% if (!gapData.ai) { %><div class="alert info"><span>Basic mode: gaps are based on counts only. Connect an AI service for deeper gaps with research questions.</span></div><% } %>
     <% } %>
-
-    <section class="card flush" id="sources">
-      <div class="card-head" style="padding:16px 20px 4px"><h2>Sources</h2><span class="mono"><%= sources.length %> · open each to check</span></div>
-      <div class="list">
-        <% sources.forEach((x) => { %>
-          <div class="row" id="src<%= x.n %>" style="padding:12px 20px;align-items:flex-start;flex-wrap:wrap">
-            <span class="mono" style="width:32px;color:var(--pri-text);flex:none">[<%= x.n %>]</span>
-            <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:4px">
-              <% if (x.url) { %><a href="<%= u.safeUrl(x.url) || '#' %>" target="_blank" rel="noopener noreferrer" style="font-weight:500;color:var(--text)"><%= x.title %></a><% } else { %><b style="font-weight:500"><%= x.title %></b><% } %>
-              <span class="hint"><%= [x.authors, x.year, x.venue].filter(Boolean).join(' · ') %><%= x.cited_by ? ' · cited ' + x.cited_by + '×' : '' %></span>
-              <% if (x.abstract) { %><details><summary class="hint" style="cursor:pointer">Abstract</summary><p class="text-2" style="font-size:13px;margin-top:6px"><%= x.abstract %></p></details><% } %>
-            </div>
-            <span class="tag" style="background:<%= x.kind === 'wiki' ? 'var(--amber-soft)' : 'var(--green-soft)' %>;color:<%= x.kind === 'wiki' ? 'var(--amber)' : 'var(--green)' %>"><%= x.kind === 'wiki' ? 'Background' : 'Scholarly' %></span>
+    <% if (!gaps.length) { %><div class="empty"><%- u.icon('target', 26) %><span><%= gapData ? 'No clear gaps found in this collection.' : 'The gaps finder wasn’t run for this agent.' %></span></div><% } %>
+    <% gaps.forEach((g, i) => { %>
+      <article class="gap <%= g.priority %>">
+        <div class="ev-tags"><span class="tag p-<%= g.priority %>"><%= g.priority[0].toUpperCase() + g.priority.slice(1) %> priority</span><span class="tag gtype"><%= GT[g.type] || g.type %></span></div>
+        <h3 data-i18n-skip><%= i + 1 %>. <%= g.title %></h3>
+        <% if (g.description) { %><p class="text-2" data-i18n-skip><%= g.description %></p><% } %>
+        <% if (g.signal) { %><p class="sig" data-i18n-skip><%= g.signal %></p><% } %>
+        <% if ((g.evidence || []).length) { %><div class="sig">Evidence: <%- g.evidence.map((id) => chip(id)).join('') %></div><% } %>
+        <% if (g.research_question) { %><div class="rq"><span><b>Suggested research question</b><br><span data-i18n-skip><%= g.research_question %></span><% if (g.method) { %><br><span class="hint"><b>Suggested method:</b> <span data-i18n-skip><%= g.method %></span></span><% } %></span><button type="button" class="mini" data-copy="<%= g.research_question %>"><%- u.icon('copy', 14) %>Copy</button></div><% } %>
+      </article>
+    <% }) %>
+    <% if (canEdit) { %>
+      <form method="post" action="<%= P %>/gaps" class="split" style="flex-wrap:wrap"><input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn btn-s btn-sm" name="scope" value="selected"<%= nSel ? '' : ' disabled title="Select some cards first"' %>>Find gaps from selected cards</button>
+        <button class="btn btn-s btn-sm" name="scope" value="all">Find gaps from all cards</button>
+        <span class="hint">Takes up to a minute.</span>
+      </form>
+    <% } %>
+    <% if (gapData && gapData.stats) { const st = gapData.stats; const maxN = Math.max(1, ...st.coverage.map((c) => c.n)); %>
+      <details class="evid"><summary>The evidence behind these gaps</summary>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:12px">
+          <div class="card flush scroll-x"><table class="table">
+            <thead><tr><th>Sub-question</th><th>Sources</th><th>High reliability</th><th>Read in full</th><th></th></tr></thead>
+            <tbody><% st.coverage.forEach((c) => { %><tr><td data-i18n-skip><%= c.question %></td><td class="nowrap"><span class="hbar"><span style="width:<%= Math.round(100 * c.n / maxN) %>%"></span></span><%= c.n %></td><td><%= c.high %></td><td><%= c.full %></td><td><% if (c.thin) { %><span class="tag p-high">thin evidence</span><% } %></td></tr><% }) %></tbody>
+          </table></div>
+          <div class="charts">
+            <%- include('../partials/hbars', { title: 'Research methods', rows: st.methods.map(([m, k]) => [ev.methodLabel('en', m), k]), color: 'var(--teal)' }) %>
+            <%- include('../partials/hbars', { title: 'Countries studied', rows: st.countries.slice(0, 10), color: 'var(--amber)' }) %>
           </div>
-        <% }) %>
+          <% if (st.years.n) { %><p class="hint"><%= st.years.recent %> of <%= st.years.n %> dated studies are from <%= st.years.recent_from %> or later (median year <%= st.years.median %>).</p><% } %>
+        </div>
+      </details>
+    <% } %>
+  </section>
+
+  <section class="tab" id="tab-overview" data-panel="overview" hidden>
+    <div class="stats-row">
+      <% [[cards.length, 'cards'], [cards.filter((c) => c.fulltext).length, 'read in full'], [cards.filter((c) => c.via).length, 'from citation trail'], [cards.filter((c) => c.flags.length).length, 'flagged'], [nClaims, 'claims mapped'], [gaps.length, 'research gaps']].forEach(([v, l]) => { %><div class="card stat"><b><%= v %></b><span><%= l %></span></div><% }) %>
+    </div>
+    <div class="charts">
+      <div class="chartbox"><span class="mono">Publications by year</span>
+        <% const ys = overview.years; const ym = Math.max(1, ...ys.map((y) => y[1])); %>
+        <% if (!ys.length) { %><span class="hint">No dated sources.</span><% } else { %><div class="vbars"><% ys.forEach(([y, k]) => { %><div class="vb" title="<%= y %>: <%= k %>"><span class="v"><%= k %></span><span class="b" style="height:<%= Math.max(4, Math.round(100 * k / ym)) %>%"></span><span class="x"><%= ys.length > 12 ? "'" + String(y).slice(-2) : y %></span></div><% }) %></div><% } %>
       </div>
+      <div class="chartbox"><span class="mono">Reliability</span>
+        <% const tot = Math.max(1, cards.length); const [h, m] = [overview.tiers[0][1], overview.tiers[1][1]]; const a1 = Math.round(360 * h / tot), a2 = Math.round(360 * (h + m) / tot); %>
+        <div class="donut-wrap"><div class="donut" style="background:conic-gradient(var(--green) 0deg <%= a1 %>deg, var(--amber) <%= a1 %>deg <%= a2 %>deg, var(--red) <%= a2 %>deg 360deg)"><span><%= cards.length %></span></div>
+          <ul class="legend"><% overview.tiers.forEach(([k, v], i) => { %><li><i style="background:var(--<%= ['green', 'amber', 'red'][i] %>)"></i><%= k %> <b><%= v %></b></li><% }) %></ul></div>
+      </div>
+      <%- include('../partials/hbars', { title: 'Top journals / venues', rows: overview.venues, color: 'var(--violet)' }) %>
+      <%- include('../partials/hbars', { title: 'Results by source', rows: overview.sources, color: 'var(--indigo)' }) %>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-log" data-panel="log" hidden>
+    <% if (plan.questions && plan.questions.length) { %><div><div class="label" style="margin-bottom:6px">Sub-questions the agent searched</div><ol class="plan" data-i18n-skip><% plan.questions.forEach((q) => { %><li><%= q.question %> <span class="hint">[<%= q.query %>]</span></li><% }) %></ol></div><% } %>
+    <pre class="log" data-i18n-skip><% logs.forEach((l) => { %>[<%= u.fmtTime(l.created_at) %>] <%= l.text %>
+<% }) %></pre>
+  </section>
+</div>
+<% } %>
+
+<div class="cols">
+  <div class="wide">
+    <section class="card" id="comments" style="display:flex;flex-direction:column;gap:10px">
+      <div class="split"><h3 style="flex:1">Comments</h3><span class="mono"><%= comments.length %></span></div>
+      <% if (!comments.length) { %><span class="hint">Co-authors can comment on this evidence here.</span><% } %>
+      <% comments.forEach((c) => { %><div class="split" style="align-items:flex-start"><%- u.avatar({ id: c.uid, name: c.name || '?', color: c.color }, 'sm') %><div style="flex:1;min-width:0"><div class="split"><b style="font-size:13px"><%= c.name || 'Former member' %></b><span class="mono" style="text-transform:none"><%= u.ago(c.created_at) %></span><% if (c.uid === me.id || isTopicLeader) { %><span style="margin-left:auto"><%- u.delForm(P + '/comments', csrf, 'Delete this comment?', 'Delete', { action: 'delete', id: c.id }) %></span><% } %></div><p style="font-size:14px;line-height:1.5;white-space:pre-wrap" data-i18n-skip><%= c.body %></p></div></div><% }) %>
+      <% if (!isGuest && topic.status !== 'archived') { %><form method="post" action="<%= P %>/comments" class="split"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="cm">Comment</label><input class="in" id="cm" name="body" maxlength="2000" required placeholder="Comment on this evidence…" style="flex:1"><button class="btn btn-s btn-sm" style="height:40px">Post</button></form><% } %>
     </section>
   </div>
   <aside class="narrow">
     <% if (!ro) { %>
-    <form method="post" action="<%= B %>/<%= part.id %>/ask" class="card" style="display:flex;flex-direction:column;gap:10px">
+    <form method="post" action="<%= P %>/ask" class="card" style="display:flex;flex-direction:column;gap:10px">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <h3>Ask the agent to dig deeper</h3>
       <label class="sr" for="fu">Follow-up</label>
       <textarea class="in" id="fu" name="followup" rows="3" maxlength="1000" placeholder="e.g. Find studies on dry-season flow in Bangladesh after 2018"<%= working ? ' disabled' : '' %>></textarea>
       <button class="btn btn-p btn-sm"<%= working ? ' disabled' : '' %>>Send to agent</button>
-      <span class="hint">It runs again with your question. Earlier findings stay in the history.</span>
+      <span class="hint">It runs again with your question. Earlier evidence stays in the run history.</span>
     </form>
     <% } %>
-    <section class="card" style="display:flex;flex-direction:column;gap:4px">
-      <h3 style="margin-bottom:6px">How the agent worked</h3>
-      <% logs.forEach((l) => { %><div class="split" style="align-items:flex-start;padding:6px 0"><span class="tick" aria-hidden="true">✓</span><div style="min-width:0"><div style="font-size:13px;line-height:1.45"><%= l.text %></div><div class="mono" style="text-transform:none"><%= u.fmtTime(l.created_at) %></div></div></div><% }) %>
-    </section>
     <% if (runs.length > 1) { %>
     <section class="card" style="display:flex;flex-direction:column;gap:6px">
       <h3 style="margin-bottom:4px">Run history</h3>
-      <% runs.forEach((x, i) => { %><a class="split" href="?run=<%= x.id %>" style="text-decoration:none;color:var(--text);padding:6px 8px;border-radius:8px;<%= run && run.id === x.id ? 'background:var(--pri-soft)' : '' %>"><span style="flex:1;font-size:13px"><%= i === 0 ? 'Latest' : 'Run ' + (runs.length - i) %><%= x.followup ? ' · follow-up' : '' %></span><span class="hint"><%= u.ago(x.started_at) %></span></a><% }) %>
+      <% runs.forEach((x, i) => { %><a class="split" href="?run=<%= x.id %>" style="text-decoration:none;color:var(--text);padding:6px 8px;border-radius:8px;<%= run && run.id === x.id ? 'background:var(--pri-soft)' : '' %>"><span style="flex:1;font-size:13px"><%= i === 0 ? 'Latest' : 'Run ' + (runs.length - i) %><%= x.followup ? ' · follow-up' : '' %><%= x.status === 'failed' ? ' · stopped' : x.status === 'running' ? ' · working' : '' %></span><span class="hint"><%= u.ago(x.started_at) %></span></a><% }) %>
     </section>
     <% } %>
-    <section class="card" id="comments" style="display:flex;flex-direction:column;gap:10px">
-      <div class="split"><h3 style="flex:1">Comments</h3><span class="mono"><%= comments.length %></span></div>
-      <% if (!comments.length) { %><span class="hint">Co-authors can comment on these findings here.</span><% } %>
-      <% comments.forEach((c) => { %><div class="split" style="align-items:flex-start"><%- u.avatar({ id: c.uid, name: c.name || '?', color: c.color }, 'sm') %><div style="flex:1;min-width:0"><div class="split"><b style="font-size:13px"><%= c.name || 'Former member' %></b><span class="mono" style="text-transform:none"><%= u.ago(c.created_at) %></span><% if (c.uid === me.id || isTopicLeader) { %><span style="margin-left:auto"><%- u.delForm(B + '/' + part.id + '/comments', csrf, 'Delete this comment?', 'Delete', { action: 'delete', id: c.id }) %></span><% } %></div><p style="font-size:14px;line-height:1.5;white-space:pre-wrap"><%= c.body %></p></div></div><% }) %>
-      <% if (!isGuest && topic.status !== 'archived') { %><form method="post" action="<%= B %>/<%= part.id %>/comments" class="split"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="cm">Comment</label><input class="in" id="cm" name="body" maxlength="2000" required placeholder="Comment on these findings…" style="flex:1"><button class="btn btn-s btn-sm" style="height:40px">Post</button></form><% } %>
-    </section>
   </aside>
 </div>
-<% } else if (logs.length) { %>
-  <section class="card" style="display:flex;flex-direction:column;gap:4px"><h3 style="margin-bottom:6px">What the agent did</h3><% logs.forEach((l) => { %><div class="text-2" style="font-size:13px;padding:4px 0">• <%= l.text %></div><% }) %></section>
-<% } %>
 <% if (prev || next) { %><div class="split" style="flex-wrap:wrap"><% if (prev) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= prev.id %>">← <%= prev.title %></a><% } %><span style="flex:1"></span><% if (next) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= next.id %>"><%= next.title %> →</a><% } %></div><% } %>
 <% if (working) { %><span hidden data-agent-poll="/topics/<%= topic.id %>/agents/status.json"></span><% } %>
 <%- include('../partials/bottom') %>

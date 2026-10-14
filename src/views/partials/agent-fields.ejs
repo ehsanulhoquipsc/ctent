@@ -1,10 +1,30 @@
-<% const srcOn = String(p.agent_sources || '').split(','); %>
+<%
+  const srcOn = normalizeKeys(p.agent_sources || DEFAULT_SOURCES);
+  const optOn = String(p.agent_options === null || p.agent_options === undefined ? 'fulltext,trail,synthesis,gaps' : p.agent_options).split(',');
+  const langOn = p.agent_lang === 'bn' ? 'bn' : 'en';
+%>
 <div class="field"><label for="<%= idp %>t">Part title</label><input id="<%= idp %>t" name="title" required minlength="3" maxlength="240" value="<%= p.title || '' %>" placeholder="e.g. Downstream water security — India & Bangladesh"></div>
-<div class="field"><label for="<%= idp %>b">What should this agent find out?</label><textarea id="<%= idp %>b" name="brief" rows="3" maxlength="1500" placeholder="The question for this part, what to focus on, anything to avoid"><%= p.description || '' %></textarea></div>
+<div class="field"><label for="<%= idp %>b">What should this agent find out?</label><textarea id="<%= idp %>b" name="brief" rows="3" maxlength="1500" placeholder="The question for this part, what to focus on, anything to avoid (English or Bangla)"><%= p.description || '' %></textarea></div>
 <div class="field"><label for="<%= idp %>a">Agent name</label><input id="<%= idp %>a" name="agent_name" maxlength="100" value="<%= p.agent_name || '' %>" placeholder="e.g. Water security agent"></div>
-<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Where to look</legend>
-  <div class="chips"><% Object.entries(SOURCE_TYPES).forEach(([k, s]) => { %><label class="chip pick" title="<%= s.note %>"><input type="checkbox" name="sources" value="<%= k %>"<%= srcOn.includes(k) ? ' checked' : '' %>> <%= s.label %></label><% }) %></div>
+<div class="agent-settings">
+  <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">How deep</legend>
+    <div class="chips"><% DEPTHS.forEach((d) => { %><label class="chip pick"><input type="radio" name="depth" value="<%= d %>"<%= (p.agent_depth || 'standard') === d ? ' checked' : '' %>> <%= DEPTH[d].label %></label><% }) %></div>
+  </fieldset>
+  <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Findings language</legend>
+    <div class="chips" data-lang-pick><label class="chip pick"><input type="radio" name="lang" value="en"<%= langOn === 'en' ? ' checked' : '' %>> English</label><label class="chip pick"><input type="radio" name="lang" value="bn"<%= langOn === 'bn' ? ' checked' : '' %>> <span data-i18n-skip>বাংলা</span></label></div>
+    <span class="hint">Findings and drafts are written in this language. Academic databases are always searched in English.</span>
+  </fieldset>
+</div>
+<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Deeper research</legend>
+  <input type="hidden" name="opts_present" value="1">
+  <div class="opt-list"><% Object.entries(OPTIONS).forEach(([k, label]) => { %><label class="opt"><input type="checkbox" name="opts" value="<%= k %>"<%= optOn.includes(k) ? ' checked' : '' %>> <span><%= label %></span></label><% }) %></div>
 </fieldset>
-<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">How deep</legend>
-  <div class="chips"><% DEPTHS.forEach((d) => { %><label class="chip pick"><input type="radio" name="depth" value="<%= d %>"<%= (p.agent_depth || 'standard') === d ? ' checked' : '' %>> <%= d[0].toUpperCase() + d.slice(1) %> <span class="hint"><%= d === 'quick' ? '~8 sources' : d === 'standard' ? '~14 sources' : '~22 sources' %></span></label><% }) %></div>
+<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Where to look</legend>
+  <div class="src-grid">
+    <% GROUPS.forEach((g) => { const list = Object.entries(SOURCE_TYPES).filter(([, s]) => s.group === g); %>
+      <div class="src-group"><span class="mono"><%= g %></span><% if (g === 'Bangladesh sources') { %><span class="hint">Ticked automatically for Bangla research.</span><% } %>
+        <div class="chips"><% list.forEach(([k, s]) => { const ok = available(k); %><label class="chip pick<%= ok ? '' : ' off' %>" title="<%= s.note || '' %><%= ok ? '' : ' — needs ' + s.needs %>"><input type="checkbox" name="sources" value="<%= k %>"<%= srcOn.includes(k) && ok ? ' checked' : '' %><%= ok ? '' : ' disabled' %><%= s.bd ? ' data-bd' : '' %>> <%= s.label %></label><% }) %></div>
+      </div>
+    <% }) %>
+  </div>
 </fieldset>

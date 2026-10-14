@@ -7,7 +7,11 @@
 // Set more than one and they back each other up: if one is busy or fails, the next is tried.
 // With no key, agents still collect real sources but can't write summaries (see agent.js).
 
-const TIMEOUT = parseInt(process.env.LLM_TIMEOUT_MS || '45000', 10);
+const TIMEOUT = parseInt(process.env.LLM_TIMEOUT_MS || '60000', 10);
+// Free tiers allow roughly 10-15 requests a minute, so calls are spaced out (shared by every running agent).
+const GAP_MS = parseInt(process.env.LLM_MIN_INTERVAL_MS || (process.env.NODE_ENV === 'test' ? '0' : '4000'), 10);
+let nextCall = 0;
+async function pace() { const t = Date.now(); const at = Math.max(t, nextCall); nextCall = at + GAP_MS; if (at > t) await new Promise((r) => setTimeout(r, at - t)); }
 let geminiModel = null; // resolved once, then reused
 
 const OPENAI_LIKE = {
@@ -104,6 +108,7 @@ async function json(system, prompt, onTry) {
   for (const p of list) {
     try {
       if (onTry) await onTry(nameOf(p));
+      await pace();
       const text = p === 'gemini' ? await gemini(system, prompt) : await openaiCompatible(p, system, prompt);
       const out = parseJson(text);
       out._by = nameOf(p);

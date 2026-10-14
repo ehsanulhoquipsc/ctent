@@ -29,8 +29,8 @@
           <b style="font-size:15px;line-height:1.35"><%= p.title %></b>
           <% if (k === 'running') { %><div data-progress><div class="bar"><span style="width:<%= p.agent_progress || 0 %>%;background:var(--indigo)"></span></div><span class="hint" data-step><%= p.agent_step || 'Waiting to start' %></span></div><% } %>
           <% if (k === 'failed') { %><span class="hint" style="color:var(--red)"><%= p.agent_step %></span><% } %>
-          <% if (p.run && ['review', 'accepted'].includes(k)) { %><div class="split" style="flex-wrap:wrap;gap:6px"><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= p.sources %> sources</span><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= k === 'accepted' ? p.kept + ' kept' : p.findings + ' findings' %></span><%- u.confTag(p.run.confidence) %></div><% } %>
-          <a class="btn <%= k === 'review' ? 'btn-p' : 'btn-s' %> btn-sm" href="<%= link %>"><%= k === 'review' ? 'Review findings →' : k === 'accepted' ? 'Open findings' : k === 'running' ? 'Watch progress' : k === 'failed' ? 'See what happened' : 'Set up & launch' %></a>
+          <% if (p.run && ['review', 'accepted'].includes(k)) { %><div class="split" style="flex-wrap:wrap;gap:6px"><span class="tag" style="background:var(--line-2);color:var(--text-2)"><%= p.sources %> evidence cards</span><% if (p.kept) { %><span class="tag" style="background:var(--green-soft);color:var(--green)"><%= p.kept %> selected</span><% } %></div><% } %>
+          <a class="btn <%= k === 'review' ? 'btn-p' : 'btn-s' %> btn-sm" href="<%= link %>"><%= k === 'review' ? 'Review evidence →' : k === 'accepted' ? 'Open evidence' : k === 'running' ? 'Watch progress' : k === 'failed' ? 'See what happened' : 'Set up & launch' %></a>
         </article>
       <% }) %>
       <% if (!list.length) { %><div class="hint" style="padding:6px 4px">None</div><% } %>

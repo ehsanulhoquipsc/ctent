@@ -47,11 +47,14 @@ async function acceptedFindings(topicId, partIds) {
   for (const p of parts) {
     const run = await db('agent_runs').where({ part_id: p.id, status: 'done' }).orderBy('id', 'desc').first();
     if (!run) continue;
-    const [fs, ss] = await Promise.all([db('agent_findings').where({ run_id: run.id, kept: true }).orderBy('position'), db('agent_sources').where({ run_id: run.id }).select('id', 'n')]);
+    const [fs, ss] = await Promise.all([db('agent_findings').where({ run_id: run.id, kept: true }).orderBy('position'), db('agent_sources').where({ run_id: run.id })]);
     const idOf = Object.fromEntries(ss.map((s) => [s.n, s.id]));
+    const cardOf = Object.fromEntries(ss.map((s) => [s.id, s]));
     fs.forEach((f) => {
-      const ids = String(f.cites || '').split(',').map((x) => idOf[parseInt(x, 10)]).filter(Boolean);
-      out.push({ ...f, part: p, srcIds: ids, marks: ids.map((id) => '[src:' + id + ']').join('') });
+      const ids = f.source_id ? [f.source_id] : String(f.cites || '').split(',').map((x) => idOf[parseInt(x, 10)]).filter(Boolean);
+      const card = f.source_id && cardOf[f.source_id] ? agent.parseCard(cardOf[f.source_id]) : null;
+      if (card && card.flags.includes('retracted')) return; // retracted papers are never cited
+      out.push({ ...f, part: p, run, card, srcIds: ids, marks: ids.map((id) => '[src:' + id + ']').join('') });
     });
   }
   return out;
@@ -59,6 +62,7 @@ async function acceptedFindings(topicId, partIds) {
 
 function harvard(s) {
   if (!s) return 'Source removed';
+  if (s.citation) return s.citation.replace(/\*/g, '');
   const who = s.kind === 'wiki' ? 'Wikipedia contributors' : (s.authors || 'Unknown author');
   return who + ' (' + (s.year || 'n.d.') + ') ' + (s.kind === 'wiki' ? s.title.replace(/ \(Wikipedia\)$/, '') : '‘' + s.title + '’') + (s.venue && s.kind !== 'wiki' ? ', ' + s.venue : '') + '.' + (s.doi ? ' doi:' + s.doi + '.' : s.url ? ' Available at: ' + s.url + '.' : '');
 }
@@ -80,6 +84,27 @@ function renderBody(body, num) {
 }
 const plain = (body, num) => String(body || '').replace(/(?:\[src:(\d+)\])+/g, (all) => { const ns = [...all.matchAll(/\[src:(\d+)\]/g)].map((m) => num[parseInt(m[1], 10)]).filter(Boolean); return ns.length ? ' [' + ns.join(', ') + ']' : ''; });
 const words = (sections) => sections.reduce((a, s) => a + String(s.body || '').replace(MARK, '').split(/\s+/).filter(Boolean).length, 0);
+
+// Draft into a section from accepted cards: AI writes connected paragraphs with [src:ID] citations; without AI the findings go in as they are.
+async function draftInto(req, res, s) {
+  const t = req.topic;
+  const items = await acceptedFindings(t.id, s.part_id ? [s.part_id] : null);
+  if (!items.length) { req.flash('error', s.part_id ? 'Accept this part’s evidence cards first, then draft from them.' : 'Accept some evidence cards first, then draft from them.'); return res.redirect(back(t, s)); }
+  let text = '', note = null;
+  if (llm.available()) {
+    const run = (items.find((f) => f.run) || {}).run;
+    try { text = await agent.draftSection(t, s, items, run ? run.lang : 'en'); } catch (e) { note = 'The AI service couldn’t draft this right now (' + e.message + '). The findings were added as they are instead.'; }
+  }
+  if (!text) text = items.map((f) => f.text.trim() + ' ' + f.marks).join('\n\n');
+  // keep only markers that point at real sources
+  const valid = new Set(items.flatMap((f) => f.srcIds));
+  text = text.replace(MARK, (m, id) => (valid.has(parseInt(id, 10)) ? m : ''));
+  const body = (String(s.body || '').trim() ? String(s.body).trim() + '\n\n' : '') + text;
+  await db('paper_sections').where({ id: s.id }).update({ body, updated_by: req.user.id, updated_at: now() });
+  await audit(req.user.id, t.id, 'paper.drafted', 'Drafted “' + s.title + '” from ' + items.length + ' evidence cards');
+  req.flash(note ? 'error' : 'ok', note || (llm.available() ? 'Drafted from your accepted evidence cards. Edit it in your own words.' : 'Accepted findings added. Rewrite them in your own words (connect an AI service to get a written draft).'));
+  return res.redirect(back(t, s));
+}
 
 r.get('/topics/:tid/paper', auth.loadTopic('member'), async (req, res) => {
   const t = req.topic;
@@ -141,23 +166,7 @@ r.post('/topics/:tid/paper/sections/:sid', auth.loadTopic('leader'), writable, l
     req.flash('ok', 'Finding inserted with its citation. Rewrite it in your own words when you’re ready.');
     return res.redirect(back(t, s));
   }
-  if (action === 'draft') {
-    const items = await acceptedFindings(t.id, s.part_id ? [s.part_id] : null);
-    if (!items.length) { req.flash('error', s.part_id ? 'Accept this part’s findings first, then draft from them.' : 'Accept some findings first, then draft from them.'); return res.redirect(back(t, s)); }
-    let text = '', note = null;
-    if (llm.available()) {
-      try { text = await agent.draftSection(t, s, items); } catch (e) { note = 'The AI service couldn’t draft this right now (' + e.message + '). The findings were added as they are instead.'; }
-    }
-    if (!text) text = items.map((f) => f.text.trim() + ' ' + f.marks).join('\n\n');
-    // keep only markers that point at real sources
-    const valid = new Set(items.flatMap((f) => f.srcIds));
-    text = text.replace(MARK, (m, id) => (valid.has(parseInt(id, 10)) ? m : ''));
-    const body = (String(s.body || '').trim() ? String(s.body).trim() + '\n\n' : '') + text;
-    await db('paper_sections').where({ id: s.id }).update({ body, updated_by: req.user.id, updated_at: now() });
-    await audit(req.user.id, t.id, 'paper.drafted', 'Drafted “' + s.title + '” from ' + items.length + ' findings');
-    req.flash(note ? 'error' : 'ok', note || (llm.available() ? 'Drafted from accepted findings. Edit it in your own words.' : 'Accepted findings added. Rewrite them in your own words (connect an AI service to get a written draft).'));
-    return res.redirect(back(t, s));
-  }
+  if (action === 'draft') return draftInto(req, res, s);
   // save
   const title = clean(req.body.title) || s.title;
   await db('paper_sections').where({ id: s.id }).update({ title, body: String(req.body.body || '').slice(0, 100000), updated_by: req.user.id, updated_at: now() });
@@ -295,4 +304,6 @@ r.get('/showcase.zip', async (req, res) => {
 });
 
 module.exports = r;
+module.exports.ensureSections = ensureSections;
+module.exports.draftInto = draftInto;
 module.exports.acceptedFindings = acceptedFindings;
