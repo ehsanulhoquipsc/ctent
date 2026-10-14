@@ -742,6 +742,59 @@ test('final paper: sections, insert findings with citations, draft, Word export,
   assert.match((await leader.get(fin.headers.location.replace('#report', ''))).text, new RegExp('value="' + fid + '" checked'));
 });
 
+test('showcase: page download, publish toggle, website zip', async () => {
+  const tid = await topicId('CT-0150');
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  const view = await leader.get('/topics/' + tid + '/showcase.html?view=1');
+  assert.strictEqual(view.status, 200);
+  assert.match(view.text, /<!doctype html>/);
+  assert.match(view.text, /References/);
+  assert.doesNotMatch(view.text, /<script/i, 'plain HTML and CSS only');
+  const dl = await leader.get('/topics/' + tid + '/showcase.html');
+  assert.match(dl.headers['content-disposition'] || '', /attachment; filename="[a-z0-9-]+\.html"/);
+  assert.strictEqual((await aisha.post('/topics/' + tid + '/showcase').type('form').send({ _csrf: aisha.csrf, action: 'publish' })).status, 403, 'only the leader publishes');
+  await leader.post('/topics/' + tid + '/showcase').type('form').send({ _csrf: leader.csrf, action: 'publish' });
+  assert.ok((await db('topics').where({ id: tid }).first()).showcase);
+  const zip = await leader.get('/showcase.zip').buffer(true).parse((res, cb) => { const ch = []; res.on('data', (c) => ch.push(c)); res.on('end', () => cb(null, Buffer.concat(ch))); });
+  assert.strictEqual(zip.status, 200);
+  assert.strictEqual(zip.body.slice(0, 2).toString(), 'PK');
+  const JSZip = require('jszip');
+  const files = Object.keys((await JSZip.loadAsync(zip.body)).files);
+  assert.ok(files.includes('index.html') && files.includes('about.html') && files.some((f) => /^papers\/.+\.html$/.test(f)), files.join(','));
+  assert.strictEqual((await aisha.get('/showcase.zip')).status, 403);
+  await leader.post('/topics/' + tid + '/showcase').type('form').send({ _csrf: leader.csrf, action: 'unpublish' });
+  assert.ok(!(await db('topics').where({ id: tid }).first()).showcase);
+});
+
+test('AI backup: Gemini busy falls back to Groq; extra sources are searched', async () => {
+  const llm = require('../src/lib/llm');
+  const research = require('../src/lib/research');
+  process.env.GEMINI_API_KEY = 'g'; process.env.GROQ_API_KEY = 'q';
+  const real = global.fetch;
+  const ok = (obj, text) => ({ ok: true, status: 200, json: async () => obj, text: async () => text || JSON.stringify(obj) });
+  global.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('generativelanguage')) return { ok: false, status: 429, json: async () => ({}), text: async () => 'quota' };
+    if (u.includes('api.groq.com')) return ok({ choices: [{ message: { content: '{"answer":42}' } }] });
+    if (u.includes('semanticscholar')) return ok({ data: [{ title: 'S2 paper', abstract: 'An abstract.', year: 2021, authors: [{ name: 'B. One' }], externalIds: { DOI: '10.1/s2' }, citationCount: 3 }] });
+    if (u.includes('europepmc')) return ok({ resultList: { result: [{ title: 'PMC paper', abstractText: '<p>Health abstract.</p>', pubYear: '2020', authorString: 'C. Two.', doi: '10.1/pmc', source: 'MED', id: '1' }] } });
+    if (u.includes('arxiv.org')) return ok(null, '<feed><entry><id>http://arxiv.org/abs/1</id><published>2022-01-01</published><title>Arxiv &amp; paper</title><summary>Preprint abstract.</summary><author><name>D. Three</name></author></entry></feed>');
+    throw new Error('unexpected ' + u);
+  };
+  try {
+    assert.deepStrictEqual(llm.providers().slice(0, 2), ['gemini', 'groq']);
+    const out = await llm.json('sys', 'prompt');
+    assert.strictEqual(out.answer, 42);
+    assert.match(out._by, /Groq/);
+    assert.strictEqual((await research.searchSemanticScholar('x'))[0].doi, '10.1/s2');
+    assert.strictEqual((await research.searchEuropePmc('x'))[0].abstract, 'Health abstract.');
+    const ax = await research.searchArxiv('x');
+    assert.strictEqual(ax[0].title, 'Arxiv & paper');
+    assert.strictEqual(ax[0].authors, 'D. Three');
+  } finally { global.fetch = real; delete process.env.GEMINI_API_KEY; delete process.env.GROQ_API_KEY; }
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

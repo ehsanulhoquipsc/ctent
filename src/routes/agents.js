@@ -89,6 +89,7 @@ r.post('/topics/:tid/agents/launch-all', auth.loadTopic('leader'), writable, asy
   res.redirect('/topics/' + t.id + '/findings');
 });
 r.get('/topics/:tid/agents/status.json', auth.loadTopic('member'), async (req, res) => {
+  await agent.watchdog();
   const parts = await db('parts').where({ topic_id: req.topic.id }).select('id', 'agent_status', 'agent_progress', 'agent_step');
   res.json({ parts: parts.map((p) => ({ id: p.id, status: p.agent_status, progress: p.agent_progress, step: p.agent_step })) });
 });
@@ -123,9 +124,18 @@ r.post('/topics/:tid/agents/:pid/launch', auth.loadTopic('leader'), writable, lo
   res.redirect(req.body.back === 'review' ? base(t) + '/' + p.id : '/topics/' + t.id + '/findings');
 });
 
+r.post('/topics/:tid/agents/:pid/stop', auth.loadTopic('leader'), loadPart, async (req, res) => {
+  const t = req.topic, p = req.part;
+  await agent.stop(p, req.user.name);
+  await audit(req.user.id, t.id, 'agent.stopped', 'Stopped ' + (p.agent_name || 'the agent') + ' on “' + p.title + '”');
+  req.flash('ok', 'Agent stopped. Earlier findings are kept.');
+  res.redirect(req.body.back === 'review' ? base(t) + '/' + p.id : base(t));
+});
+
 // ---------- Findings board ----------
 r.get('/topics/:tid/findings', auth.loadTopic('member'), async (req, res) => {
   const t = req.topic;
+  await agent.watchdog();
   const parts = await partsOf(t.id);
   const runIds = parts.filter((p) => p.run).map((p) => p.run.id);
   const log = runIds.length ? await db('agent_logs').join('agent_runs', 'agent_runs.id', 'agent_logs.run_id').join('parts', 'parts.id', 'agent_runs.part_id')

@@ -2,7 +2,8 @@
 <div class="page-head">
   <div><h1><%= isMemberOnly ? 'My topics' : (isAdmin ? 'All topics' : 'Research topics') %></h1><p><%= isMemberOnly ? 'Only the topics you’ve been added to.' : isAdmin ? 'Every topic on the platform.' : 'Topics you lead or belong to.' %></p></div>
 </div>
-<div class="chips"><a class="chip<%= show === 'current' ? ' on' : '' %>" href="/topics">Current</a><a class="chip<%= show === 'completed' ? ' on' : '' %>" href="/topics?show=completed">🏆 Completed</a><a class="chip<%= show === 'archived' ? ' on' : '' %>" href="/topics?show=archived">Archived</a></div>
+<div class="split" style="flex-wrap:wrap"><div class="chips" style="flex:1"><a class="chip<%= show === 'current' ? ' on' : '' %>" href="/topics">Current</a><a class="chip<%= show === 'completed' ? ' on' : '' %>" href="/topics?show=completed">🏆 Completed</a><a class="chip<%= show === 'archived' ? ' on' : '' %>" href="/topics?show=archived">Archived</a></div>
+<% if (show === 'completed' && (canCreate || isAdmin)) { %><a class="btn btn-s btn-sm" href="/showcase.zip" title="Every paper added to the showcase, as a ready-to-upload website">Download showcase website</a><% } %></div>
 <% if (!topics.length) { %>
   <section class="card"><div class="empty"><b><%= show === 'archived' ? 'No archived topics' : show === 'completed' ? 'No completed projects yet' : 'You’re not in any topics yet' %></b><span><%= canCreate ? 'Create a topic to start, or ask to join one below.' : 'A topic leader can add you, or you can ask to join one below.' %></span><% if (canCreate && show !== 'archived') { %><a class="btn btn-p" href="/topics/new">Create a topic</a><% } %></div></section>
 <% } %>

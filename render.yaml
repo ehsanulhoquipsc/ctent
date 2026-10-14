@@ -31,6 +31,19 @@ services:
       # Optional: a free OpenAlex key raises the daily search budget (https://openalex.org/settings/api)
       - key: OPENALEX_API_KEY
         sync: false
+      # Optional backups: when Gemini is busy, agents switch to these automatically
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Optional: private Semantic Scholar rate limit (https://www.semanticscholar.org/product/api)
+      - key: S2_API_KEY
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false
+      # Showcase website name and tagline
+      - key: SHOWCASE_NAME
+        value: "CTENT Research"
 
 databases:
   - name: ctent-db

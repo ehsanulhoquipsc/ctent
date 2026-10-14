@@ -35,7 +35,7 @@ function firstSentences(text, n) {
   return s.slice(0, n || 1).join(' ').trim();
 }
 
-async function planQueries(topic, part, followup, depth) {
+async function planQueries(topic, part, followup, depth, runId) {
   const base = [part.title, keywords(part.description || part.title, 8)];
   if (followup) base.unshift(keywords(followup, 8));
   if (!llm.available()) return [...new Set(base.filter(Boolean))].slice(0, depth.queries);
@@ -44,11 +44,18 @@ async function planQueries(topic, part, followup, depth) {
       'You plan literature searches for a research assistant. Reply with JSON only: {"queries": ["..."]}.',
       'Research question: ' + (topic.question || topic.title) + '\nPart: ' + part.title + '\nWhat to find out: ' + (part.description || '') +
       (followup ? '\nFollow-up from the researcher: ' + followup : '') +
-      '\nWrite ' + depth.queries + ' short English search queries (3–8 words each) for a scholarly database. Cover different angles. No quotes or operators.');
+      '\nWrite ' + depth.queries + ' short English search queries (3–8 words each) for a scholarly database. Cover different angles. No quotes or operators.',
+      (name) => log(runId, 'Asking ' + name + ' to plan searches'));
     const qs = (out.queries || []).map((q) => String(q).slice(0, 120)).filter(Boolean);
     return qs.length ? qs.slice(0, depth.queries) : base.slice(0, depth.queries);
-  } catch (e) { return base.slice(0, depth.queries); }
+  } catch (e) {
+    await log(runId, 'AI planning failed (' + e.message + ') — using keywords from the brief instead');
+    return [...new Set(base.filter(Boolean))].slice(0, depth.queries);
+  }
 }
+// The researcher can stop a run, and the watchdog ends runs that hang; either way the job must not overwrite it.
+async function alive(runId) { const r = await db('agent_runs').where({ id: runId }).select('status').first(); return !!r && r.status === 'running'; }
+class Stopped extends Error {}
 
 function rank(found, keep) {
   const seen = new Map();
@@ -63,7 +70,7 @@ function rank(found, keep) {
   return rest.concat(wiki);
 }
 
-async function synthesize(topic, part, followup, sources, depth) {
+async function synthesize(topic, part, followup, sources, depth, runId) {
   const list = sources.map((s) => '[' + s.n + '] ' + s.title + (s.authors ? ' — ' + s.authors : '') + (s.year ? ' (' + s.year + ')' : '') + (s.venue ? '. ' + s.venue : '') + '\nAbstract: ' + (s.abstract || '').slice(0, 1000)).join('\n\n');
   const out = await llm.json(
     'You are a careful research assistant. Use ONLY the numbered sources given. Never invent sources, numbers, quotes or facts that are not in them. ' +
@@ -73,7 +80,8 @@ async function synthesize(topic, part, followup, sources, depth) {
     '\n\nSources:\n' + list +
     '\n\nReturn JSON exactly like: {"summary": "3-5 sentences answering this part", "confidence": "High|Medium|Low", ' +
     '"findings": [{"text": "one clear finding, 1-2 sentences", "confidence": "High|Medium|Low", "cites": [1, 3]}], "gaps": ["what the sources could not answer"]}. ' +
-    'Give ' + depth.findings + ' findings. Every finding must cite at least one source number from the list. Confidence is High only when several good sources agree.');
+    'Give ' + depth.findings + ' findings. Every finding must cite at least one source number from the list. Confidence is High only when several good sources agree.',
+    (name) => log(runId, 'Asking ' + name + ' to write findings from ' + sources.length + ' sources'));
   const n = sources.length;
   const okConf = (c) => (['High', 'Medium', 'Low'].includes(c) ? c : 'Medium');
   const findings = (out.findings || []).map((f) => ({
@@ -81,7 +89,7 @@ async function synthesize(topic, part, followup, sources, depth) {
     cites: [...new Set((f.cites || []).map((x) => parseInt(x, 10)).filter((x) => x >= 1 && x <= n))]
   })).filter((f) => f.text && f.cites.length);
   if (!findings.length) throw new Error('The AI reply had no findings that cite the sources.');
-  return { summary: String(out.summary || '').slice(0, 3000), confidence: okConf(out.confidence), findings, gaps: (out.gaps || []).map((g) => String(g).slice(0, 400)).filter(Boolean).slice(0, 8) };
+  return { by: out._by, summary: String(out.summary || '').slice(0, 3000), confidence: okConf(out.confidence), findings, gaps: (out.gaps || []).map((g) => String(g).slice(0, 400)).filter(Boolean).slice(0, 8) };
 }
 
 function extractive(sources) {
@@ -96,7 +104,7 @@ function extractive(sources) {
 
 async function execute(runId) {
   const run = await db('agent_runs').where({ id: runId }).first();
-  if (!run) return;
+  if (!run || run.status !== 'running') return;
   const part = await db('parts').where({ id: run.part_id }).first();
   const topic = await db('topics').where({ id: run.topic_id }).first();
   if (!part || !topic) return;
@@ -106,15 +114,22 @@ async function execute(runId) {
   try {
     await db('parts').where({ id: part.id }).update({ agent_status: 'running' });
     await step(part, 8, 'Planning searches');
-    const queries = await planQueries(topic, part, run.followup, depth);
+    const queries = await planQueries(topic, part, run.followup, depth, runId);
+    if (!(await alive(runId))) throw new Stopped();
     await log(runId, 'Planned ' + queries.length + ' searches: ' + queries.map((q) => '“' + q + '”').join(', '));
     const found = [];
+    const scholarly = kinds.filter((k) => research.SOURCE_TYPES[k] && research.SOURCE_TYPES[k].search);
+    const total = Math.max(1, scholarly.length * queries.length);
     let i = 0;
-    if (kinds.includes('papers')) {
+    for (const k of scholarly) {
+      const src = research.SOURCE_TYPES[k];
+      let failures = 0;
       for (const q of queries) {
-        await step(part, 15 + Math.round((i++ / queries.length) * 40), 'Searching papers: ' + q);
-        try { const r = await research.searchPapers(q, { since, limit: depth.perQuery }); found.push(...r); await log(runId, 'Searched papers for “' + q + '” — ' + r.length + ' results'); }
-        catch (e) { await log(runId, 'Paper search failed for “' + q + '”: ' + e.message); }
+        await step(part, 15 + Math.round((i++ / total) * 40), 'Searching ' + src.label + ': ' + q);
+        if (failures >= 2) continue; // this service is down or busy — don't keep hammering it
+        try { const r = await src.search(q, { since, limit: depth.perQuery }); found.push(...r); await log(runId, src.label + ': “' + q + '” — ' + r.length + ' results'); }
+        catch (e) { failures++; await log(runId, src.label + ' search failed for “' + q + '”: ' + e.message); }
+        if (!(await alive(runId))) throw new Stopped();
       }
     }
     if (kinds.includes('wiki')) {
@@ -130,11 +145,12 @@ async function execute(runId) {
     let result, model = 'none';
     if (llm.available()) {
       await step(part, 75, 'Writing findings from the sources');
-      try { result = await synthesize(topic, part, run.followup, picked, depth); model = llm.label(); }
+      try { result = await synthesize(topic, part, run.followup, picked, depth, runId); model = result.by || llm.label(); }
       catch (e) { await log(runId, 'AI summary failed (' + e.message + ') — listing key sentences instead'); result = extractive(picked); }
     } else {
       result = extractive(picked);
     }
+    if (!(await alive(runId))) throw new Stopped();
     await db('agent_findings').insert(result.findings.map((f, k) => ({ run_id: runId, part_id: part.id, position: k, text: f.text, confidence: f.confidence, cites: f.cites.join(','), kept: true })));
     await db('agent_runs').where({ id: runId }).update({ status: 'done', summary: result.summary, confidence: result.confidence, gaps: result.gaps.join('\n'), model, finished_at: now() });
     await log(runId, 'Handed back ' + result.findings.length + ' findings for review');
@@ -143,6 +159,7 @@ async function execute(runId) {
     await notify(leaders, { kind: 'review', title: (part.agent_name || 'Agent') + ' finished “' + part.title + '”', body: result.findings.length + ' findings from ' + picked.length + ' sources', link: '/topics/' + topic.id + '/agents/' + part.id });
     await audit(null, topic.id, 'agent.finished', (part.agent_name || 'Agent') + ' handed back ' + result.findings.length + ' findings for “' + part.title + '”');
   } catch (e) {
+    if (e instanceof Stopped || !(await alive(runId))) return; // already stopped by the researcher or the watchdog
     await db('agent_runs').where({ id: runId }).update({ status: 'failed', error: String(e.message).slice(0, 1000), finished_at: now() });
     await db('parts').where({ id: part.id }).update({ agent_status: 'failed', agent_step: String(e.message).slice(0, 240) });
     await log(runId, 'Stopped: ' + e.message);
@@ -176,6 +193,28 @@ async function recover() {
   } catch (e) { /* tables may not exist yet */ }
 }
 
+// Ends runs that have been going far too long (e.g. the server slept or a service hung).
+const MAX_MIN = parseInt(process.env.AGENT_MAX_MINUTES || '12', 10);
+async function watchdog() {
+  const cutoff = new Date(Date.now() - MAX_MIN * 60000).toISOString();
+  const stuck = await db('agent_runs').where({ status: 'running' }).where('started_at', '<', cutoff).select('id', 'part_id');
+  for (const r of stuck) {
+    await db('agent_runs').where({ id: r.id }).update({ status: 'failed', error: 'This run took longer than ' + MAX_MIN + ' minutes and was stopped. Run it again — if it keeps happening, an AI or search service may be down.', finished_at: now() });
+    await db('parts').where({ id: r.part_id }).whereIn('agent_status', ['queued', 'running']).update({ agent_status: 'failed', agent_step: 'Took too long — run it again' });
+    await log(r.id, 'Stopped by the watchdog after ' + MAX_MIN + ' minutes');
+  }
+}
+async function stop(part, userName) {
+  const run = await db('agent_runs').where({ part_id: part.id, status: 'running' }).orderBy('id', 'desc').first();
+  if (run) {
+    await db('agent_runs').where({ id: run.id }).update({ status: 'failed', error: 'Stopped by ' + userName + '.', finished_at: now() });
+    await log(run.id, 'Stopped by ' + userName);
+    const i = queue.indexOf(run.id); if (i >= 0) queue.splice(i, 1);
+  }
+  const prev = await db('agent_runs').where({ part_id: part.id, status: 'done' }).orderBy('id', 'desc').first();
+  await db('parts').where({ id: part.id }).update({ agent_status: prev ? 'review' : 'draft', agent_progress: 0, agent_step: 'Stopped' });
+}
+
 async function suggestParts(question, title) {
   const out = await llm.json(
     'You help a researcher split a research question into parts that separate AI research agents can each investigate. Reply with JSON only.',
@@ -193,4 +232,4 @@ async function draftSection(topic, section, items) {
   return String(out.text || '').trim();
 }
 
-module.exports = { launch, recover, suggestParts, draftSection, DEPTH, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };
+module.exports = { launch, recover, watchdog, stop, suggestParts, draftSection, DEPTH, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };

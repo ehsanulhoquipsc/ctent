@@ -230,5 +230,69 @@ r.post('/topics/:tid/paper/final', auth.loadTopic('leader'), writable, async (re
   res.redirect('/topics/' + t.id + '/finish?file=' + fid + '#report');
 });
 
+// ---------- Showcase website (plain HTML + CSS) ----------
+const showcase = require('../lib/showcase');
+async function showcaseData(t) {
+  const sections = await ensureSections(t);
+  const { num, refs } = await numbering(sections);
+  const filled = sections.filter((s) => String(s.body || '').trim());
+  const abs = filled.find((s) => /^abstract$/i.test(s.title));
+  const people = await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where('topic_members.topic_id', t.id).whereNot('topic_members.role', 'guest')
+    .orderByRaw("case topic_members.role when 'leader' then 0 else 1 end").orderBy('users.name').select('users.name');
+  const abstractText = abs ? plain(abs.body, num).replace(/\s*\[[\d, ]+\]/g, '').replace(/\s+/g, ' ').trim() : (t.question || t.description || '');
+  return { topic: t, authors: people.map((p) => p.name), sections: filled.map((s) => ({ title: s.title, html: renderBody(s.body, num) })), refs, abstract: abs ? renderBody(abs.body, num) : '', abstractText };
+}
+r.get('/topics/:tid/showcase.html', auth.loadTopic('member'), async (req, res) => {
+  const t = await db('topics').where({ id: req.topic.id }).first();
+  const html = showcase.paperPage(await showcaseData(t));
+  if (req.query.view === '1') return res.type('html').send(html);
+  res.set('Content-Disposition', 'attachment; filename="' + showcase.slug(t) + '.html"');
+  res.type('html').send(html);
+});
+r.post('/topics/:tid/showcase', auth.loadTopic('leader'), async (req, res) => {
+  const t = req.topic;
+  const on = req.body.action === 'publish';
+  if (on) {
+    const sections = await ensureSections(t);
+    if (!sections.some((s) => String(s.body || '').trim())) { req.flash('error', 'Write the paper first — the showcase page is built from it.'); return res.redirect('/topics/' + t.id + '/paper'); }
+  }
+  await db('topics').where({ id: t.id }).update({ showcase: on, showcase_at: on ? now() : null });
+  await audit(req.user.id, t.id, on ? 'showcase.added' : 'showcase.removed', on ? 'Added the paper to the showcase website' : 'Removed the paper from the showcase website');
+  req.flash('ok', on ? 'Added to the showcase. Download the showcase website to update it.' : 'Removed from the showcase. Download the showcase website again to update it.');
+  res.redirect(req.body.back && String(req.body.back).startsWith('/') && !String(req.body.back).startsWith('//') ? req.body.back : '/topics/' + t.id + '/finish');
+});
+r.get('/showcase.zip', async (req, res) => {
+  const role = req.user.platform_role;
+  if (!['admin', 'leader'].includes(role)) return auth.forbidden(res, 'Only leaders and admins can download the showcase website.');
+  let q = db('topics').where({ showcase: true });
+  if (role !== 'admin') q = q.whereIn('id', db('topic_members').where({ user_id: req.user.id, role: 'leader' }).select('topic_id'));
+  const topics = await q.orderByRaw('coalesce(completed_at, showcase_at) desc');
+  const JSZip = require('jszip');
+  const zip = new JSZip();
+  const items = [];
+  for (const t of topics) {
+    const d = await showcaseData(t);
+    zip.file('papers/' + showcase.slug(t) + '.html', showcase.paperPage(d));
+    items.push(d);
+  }
+  zip.file('index.html', showcase.indexPage(items));
+  zip.file('about.html', showcase.aboutPage());
+  zip.file('README.txt', [
+    showcase.SITE() + ' — showcase website', '',
+    'Plain HTML + CSS. No server or database needed.', '',
+    'Put it online for free with GitHub Pages:',
+    '1. Create a new public repository on github.com (e.g. ctent-showcase).',
+    '2. Click "Add file" > "Upload files" and drag in everything from this folder (index.html, about.html and the papers folder).',
+    '3. Settings > Pages > Source: "Deploy from a branch", branch "main", folder "/ (root)" > Save.',
+    '4. After about a minute the site is live at https://<your-username>.github.io/<repository-name>/',
+    '', 'To update: download a fresh copy from CTENT and upload the files again (replace the old ones).', ''
+  ].join('\n'));
+  const buf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  await audit(req.user.id, null, 'showcase.downloaded', 'Downloaded the showcase website (' + items.length + ' papers)');
+  res.set('Content-Type', 'application/zip');
+  res.set('Content-Disposition', 'attachment; filename="ctent-showcase.zip"');
+  res.send(buf);
+});
+
 module.exports = r;
 module.exports.acceptedFindings = acceptedFindings;

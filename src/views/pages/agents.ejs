@@ -56,6 +56,7 @@
             <%- u.delForm(B + '/' + p.id, csrf, 'Delete the part “' + p.title + '” and everything its agent found?', 'Delete', { action: 'delete' }) %>
           <% } %>
           <% if (p.run) { %><a class="btn btn-s btn-sm" href="<%= B %>/<%= p.id %>"><%= ['review', 'accepted'].includes(s.key) ? 'Open findings' : 'Open' %></a><% } %>
+          <% if (!ro && working) { %><form method="post" action="<%= B %>/<%= p.id %>/stop" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm">Stop</button></form><% } %>
           <% if (!ro && !working) { %><form method="post" action="<%= B %>/<%= p.id %>/launch" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm"><%= p.run ? 'Run again' : 'Launch agent' %></button></form><% } %>
         </div>
       </article>

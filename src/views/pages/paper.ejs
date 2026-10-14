@@ -9,6 +9,15 @@
   </div>
   <a class="btn btn-s" href="<%= P %>.docx"><%- u.icon('download', 16) %>Word</a>
   <a class="btn btn-s" href="<%= P %>/print" target="_blank" rel="noopener">Print / PDF</a>
+  <details class="ed"><summary class="btn btn-s">Showcase page</summary>
+    <div class="ed-pop" style="gap:8px">
+      <h3>Showcase page</h3>
+      <p class="hint">A public web page of this paper — plain HTML and CSS, ready for the showcase website.</p>
+      <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/showcase.html?view=1" target="_blank" rel="noopener">Preview</a>
+      <a class="btn btn-p btn-sm" href="/topics/<%= topic.id %>/showcase.html">Download showcase page</a>
+      <% if (isTopicLeader) { %><form method="post" action="/topics/<%= topic.id %>/showcase"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="<%= P %>"><button class="btn btn-s btn-sm" style="width:100%" name="action" value="<%= topic.showcase ? 'unpublish' : 'publish' %>"><%= topic.showcase ? 'Remove from showcase website' : 'Add to showcase website' %></button></form><% } %>
+    </div>
+  </details>
   <% if (!ro) { %><form method="post" action="<%= P %>/final" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p">Save as final report →</button></form><% } %>
 </section>
 <% if (!accepted) { %><div class="alert info"><span>No findings are accepted yet. <a href="/topics/<%= topic.id %>/findings">Review your agents’ findings</a> — accepted findings appear on the right, ready to insert with their citations.</span></div><% } %>

@@ -49,6 +49,18 @@
     <section class="card"><h3 style="margin-bottom:10px"><%= done ? 'The team' : 'Thank your team' %></h3>
       <% sum.team.forEach((m) => { %><div class="row"><%- u.avatar(m, 'sm', true) %><span style="flex:1;min-width:0;font-size:14px"><b style="font-weight:500"><%= m.name %></b><br><span class="hint"><%= m.role === 'leader' ? 'Leader' : (m.title || 'Member') %></span></span><span class="tag" style="background:var(--green-soft);color:var(--green)"><%= m.doneCount %> done</span></div><% }) %>
     </section>
+    <% if (done) { %>
+      <section class="card" style="display:flex;flex-direction:column;gap:10px">
+        <div class="split"><h3 style="flex:1">Showcase website</h3><% if (topic.showcase) { %><span class="tag" style="background:var(--green-soft);color:var(--green)">Included</span><% } %></div>
+        <p class="hint">Share the finished paper publicly as a plain HTML page.</p>
+        <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/showcase.html?view=1" target="_blank" rel="noopener">Preview the page</a>
+        <a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/showcase.html">Download showcase page</a>
+        <% if (isTopicLeader) { %>
+          <form method="post" action="/topics/<%= topic.id %>/showcase"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn <%= topic.showcase ? 'btn-s' : 'btn-p' %> btn-sm" style="width:100%" name="action" value="<%= topic.showcase ? 'unpublish' : 'publish' %>"><%= topic.showcase ? 'Remove from showcase website' : 'Add to showcase website' %></button></form>
+          <a class="btn btn-s btn-sm" href="/showcase.zip">Download the whole showcase website (.zip)</a>
+        <% } %>
+      </section>
+    <% } %>
     <% if (done && isTopicLeader) { %>
       <section class="card"><h3>Need to work on it again?</h3><p class="hint" style="margin:6px 0 10px">Reopening keeps the final report until you finish again.</p>
         <form method="post" action="/topics/<%= topic.id %>/finish/reopen" data-confirm="Reopen <%= topic.code %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s">Reopen project</button></form></section>

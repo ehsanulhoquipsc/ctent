@@ -38,16 +38,32 @@ Every demo account uses the password `demo1234`. Everyone trying the demo shares
 
 ### Connect a free AI service
 
-Agents work without any key, but in that case they only list the key lines from each source. For written summaries and findings, add **one** free key on Render under **ctent → Environment**:
+Agents work without any key, but in that case they only list the key lines from each source. For written summaries and findings, add free keys on Render under **ctent → Environment**. Add more than one AI key: when one is busy or over its free limit, agents switch to the next one automatically.
 
 | Service | Key name | Get it |
 |---|---|---|
-| Google Gemini (recommended) | `GEMINI_API_KEY` | https://aistudio.google.com/apikey |
-| Groq (alternative) | `GROQ_API_KEY` | https://console.groq.com/keys |
+| Google Gemini (AI, first choice) | `GEMINI_API_KEY` | https://aistudio.google.com/apikey |
+| Groq (AI backup) | `GROQ_API_KEY` | https://console.groq.com/keys |
+| OpenRouter (AI backup, free models) | `OPENROUTER_API_KEY` | https://openrouter.ai/keys |
+| OpenAlex (papers, bigger daily budget) | `OPENALEX_API_KEY` | https://openalex.org/settings/api |
+| Semantic Scholar (papers, private rate limit) | `S2_API_KEY` | https://www.semanticscholar.org/product/api |
+| Your email (polite use of the free services) | `CONTACT_EMAIL` | — |
 
-Optional: an `OPENALEX_API_KEY` (free, from https://openalex.org/settings/api) raises the daily search budget. Without it OpenAlex allows roughly 100 searches a day, and each agent uses 2–5 searches.
+Sources the agents search, all free: OpenAlex, Semantic Scholar, Europe PMC (health and life sciences), arXiv (preprints) and Wikipedia. Choose them per part.
 
-Free AI tiers have per-minute limits. Agents retry when they hit one. If a run still fails, click **Run again** a minute later.
+A run that takes longer than 12 minutes (`AGENT_MAX_MINUTES`) is stopped automatically. Researchers can also press **Stop** and run it again.
+
+### Showcase website (plain HTML and CSS)
+
+Finished papers can be published on a separate public website, for example on free GitHub Pages.
+
+1. On a completed project's **Finish** page (or the paper's **Showcase page** menu), press **Add to showcase website**.
+2. On **Topics → Completed**, press **Download showcase website**. You get a zip with `index.html`, `about.html` and one page per paper in `papers/`.
+3. Create a public GitHub repository, for example `ctent-showcase`. Unzip and upload the files with **Add file → Upload files**.
+4. In the repository, open **Settings → Pages**, choose **Deploy from a branch**, branch `main`, folder `/ (root)`, and save. The site appears at `https://<your-username>.github.io/ctent-showcase/`.
+5. When a new paper is finished, download the zip again and upload the files over the old ones.
+
+Set the site's name with `SHOWCASE_NAME`, and optionally `SHOWCASE_TAGLINE` and `SHOWCASE_CONTACT`.
 
 ## What works in this version
 

@@ -2,41 +2,49 @@
 // One small interface over free AI services. Pick one by setting its key on the server:
 //   GEMINI_API_KEY  – Google AI Studio (free tier). Optional GEMINI_MODEL (default: gemini-flash-latest).
 //   GROQ_API_KEY    – Groq (free tier, Llama models). Optional GROQ_MODEL.
-//   LLM_API_KEY + LLM_BASE_URL (+ LLM_MODEL) – any OpenAI-compatible service, e.g. OpenRouter free models.
+//   OPENROUTER_API_KEY – OpenRouter (free models). Optional OPENROUTER_MODEL.
+//   LLM_API_KEY + LLM_BASE_URL (+ LLM_MODEL) – any other OpenAI-compatible service.
+// Set more than one and they back each other up: if one is busy or fails, the next is tried.
 // With no key, agents still collect real sources but can't write summaries (see agent.js).
 
-const TIMEOUT = parseInt(process.env.LLM_TIMEOUT_MS || '90000', 10);
+const TIMEOUT = parseInt(process.env.LLM_TIMEOUT_MS || '45000', 10);
 let geminiModel = null; // resolved once, then reused
 
-function provider() {
-  if (process.env.GEMINI_API_KEY) return 'gemini';
-  if (process.env.GROQ_API_KEY) return 'groq';
-  if (process.env.LLM_API_KEY && process.env.LLM_BASE_URL) return 'openai';
-  return null;
+const OPENAI_LIKE = {
+  groq: () => ({ base: 'https://api.groq.com/openai/v1', key: process.env.GROQ_API_KEY, model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', name: 'Groq' }),
+  openrouter: () => ({ base: 'https://openrouter.ai/api/v1', key: process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free', name: 'OpenRouter' }),
+  openai: () => ({ base: String(process.env.LLM_BASE_URL || '').replace(/\/$/, ''), key: process.env.LLM_API_KEY, model: process.env.LLM_MODEL, name: 'AI service' })
+};
+function providers() {
+  const list = [];
+  if (process.env.GEMINI_API_KEY) list.push('gemini');
+  if (process.env.GROQ_API_KEY) list.push('groq');
+  if (process.env.OPENROUTER_API_KEY) list.push('openrouter');
+  if (process.env.LLM_API_KEY && process.env.LLM_BASE_URL) list.push('openai');
+  return list;
 }
-function available() { return !!provider(); }
-function label() {
-  const p = provider();
+function provider() { return providers()[0] || null; }
+function available() { return providers().length > 0; }
+function nameOf(p) {
   if (p === 'gemini') return 'Google Gemini (' + (geminiModel || process.env.GEMINI_MODEL || 'gemini-flash-latest') + ')';
-  if (p === 'groq') return 'Groq (' + (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') + ')';
-  if (p === 'openai') return process.env.LLM_MODEL || 'AI model';
-  return 'No AI service connected';
+  const c = OPENAI_LIKE[p](); return c.name + ' (' + c.model + ')';
 }
+function label() { const l = providers(); return l.length ? l.map(nameOf).join(' + backup ') : 'No AI service connected'; }
 
 async function call(url, opts) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT);
   try {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(url, { ...opts, signal: ctl.signal });
-      if (res.status === 429 || res.status === 503) { await new Promise((r) => setTimeout(r, 4000 * (attempt + 1))); continue; }
+      if (res.status === 429 || res.status === 503) { if (attempt === 0) await new Promise((r) => setTimeout(r, 5000)); continue; }
       const text = await res.text();
       let body = null;
       try { body = JSON.parse(text); } catch (e) { /* not JSON */ }
       if (!res.ok) { const err = new Error('AI service error ' + res.status + ': ' + ((body && body.error && (body.error.message || body.error)) || text).toString().slice(0, 300)); err.status = res.status; throw err; }
       return body;
     }
-    throw new Error('The AI service is busy (rate limit). Try again in a minute.');
+    const err = new Error('The AI service is busy (free-tier limit reached). Try again in a minute.'); err.status = 429; throw err;
   } finally { clearTimeout(timer); }
 }
 
@@ -72,14 +80,11 @@ async function gemini(system, prompt) {
   return parts.map((p) => p.text || '').join('');
 }
 
-async function openaiCompatible(system, prompt) {
-  const groq = provider() === 'groq';
-  const base = groq ? 'https://api.groq.com/openai/v1' : process.env.LLM_BASE_URL.replace(/\/$/, '');
-  const key = groq ? process.env.GROQ_API_KEY : process.env.LLM_API_KEY;
-  const model = groq ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : process.env.LLM_MODEL;
-  const out = await call(base + '/chat/completions', {
-    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
-    body: JSON.stringify({ model, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+async function openaiCompatible(p, system, prompt) {
+  const c = OPENAI_LIKE[p]();
+  const out = await call(c.base + '/chat/completions', {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.key },
+    body: JSON.stringify({ model: c.model, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
   });
   return ((((out.choices || [])[0] || {}).message || {}).content) || '';
 }
@@ -91,12 +96,24 @@ function parseJson(text) {
   return JSON.parse(s.slice(a, b + 1));
 }
 
-// Ask for a JSON object. Throws if no service is connected or the reply can't be read.
-async function json(system, prompt) {
-  const p = provider();
-  if (!p) throw new Error('No AI service is connected.');
-  const text = p === 'gemini' ? await gemini(system, prompt) : await openaiCompatible(system, prompt);
-  return parseJson(text);
+// Ask for a JSON object. Tries each connected service in turn; throws if all of them fail.
+async function json(system, prompt, onTry) {
+  const list = providers();
+  if (!list.length) throw new Error('No AI service is connected.');
+  const errors = [];
+  for (const p of list) {
+    try {
+      if (onTry) await onTry(nameOf(p));
+      const text = p === 'gemini' ? await gemini(system, prompt) : await openaiCompatible(p, system, prompt);
+      const out = parseJson(text);
+      out._by = nameOf(p);
+      return out;
+    } catch (e) {
+      const msg = e.name === 'AbortError' ? 'timed out' : e.message;
+      errors.push(nameOf(p) + ': ' + msg);
+    }
+  }
+  throw new Error(errors.join(' · '));
 }
 
-module.exports = { available, label, json, parseJson, provider };
+module.exports = { available, label, json, parseJson, provider, providers };
