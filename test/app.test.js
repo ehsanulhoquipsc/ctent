@@ -220,7 +220,7 @@ test('archived topics are read-only', async () => {
 test('every main page renders for a leader', async () => {
   const a = await agentFor('ehsan@ctent.demo');
   const tid = await topicId('CT-0142');
-  for (const p of ['/', '/tasks', '/actions', '/notifications', '/meetings', '/messages', '/topics', '/profile', '/search?q=sampling', '/people/' + ids.aisha,
+  for (const p of ['/', '/tasks', '/inbox', '/inbox?f=needs', '/inbox?f=message', '/help', '/meetings', '/topics/new', '/topics/' + tid + '/paper', '/topics/' + tid + '/paper/check', '/topics/' + tid + '/mode', '/messages', '/topics', '/profile', '/search?q=sampling', '/people/' + ids.aisha,
     '/topics/' + tid, '/topics/' + tid + '/plan', '/topics/' + tid + '/board', '/topics/' + tid + '/meetings', '/topics/' + tid + '/members', '/topics/' + tid + '/submissions', '/topics/' + tid + '/files', '/topics/' + tid + '/activity', '/topics/' + tid + '/settings']) {
     const res = await a.get(p);
     assert.ok([200, 302].includes(res.status), p + ' returned ' + res.status);
@@ -263,7 +263,7 @@ test('task flow: brief → start → steps → upload → submit → changes →
   await aisha.post(url + '/act').type('form').send({ _csrf: aisha.csrf, action: 'submit' });
   assert.strictEqual((await db('tasks').where({ id: task.id }).first()).status, 'review');
   // It shows in the leader's Action centre
-  assert.match((await leader.get('/actions')).text, /Review task “Draft the downstream impact section”/);
+  assert.match((await leader.get('/inbox')).text, /Review task “Draft the downstream impact section”/);
   // Member can't review own work; approve is refused with an unmet point
   assert.strictEqual((await aisha.post(url + '/review').type('form').send({ _csrf: aisha.csrf, decision: 'approve' })).status, 403);
   const crit = await db('task_criteria').where({ task_id: task.id }).orderBy('position');
@@ -304,7 +304,7 @@ test('blocked update alerts the leader in the Action centre', async () => {
   await tom.post(url + '/act').type('form').send({ _csrf: tom.csrf, action: 'start' });
   await tom.post(url + '/updates').type('form').send({ _csrf: tom.csrf, text: 'Library access is down', blocked: '1' });
   assert.ok((await db('tasks').where({ id: task.id }).first()).blocked);
-  assert.match((await leader.get('/actions')).text, /is blocked on “Map dam diplomacy sources”/);
+  assert.match((await leader.get('/inbox')).text, /is blocked on “Map dam diplomacy sources”/);
 });
 
 test('edit/delete: tasks, comments and updates respect roles', async () => {
@@ -564,13 +564,13 @@ test('language switch: Bengali interface, user content kept as typed', async () 
   assert.match(board.text, /বোর্ড/);
   assert.match(board.text, /Delete old files — Done/, 'task titles are not translated');
   const dash = await leader.get('/');
-  assert.match(dash.text, /ড্যাশবোর্ড/);
-  assert.doesNotMatch(dash.text, />Dashboard</);
+  assert.match(dash.text, /হোম/);
+  assert.doesNotMatch(dash.text, />Home</);
   // Errors from the JSON API are translated too
   const m = await leader.post('/topics/' + tid + '/tasks/999999/move').set('Accept', 'application/json').set('x-csrf-token', leader.csrf).send({ status: 'done' });
   assert.strictEqual(m.status, 404);
   await leader.get('/lang/en');
-  assert.match((await leader.get('/')).text, />Dashboard</);
+  assert.match((await leader.get('/')).text, />Home</);
   assert.strictEqual((await leader.get('/lang/xx?next=//evil.com')).headers.location, '/', 'no open redirects');
 });
 
@@ -744,7 +744,7 @@ test('AI agents: work without an AI key, and report failures', async () => {
     const p = await db('parts').where({ id: part.id }).first();
     assert.strictEqual(p.agent_status, 'failed');
     assert.match((await leader.get('/topics/' + tid + '/agents/' + part.id)).text, /This run stopped/);
-    assert.match((await leader.get('/actions')).text, /Agent stopped/);
+    assert.match((await leader.get('/inbox')).text, /Agent stopped/);
   } finally { m.restore(); }
 });
 
@@ -766,7 +766,7 @@ test('final paper: sections, insert findings with citations, draft, Word export,
   const body = (await db('paper_sections').where({ id: sec.id }).first()).body;
   assert.match(body, /\[src:\d+\]/);
   const view = await leader.get('/topics/' + tid + '/paper?s=' + sec.id);
-  assert.match(view.text, /<sup class="ref">\[<a href="#ref1">1<\/a>/);
+  assert.match(view.text, /class="cite-chip" data-cite="\d+" aria-label="Citation 1">\[1\]/);
   assert.match(view.text, /Author1, A\./);
   // Draft from findings with AI: invented citation markers are removed
   process.env.GEMINI_API_KEY = 'test-key';
@@ -851,7 +851,7 @@ test('AI backup: Gemini busy falls back to Groq; extra sources are searched', as
 test('project journey: wizard creates parts and team, next step guides the leader', async () => {
   const leader = await agentFor('ehsan@ctent.demo');
   const aisha = await agentFor('aisha@ctent.demo');
-  assert.match((await leader.get('/topics/new')).text, /Start a research project/);
+  assert.match((await leader.get('/topics/new')).text, /Tell us about the project/);
   // Wizard: template parts and a co-author in one go
   const r1 = await leader.post('/topics/new').type('form').send({ _csrf: leader.csrf, title: 'Microplastics in rivers', question: 'Where do river microplastics come from?', template: 'policy', invite: String(ids.aisha) });
   const tid = parseInt(r1.headers.location.match(/\/topics\/(\d+)\/agents/)[1], 10);
@@ -881,6 +881,97 @@ test('project journey: wizard creates parts and team, next step guides the leade
   assert.match((await leader.get('/topics/' + t3 + '/findings')).text, /Parts/);
 });
 
+test('inbox, home, help, quick-add and live status', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const inbox = await leader.get('/inbox');
+  assert.strictEqual(inbox.status, 200);
+  assert.match(inbox.text, /Needs you/);
+  assert.match(inbox.text, /Messages &amp; updates/);
+  assert.match((await leader.get('/actions')).headers.location, /\/inbox\?f=needs/);
+  assert.match((await leader.get('/notifications')).headers.location, /\/inbox/);
+  assert.match((await leader.get('/inbox?f=mention')).text, /class="fchip on"[^>]*>Mentions/);
+  const home = await leader.get('/');
+  assert.match(home.text, /Your projects/);
+  assert.match(home.text, /class="jbar"/);
+  assert.match(home.text, /class="pips"/, 'sidebar shows each project’s step');
+  assert.match((await leader.get('/help')).text, /Every project is a journey/);
+  // Quick-add: a question and a mode is enough
+  const q = await leader.post('/topics/quick').type('form').send({ _csrf: leader.csrf, question: 'Does mobile money reduce poverty in rural Bangladesh?', mode: 'manual' });
+  const tid = parseInt(q.headers.location.match(/\/topics\/(\d+)\//)[1], 10);
+  const t = await db('topics').where({ id: tid }).first();
+  assert.strictEqual(t.mode, 'manual');
+  assert.strictEqual(t.title, 'Mobile money reduce poverty in rural Bangladesh');
+  assert.strictEqual((await leader.post('/topics/quick').type('form').send({ _csrf: leader.csrf, question: 'short', mode: 'agent' })).status, 302);
+  // Live status: plain-language text for each agent part
+  const t150 = await topicId('CT-0150');
+  const st = await leader.get('/topics/' + t150 + '/agents/status.json');
+  assert.ok(st.body.parts.length && st.body.parts.every((p) => typeof p.plain === 'string' && p.plain.length));
+});
+
+test('manual mode: pick a team, give parts to people, switch modes without losing work', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const aisha = await agentFor('aisha@ctent.demo');
+  const r = await leader.post('/topics/new').type('form').send({ _csrf: leader.csrf, title: 'Microplastics field study', question: 'Where do river microplastics come from?', mode: 'manual', parts_present: '1',
+    invite: [String(ids.aisha), String(ids.tom)], part_title: ['Sources of microplastics', 'Sampling methods', 'Policy review'], part_brief: ['Industries and cities', 'Water and sediment', 'Rules in the region'],
+    part_who: [String(ids.aisha), 'agent', ''], part_due: ['2030-12-01', '', ''], action: 'launch' });
+  const tid = parseInt(r.headers.location.match(/\/topics\/(\d+)\/agents/)[1], 10);
+  assert.strictEqual((await db('topics').where({ id: tid }).first()).mode, 'manual');
+  const parts = await db('parts').where({ topic_id: tid }).orderBy('position');
+  assert.deepStrictEqual(parts.map((p) => p.handler), ['person', 'agent', 'person']);
+  const task = await db('tasks').where({ part_id: parts[0].id }).first();
+  assert.ok(task && task.assignee_id === ids.aisha && String(task.due_date).startsWith('2030-12-01'), 'a person’s part becomes their task');
+  assert.ok(await db('notifications').where({ user_id: ids.aisha }).where('title', 'like', '%gave you a part: Sources of microplastics%').first());
+  assert.notStrictEqual(parts[1].agent_status, 'draft', 'the agent part was launched');
+  // Journey has the manual steps, and the next step asks to assign the open part
+  const home = await leader.get('/topics/' + tid);
+  assert.match(home.text, /Assign the parts/);
+  assert.match(home.text, /Review work/);
+  const research = await leader.get('/topics/' + tid + '/agents');
+  assert.match(research.text, /Parts &amp; people/);
+  assert.match(research.text, /Needs a person/);
+  // Give the open part to Tom, then to an agent
+  await leader.post('/topics/' + tid + '/agents/' + parts[2].id + '/assign').type('form').send({ _csrf: leader.csrf, who: String(ids.tom), due: '2030-12-05' });
+  assert.strictEqual((await db('tasks').where({ part_id: parts[2].id }).first()).assignee_id, ids.tom);
+  assert.strictEqual((await aisha.post('/topics/' + tid + '/agents/' + parts[2].id + '/assign').type('form').send({ _csrf: aisha.csrf, who: 'agent' })).status, 403);
+  // Switch to agent mode: Aisha's part goes to an agent, her task is kept
+  assert.match((await leader.get('/topics/' + tid + '/mode')).text, /Switch to Agent mode/);
+  await leader.post('/topics/' + tid + '/mode').type('form').send({ _csrf: leader.csrf, mode: 'agent', ['who_' + parts[0].id]: 'agent', ['who_' + parts[2].id]: 'keep' });
+  assert.strictEqual((await db('topics').where({ id: tid }).first()).mode, 'agent');
+  assert.strictEqual((await db('parts').where({ id: parts[0].id }).first()).handler, 'agent');
+  assert.ok(await db('tasks').where({ id: task.id }).first(), 'nothing is deleted');
+  assert.strictEqual((await db('parts').where({ id: parts[2].id }).first()).handler, 'person');
+  // Removing a part (the Undo toast sends this after a few seconds)
+  await leader.post('/topics/' + tid + '/agents/' + parts[2].id).type('form').send({ _csrf: leader.csrf, action: 'delete' });
+  assert.ok(!(await db('parts').where({ id: parts[2].id }).first()));
+});
+
+test('paper: writing page citations, health check with fixes and undo', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const tid = await topicId('CT-0150');
+  const part = await db('parts').where({ topic_id: tid, title: 'Downstream flow' }).first();
+  const sec = await db('paper_sections').where({ topic_id: tid, part_id: part.id }).first();
+  const run = await db('agent_runs').where({ part_id: part.id, status: 'done' }).orderBy('id', 'desc').first();
+  const srcs = await db('agent_sources').where({ run_id: run.id }).orderBy('id').limit(2);
+  await db('agent_sources').where({ id: srcs[0].id }).update({ flags: JSON.stringify(['retracted']) });
+  await db('agent_sources').where({ id: srcs[1].id }).update({ flags: JSON.stringify(['preprint']) });
+  await db('paper_sections').where({ id: sec.id }).update({ body: 'Flow fell by 12% [src:' + srcs[0].id + '].\n\nA preprint says otherwise [src:' + srcs[1].id + '].\n\nAbout 40% of farmers saw later water in five districts.' });
+  const page = await leader.get('/topics/' + tid + '/paper?s=' + sec.id);
+  assert.match(page.text, /class="cite-chip"/);
+  assert.match(page.text, /data-cites="\{/);
+  const chk = await leader.get('/topics/' + tid + '/paper/check');
+  assert.match(chk.text, /1 retracted paper is cited/);
+  assert.match(chk.text, /1 preprint is cited/);
+  assert.match(chk.text, /paragraph with numbers but no citation/);
+  assert.match(chk.text, /Save as final report →<\/button>|disabled title="Fix the problems in red first"/);
+  await leader.post('/topics/' + tid + '/paper/check/fix').type('form').send({ _csrf: leader.csrf, key: 'retracted' });
+  assert.doesNotMatch((await db('paper_sections').where({ id: sec.id }).first()).body, new RegExp('src:' + srcs[0].id + '\\]'));
+  await leader.post('/topics/' + tid + '/paper/check/fix').type('form').send({ _csrf: leader.csrf, key: 'preprint' });
+  assert.match((await db('paper_sections').where({ id: sec.id }).first()).body, /\(preprint\) \[src:/);
+  assert.match((await leader.get('/topics/' + tid + '/paper/check')).text, /Undo/);
+  await leader.post('/topics/' + tid + '/paper/check/undo').type('form').send({ _csrf: leader.csrf });
+  assert.doesNotMatch((await db('paper_sections').where({ id: sec.id }).first()).body, /\(preprint\)/, 'undo restores the text');
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);
@@ -893,5 +984,5 @@ test('admin can clear workspace data; accounts are kept', async () => {
   for (const t of ['topics', 'tasks', 'messages', 'files', 'submissions', 'notifications']) assert.strictEqual(Number((await db(t).count({ n: '*' }).first()).n), 0, t + ' cleared');
   assert.strictEqual(Number((await db('users').count({ n: '*' }).first()).n), users, 'users kept');
   // Empty workspace still renders
-  for (const p of ['/', '/topics', '/messages', '/meetings', '/tasks', '/actions', '/notifications', '/admin']) assert.strictEqual((await admin.get(p)).status === 200 || (await admin.get(p)).status === 302, true, p);
+  for (const p of ['/', '/topics', '/messages', '/meetings', '/tasks', '/inbox', '/actions', '/admin']) assert.strictEqual((await admin.get(p)).status === 200 || (await admin.get(p)).status === 302, true, p);
 });

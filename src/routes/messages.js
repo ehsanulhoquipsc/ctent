@@ -46,7 +46,7 @@ const msgQuery = (cid) => db('messages').leftJoin('users', 'users.id', 'messages
 
 r.get('/messages', async (req, res) => {
   const { all } = await myChannels(req.user);
-  if (!all.length) return res.render('pages/messages', { title: 'Messages', active: 'messages', mainClass: 'chat-page', channel: null, topicCh: [], rooms: [], msgs: [], people: await db('users').where({ status: 'active' }).whereNot('id', req.user.id).orderBy('name'), last: 0, members: [] });
+  if (!all.length) return res.render('pages/messages', { title: 'Messages', active: 'inbox', mainClass: 'chat-page', channel: null, topicCh: [], rooms: [], msgs: [], people: await db('users').where({ status: 'active' }).whereNot('id', req.user.id).orderBy('name'), last: 0, members: [] });
   res.redirect('/messages/' + all[0].id);
 });
 r.get('/topics/:tid/channels', auth.loadTopic('member'), async (req, res) => {
@@ -67,7 +67,7 @@ r.get('/messages/:cid', async (req, res) => {
     ? await db('channel_members').join('users', 'users.id', 'channel_members.user_id').where({ channel_id: ch.id }).select('users.id', 'users.name', 'users.color')
     : await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where({ topic_id: ch.topic_id }).whereNot('role', 'guest').select('users.id', 'users.name', 'users.color');
   const people = await db('users').where({ status: 'active' }).whereNot('id', req.user.id).whereNot('platform_role', 'guest').orderBy('name').select('id', 'name');
-  res.render('pages/messages', { title: (ch.kind === 'room' ? '' : '#') + ch.name, active: 'messages', mainClass: 'chat-page', channel: ch, topic, topicCh, rooms, msgs, members, people, last: msgs.length ? msgs[msgs.length - 1].id : 0,
+  res.render('pages/messages', { title: (ch.kind === 'room' ? '' : '#') + ch.name, active: 'inbox', mainClass: 'chat-page', channel: ch, topic, topicCh, rooms, msgs, members, people, last: msgs.length ? msgs[msgs.length - 1].id : 0,
     canMod: await canModerate(req.user, ch), readOnly: !!topic && topic.status === 'archived', since: now() });
 });
 

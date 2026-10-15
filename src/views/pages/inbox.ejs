@@ -1,0 +1,90 @@
+<%- include('../partials/top', { crumb: 'Inbox' }) %>
+<%
+  const KINDS = { message: 'Messages', mention: 'Mentions', meeting: 'Meetings', update: 'Updates' };
+  const KIND1 = { message: 'Message', mention: 'Mention', meeting: 'Meeting', update: 'Update' };
+  const KC = { message: 'indigo', mention: 'burgundy', meeting: 'violet', update: 'teal' };
+  const NICON = { Findings: 'check', Agent: 'bot', Review: 'check', Request: 'user', Blocked: 'help', Overdue: 'target' };
+  const NACT = { Findings: 'Review', Agent: 'Open', Review: 'Review', Blocked: 'Help', Overdue: 'Update' };
+  const RACT = { message: 'Reply', mention: 'Open', meeting: 'View', update: 'Open' };
+  const chips = [['all', 'All'], ['needs', 'Needs you'], ['message', 'Messages'], ['mention', 'Mentions'], ['meeting', 'Meetings'], ['update', 'Updates']];
+%>
+<div class="inbox">
+  <section class="inbox-main">
+    <div class="page-head">
+      <div><h1>Inbox</h1><p>Everything that needs you, plus messages and updates — in one place.</p></div>
+      <% if (unreadCount) { %><form method="post" action="/notifications/read-all"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm">Mark all as read</button></form><% } %>
+    </div>
+    <nav class="fchips" aria-label="Filter">
+      <% chips.forEach(([k, label]) => { %><a class="fchip<%= f === k ? ' on' : '' %>" href="/inbox<%= k === 'all' ? '' : '?f=' + k %>"<%- f === k ? ' aria-current="true"' : '' %>><%= label %><span class="n"><%= counts[k] %></span></a><% }) %>
+    </nav>
+
+    <% if (f === 'all' || f === 'needs') { %>
+    <div class="card flush needs-card<%= needs.length ? '' : ' calm' %>">
+      <div class="ib-head"><span class="ib-dot"></span><h2>Needs you</h2><span class="mono"><%= needs.length %> to do</span></div>
+      <% if (!needs.length) { %>
+        <div class="empty2"><span class="e-ico"><%- u.icon('check', 24) %></span><b>You’re all caught up</b><span>Nothing needs you right now. We’ll show it here the moment something does.</span><a class="btn btn-p btn-sm" href="/">Go to your projects</a></div>
+      <% } %>
+      <% needs.forEach((i) => { %>
+        <div class="ib-row" id="<%= i.requestId ? 'req-' + i.requestId : '' %>">
+          <span class="ib-ico<%= i.urgent ? ' urgent' : '' %>"><%- u.icon(NICON[i.type] || 'check', 18) %></span>
+          <div class="ib-body">
+            <span class="ib-title"><%= i.title %></span>
+            <span class="ib-meta"><span class="ptag"><%= i.topic %></span><%= i.detail %><% if (i.urgent) { %> <span class="tag" style="background:var(--red-soft);color:var(--red)">Urgent</span><% } %></span>
+          </div>
+          <% if (i.requestId) { %>
+            <a class="btn btn-s btn-sm" href="<%= i.personHref %>">Profile</a>
+            <form method="post" action="/requests/<%= i.requestId %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="decision" value="declined"><button class="btn btn-s btn-sm">Decline</button></form>
+            <form method="post" action="/requests/<%= i.requestId %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="decision" value="accepted"><button class="btn btn-p btn-sm">Accept</button></form>
+          <% } else { %>
+            <a class="btn btn-p btn-sm" href="<%= i.href %>"><%= NACT[i.type] || 'Open' %></a>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+    <% } %>
+
+    <div class="card flush">
+      <div class="ib-head"><h2><%= f === 'needs' ? 'Recent' : f === 'all' ? 'Messages & updates' : KINDS[f] %></h2><span class="mono"><%= rows.length %></span></div>
+      <% if (!rows.length) { %><div class="empty2"><span class="e-ico"><%- u.icon('inbox', 24) %></span><b>Nothing here</b><span><%= f === 'all' || f === 'needs' ? 'Messages, mentions, meeting invites and project updates will show up here.' : 'No ' + KINDS[f].toLowerCase() + ' yet.' %></span><% if (f !== 'all') { %><a class="btn btn-s btn-sm" href="/inbox">Show everything</a><% } %></div><% } %>
+      <% rows.forEach((n) => { const c = u.color(KC[n.k]); %>
+        <div class="ib-row<%= n.read_at ? '' : ' unread' %>">
+          <span class="ib-unread" aria-hidden="true"></span>
+          <span class="ib-av" style="background:<%= c[1] %>;color:<%= c[0] %>"><%- u.icon({ message: 'chat', mention: 'chat', meeting: 'video', update: 'bell' }[n.k], 16) %></span>
+          <div class="ib-body">
+            <span class="ib-title"><%= n.title %><% if (!n.read_at) { %><span class="sr"> (new)</span><% } %></span>
+            <% if (n.body) { %><span class="ib-text" data-i18n-skip><%= n.body %></span><% } %>
+            <span class="ib-meta"><span><%= KIND1[n.k] %></span><span>· <%= u.ago(n.created_at) %></span></span>
+          </div>
+          <a class="btn btn-s btn-sm" href="/notifications/<%= n.id %>/go"><%= RACT[n.k] %></a>
+          <form method="post" action="/notifications/<%= n.id %>/delete"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn sm" aria-label="Delete" title="Delete"><%- u.icon('x', 14) %></button></form>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <aside class="inbox-side">
+    <div class="card">
+      <% const anyToday = meetings.some((m) => new Date(m.starts_at).toLocaleDateString('en-AU', { timeZone: u.TZ }) === todayKey); %>
+      <div class="card-head"><h2><%= anyToday ? 'Today' : 'Coming up' %></h2><span class="mono"><%= new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: u.TZ }) %></span></div>
+      <% if (!meetings.length) { %><p class="text-2" style="font-size:13.5px">No meetings in the next week.</p><% } %>
+      <div style="display:flex;flex-direction:column;gap:8px">
+      <% meetings.forEach((m, i) => { const today = new Date(m.starts_at).toLocaleDateString('en-AU', { timeZone: u.TZ }) === todayKey; %>
+        <div class="meet<%= today ? ' now' : '' %>">
+          <div class="meet-t"><b><%= today ? u.fmtTime(m.starts_at) : u.fmtDate(m.starts_at, { weekday: 'short' }) %></b><span><%= today ? '' : u.fmtTime(m.starts_at) %></span></div>
+          <div style="flex:1;min-width:0"><b style="font-size:14px;font-weight:600" data-i18n-skip><%= m.title %></b><div class="text-2" style="font-size:12.5px"><span data-i18n-skip><%= m.topic_title %></span> · <%= m.duration_min %> min<%= m.platform ? ' · ' + m.platform : '' %></div></div>
+          <% if (today && m.link) { %><a class="btn btn-p btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
+        </div>
+      <% }) %>
+      </div>
+      <a href="/meetings" style="font-size:13px;font-weight:500;display:inline-block;margin-top:12px">All meetings →</a>
+    </div>
+    <% if (me.platform_role !== 'guest') { %>
+    <div class="card">
+      <div class="card-head"><h2>Chat</h2></div>
+      <p class="text-2" style="font-size:13.5px">Project channels and direct messages live in each project’s Team tab.</p>
+      <a href="/messages" style="font-size:13px;font-weight:500;display:inline-block;margin-top:10px">Open all chats →</a>
+    </div>
+    <% } %>
+  </aside>
+</div>
+<%- include('../partials/bottom') %>

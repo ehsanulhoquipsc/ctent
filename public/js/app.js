@@ -6,6 +6,7 @@
     '(edited)': '(সম্পাদিত)', 'This message was deleted.': 'বার্তাটি মুছে ফেলা হয়েছে।', 'Delete this message for everyone?': 'সবার জন্য বার্তাটি মুছবেন?',
     'Save': 'সংরক্ষণ', 'Cancel': 'বাতিল', 'Message not sent. Check your connection and try again.': 'বার্তা পাঠানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।', 'Something went wrong.': 'কিছু একটা ভুল হয়েছে।' };
   BN['Add a sentence on why it matters'] = 'কেন গুরুত্বপূর্ণ তা এক বাক্যে লিখুন'; BN['Add a title and at least one “done when” point to send.'] = 'পাঠাতে একটি শিরোনাম এবং কমপক্ষে একটি “সম্পন্ন হবে যখন” শর্ত যোগ করুন।'; BN['Clear title'] = 'স্পষ্ট শিরোনাম'; BN['Excellent'] = 'চমৎকার'; BN['Give it a specific title'] = 'নির্দিষ্ট একটি শিরোনাম দিন'; BN['Goal explains why'] = 'লক্ষ্যে কারণ বলা আছে'; BN['Good — it starts with an action.'] = 'ভালো — এটি একটি কাজ দিয়ে শুরু হয়েছে।'; BN['Good'] = 'ভালো'; BN['Link at least one file'] = 'অন্তত একটি ফাইল যুক্ত করুন'; BN['Looks great. '] = 'দারুণ হয়েছে। '; BN['Needs work'] = 'আরও ভালো করা দরকার'; BN['None'] = 'কিছু নেই'; BN['Normal'] = 'সাধারণ'; BN['Say how you’ll judge it’s done'] = 'কীভাবে বুঝবেন কাজ শেষ, তা লিখুন'; BN['Start with a verb like Draft, Collect, Analyse'] = 'খসড়া, সংগ্রহ, বিশ্লেষণ — এমন একটি ক্রিয়া দিয়ে শুরু করুন'; BN['Starter file linked'] = 'শুরুর ফাইল যুক্ত'; BN['Starts with an action'] = 'কাজ দিয়ে শুরু'; BN['They’ll be notified straight away.'] = 'তাদের সঙ্গে সঙ্গে জানানো হবে।'; BN['Tip: start with a verb so it reads like a to-do.'] = 'পরামর্শ: ক্রিয়া দিয়ে শুরু করুন, যাতে করণীয়র মতো পড়া যায়।'; BN['Untitled task'] = 'শিরোনামহীন কাজ'; BN['You can send now, or improve the brief first. '] = 'এখনই পাঠাতে পারেন, অথবা আগে নির্দেশনা আরও ভালো করুন। '; 
+  Object.assign(BN, {"Dismiss": "বন্ধ করুন", "Undo": "ফিরিয়ে নিন", "Tip": "পরামর্শ", "of": "/", "Skip tips": "পরামর্শ বাদ দিন", "Got it": "বুঝেছি", "Next": "পরবর্তী", "Review": "পর্যালোচনা", " working": "টি কাজ করছে", " ready": "টি প্রস্তুত", "Part removed": "অংশ সরানো হয়েছে", "Template parts added — edit any of them": "টেমপ্লেটের অংশ যোগ হয়েছে — যেকোনোটি সম্পাদনা করুন", "Create & pick team": "তৈরি করে দল বাছুন", "Create & suggest parts": "তৈরি করে অংশ প্রস্তাব করুন", "Good match: ": "ভালো মিল: ", " knows ": " জানেন ", "An AI agent will research this part — you review its evidence": "একটি AI এজেন্ট এই অংশ গবেষণা করবে — আপনি তার প্রমাণ পর্যালোচনা করবেন", "Kept": "রাখা হয়েছে", "Skipped": "বাদ দেওয়া হয়েছে", "Selected ": "নির্বাচিত ", " high-reliability cards": "টি উচ্চ-নির্ভরযোগ্য কার্ড", "All high-reliability cards are already selected": "সব উচ্চ-নির্ভরযোগ্য কার্ড আগেই নির্বাচিত", "Supports: ": "সমর্থন করে: ", "Open source ↗": "উৎস খুলুন ↗", "High reliability": "উচ্চ নির্ভরযোগ্যতা", "Medium reliability": "মাঝারি নির্ভরযোগ্যতা", "Low reliability": "নিম্ন নির্ভরযোগ্যতা", "RETRACTED": "প্রত্যাহৃত", "Preprint": "প্রিপ্রিন্ট", "Tips will show again on each page": "প্রতিটি পৃষ্ঠায় আবার পরামর্শ দেখাবে", "Write the research question first (step 1) and the AI can suggest parts.": "আগে গবেষণা প্রশ্ন লিখুন (ধাপ ১), তাহলে AI অংশ প্রস্তাব করতে পারবে।", "Suggesting…": "প্রস্তাব করা হচ্ছে…", "Suggest parts": "অংশ প্রস্তাব করুন", "AI suggested ": "AI প্রস্তাব করেছে ", " parts from your question — edit any of them": "টি অংশ — যেকোনোটি সম্পাদনা করুন", "Accept N and use in paper": "Nটি গ্রহণ করে গবেষণাপত্রে ব্যবহার করুন", "Update accepted cards (N)": "গৃহীত কার্ড হালনাগাদ করুন (N)", " of ": " / ", " parts have someone.": "টি অংশে দায়িত্ব দেওয়া হয়েছে।", " go to an AI agent.": "টি যাবে AI এজেন্টের কাছে।", "Members get a notification with their brief and due date.": "সদস্যরা বিবরণ ও শেষ তারিখসহ নোটিফিকেশন পাবেন।", " agents": "টি এজেন্ট", "about ": "প্রায় ", " minutes · two run at a time. You can leave the page; you’ll be notified.": " মিনিট · একসঙ্গে দুটি চলে। পৃষ্ঠা ছেড়ে যেতে পারেন; আপনাকে জানানো হবে।", " parts go to people.": "টি অংশ যাবে সদস্যদের কাছে।"});
   var L = function (s) { return document.documentElement.lang === 'bn' && BN[s] ? BN[s] : s; };
 
   // Light / dark theme
@@ -114,27 +115,6 @@
   });
 
   document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });
-
-  // Agents: keep progress bars live and reload when an agent changes state
-  var poll = document.querySelector('[data-agent-poll]');
-  if (poll) {
-    var seen = null;
-    var tick = function () {
-      fetch(poll.getAttribute('data-agent-poll'), { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
-        var now = {}; (d.parts || []).forEach(function (p) { now[p.id] = p.status; });
-        if (seen) { for (var k in now) { if (seen[k] !== now[k]) { window.location.reload(); return; } } }
-        seen = now;
-        (d.parts || []).forEach(function (p) {
-          document.querySelectorAll('[data-agent="' + p.id + '"]').forEach(function (el) {
-            var bar = el.querySelector('[data-progress] .bar > span'); if (bar) bar.style.width = (p.progress || 0) + '%';
-            var st = el.querySelector('[data-step]'); if (st && p.step) st.textContent = p.step;
-            var pc = el.querySelector('[data-pct]'); if (pc) pc.textContent = (p.progress || 0) + '%';
-          });
-        });
-      }).catch(function () {});
-    };
-    tick(); setInterval(tick, 4000);
-  }
 
   // Kanban drag and drop (buttons work without JS too)
   var board = document.querySelector('[data-board]');
@@ -320,7 +300,8 @@
       ws.querySelectorAll('[data-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-panel') !== found; });
       try { history.replaceState(null, '', '#' + found); } catch (e) { /* ignore */ }
     };
-    ws.querySelectorAll('.tabs a').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); showTab(a.getAttribute('data-tab')); }); });
+    ws.querySelectorAll('[data-tab]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); showTab(a.getAttribute('data-tab')); }); });
+    document.querySelectorAll('.more-menu [data-tab]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); a.closest('details').open = false; showTab(a.getAttribute('data-tab')); ws.scrollIntoView({ behavior: 'smooth' }); }); });
     if (location.hash && /^#(cards|agree|gaps|overview|log)$/.test(location.hash)) showTab(location.hash.slice(1));
     else if (location.hash && /^#c\d+$/.test(location.hash)) showTab('cards');
 
@@ -335,15 +316,16 @@
         var d = c.dataset, rel = d.rel === '' ? null : +d.rel;
         return (!t || d.text.indexOf(t) >= 0) && (!q || d.q === q) && (!ty || d.type === ty) && (!src || (' ' + d.src + ' ').indexOf(' ' + src + ' ') >= 0) &&
           tiers.indexOf(d.tier) >= 0 && (!val('hideflag') || d.flag !== '1') && (!val('rel') || rel === null || rel >= 2) && (!val('full') || d.full === '1') &&
-          (!val('data') || d.data === '1') && (!val('sel') || c.querySelector('input[name=card]').checked);
+          (!val('data') || d.data === '1') && (!val('highonly') || d.tier === 'high') && (!val('sel') || c.querySelector('input[name=card]').checked);
       });
       var grouped = !q && sort === 'score';
       var key = { score: function (c) { return +c.dataset.score; }, year: function (c) { return +c.dataset.year; }, cited: function (c) { return +c.dataset.cited; } }[sort];
       var order = cards.slice().sort(function (a, b) { return grouped ? (a.dataset.q.localeCompare(b.dataset.q) || key(b) - key(a)) : key(b) - key(a); });
       var heads = form.querySelectorAll('[data-qhead]');
       var foot = form.querySelector('.cards-foot'), none = form.querySelector('[data-nomatch]');
+      var lastQ = null;
       order.forEach(function (c) {
-        if (grouped) { var h = form.querySelector('[data-qhead="' + CSS.escape(c.dataset.q) + '"]'); if (h) form.insertBefore(h, none || foot); }
+        if (grouped && c.dataset.q !== lastQ) { lastQ = c.dataset.q; var h = form.querySelector('[data-qhead="' + CSS.escape(c.dataset.q) + '"]'); if (h) form.insertBefore(h, none || foot); }
         form.insertBefore(c, none || foot);
         c.hidden = visible.indexOf(c) < 0;
       });
@@ -354,7 +336,12 @@
     ws.querySelectorAll('[data-f]').forEach(function (el) { el.addEventListener(el.tagName === 'INPUT' && el.type !== 'checkbox' ? 'input' : 'change', apply); });
     if (form) apply();
 
-    var count = function () { var n = cards.filter(function (c) { return c.querySelector('input[name=card]').checked; }).length; document.querySelectorAll('[data-sel-count]').forEach(function (e) { e.textContent = n; }); };
+    var count = function () {
+      var n = cards.filter(function (c) { return c.querySelector('input[name=card]').checked; }).length;
+      document.querySelectorAll('[data-sel-count]').forEach(function (e) { e.textContent = n; });
+      document.querySelectorAll('[data-accept-label]').forEach(function (b) { b.textContent = L(b.getAttribute('data-accept-label')).replace('N', n); b.disabled = !n; });
+    };
+    count();
     var save = function (ids, on) {
       if (!form || !ids.length) return;
       fetch(form.getAttribute('data-select-url'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' }, body: JSON.stringify({ ids: ids, selected: on }) }).catch(function () {});
@@ -369,6 +356,29 @@
         var on = b.getAttribute('data-select-visible') === '1', ids = [];
         visible.forEach(function (c) { var box = c.querySelector('input[name=card]'); if (box && !box.disabled && box.checked !== on) { box.checked = on; c.classList.toggle('sel', on); ids.push(+box.value); } });
         count(); save(ids, on);
+      });
+    });
+    ws.querySelectorAll('[data-select-high]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var ids = [];
+        cards.forEach(function (c) { var box = c.querySelector('input[name=card]'); if (c.dataset.tier === 'high' && c.dataset.flag !== '1' && box && !box.disabled && !box.checked) { box.checked = true; c.classList.add('sel'); ids.push(+box.value); } });
+        count(); save(ids, true); toast(ids.length ? L('Selected ') + ids.length + L(' high-reliability cards') : L('All high-reliability cards are already selected'));
+      });
+    });
+    ws.querySelectorAll('[data-quick-high]').forEach(function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); var hb = ws.querySelector('[data-f="highonly"]'); if (hb) { hb.checked = !hb.checked; showTab('cards'); apply(); } });
+    });
+    // Phone: swipe a card right to keep it, left to skip it
+    cards.forEach(function (c) {
+      var box = c.querySelector('input[name=card]'); if (!box || box.disabled) return;
+      var x0 = null, y0 = null, dx = 0;
+      c.addEventListener('touchstart', function (e) { if (e.touches.length !== 1) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; }, { passive: true });
+      c.addEventListener('touchmove', function (e) { if (x0 === null) return; dx = e.touches[0].clientX - x0; var dy = e.touches[0].clientY - y0; if (Math.abs(dy) > Math.abs(dx)) { x0 = null; c.style.transform = ''; return; } c.style.transform = 'translateX(' + Math.max(-90, Math.min(90, dx)) + 'px)'; c.style.background = dx > 40 ? 'var(--green-soft)' : dx < -40 ? 'var(--surface-2)' : ''; }, { passive: true });
+      c.addEventListener('touchend', function () {
+        if (x0 === null) return; x0 = null; c.style.transform = ''; c.style.background = '';
+        if (Math.abs(dx) < 70) return;
+        var on = dx > 0; if (box.checked === on) return;
+        box.checked = on; c.classList.toggle('sel', on); count(); save([+box.value], on); toast(on ? L('Kept') : L('Skipped'));
       });
     });
     ws.querySelectorAll('[data-toggle]').forEach(function (b) { b.addEventListener('click', function () { var el = document.querySelector(b.getAttribute('data-toggle')); if (el) el.hidden = !el.hidden; }); });
@@ -395,25 +405,108 @@
   });
 
 
-  // ===== New project wizard: one step at a time (all steps show without JS) =====
+  // ===== New project: details → mode → agents or team (all steps show without JS) =====
   var wiz = document.querySelector('[data-wizard]');
   if (wiz) {
     wiz.classList.add('js');
     var go = function (n) {
       wiz.querySelectorAll('[data-pane]').forEach(function (p) { p.classList.toggle('on', p.getAttribute('data-pane') === String(n)); });
       wiz.querySelectorAll('[data-wstep]').forEach(function (li) { var k = +li.getAttribute('data-wstep'); li.classList.toggle('on', k === n); li.classList.toggle('past', k < n); });
-      var first = wiz.querySelector('[data-pane="' + n + '"] input:not([type=hidden]), [data-pane="' + n + '"] textarea'); if (first && n === 1) first.focus();
+      var tt = wiz.querySelector('#title');
+      wiz.querySelectorAll('[data-echo-title]').forEach(function (e) { e.textContent = tt ? tt.value : ''; });
+      if (n === 3 && wiz.getAttribute('data-ai') === '1' && !filled() && !wiz.__asked) { wiz.__asked = true; suggest(); }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     wiz.querySelectorAll('[data-wnext]').forEach(function (b) {
       b.addEventListener('click', function () {
         var n = +b.getAttribute('data-wnext');
-        var t = wiz.querySelector('#title');
-        if (n > 1 && t && !t.checkValidity()) { go(1); t.reportValidity(); return; }
+        var tt = wiz.querySelector('#title');
+        if (n > 1 && tt && !tt.checkValidity()) { go(1); tt.reportValidity(); return; }
         go(n);
       });
     });
-    go(wiz.querySelector('.alert.err') ? 1 : 1);
+    var mode = function () { var m = wiz.querySelector('input[name=mode]:checked'); return m ? m.value : 'agent'; };
+    var rowsBox = wiz.querySelector('[data-prows]');
+    var rows = function () { return Array.prototype.slice.call(rowsBox.querySelectorAll('[data-prow]')); };
+    var filled = function () { return rows().some(function (r) { return r.querySelector('[name=part_title]').value.trim(); }); };
+    var picked = function () { return Array.prototype.map.call(wiz.querySelectorAll('input[name=invite]:checked'), function (c) { return c.value; }); };
+    var words = function (s) { return String(s || '').toLowerCase().split(/[^a-zঀ-৿]+/).filter(function (w) { return w.length > 3; }); };
+    var syncRow = function (r) {
+      var sel = r.querySelector('[data-who]'), v = sel.value, isP = v && v !== 'agent';
+      r.classList.toggle('is-person', !!isP); r.classList.toggle('is-agent', v === 'agent');
+      var m = r.querySelector('[data-match]'), opt = sel.options[sel.selectedIndex];
+      if (isP && opt) {
+        var skills = (opt.getAttribute('data-skills') || '').split('|').filter(Boolean), need = words(r.querySelector('[name=part_title]').value + ' ' + r.querySelector('[name=part_brief]').value);
+        var hit = skills.filter(function (sk) { return words(sk).some(function (w) { return need.some(function (n) { return n.indexOf(w.slice(0, 5)) === 0 || w.indexOf(n.slice(0, 5)) === 0; }); }); })[0];
+        var name = opt.textContent.split(' — ')[0];
+        m.hidden = false; m.classList.toggle('good', !!hit);
+        m.textContent = hit ? '✓ ' + L('Good match: ') + name + L(' knows ') + hit.toLowerCase() : name + (skills[0] ? ' · ' + skills[0] : '');
+        var box = wiz.querySelector('input[name=invite][value="' + v + '"]'); if (box && !box.checked) { box.checked = true; team(); }
+      } else if (v === 'agent') { m.hidden = false; m.classList.remove('good'); m.textContent = '✦ ' + L('An AI agent will research this part — you review its evidence'); }
+      else m.hidden = true;
+    };
+    var summary = function () {
+      var rs = rows().filter(function (r) { return r.querySelector('[name=part_title]').value.trim(); });
+      var ag = rs.filter(function (r) { return r.querySelector('[data-who]').value === 'agent'; }).length;
+      var ps = rs.filter(function (r) { var v = r.querySelector('[data-who]').value; return v && v !== 'agent'; }).length;
+      var el = wiz.querySelector('[data-wiz-summary]'); if (!el) return;
+      var d = wiz.querySelector('input[name=depth]:checked'), per = { quick: 3, standard: 8, deep: 20 }[d ? d.value : 'standard'];
+      el.textContent = mode() === 'manual'
+        ? ps + L(' of ') + rs.length + L(' parts have someone.') + (ag ? ' ' + ag + L(' go to an AI agent.') : '') + ' ' + L('Members get a notification with their brief and due date.')
+        : ag + L(' agents') + (ag ? ' · ' + L('about ') + Math.ceil(ag / 2) * per + L(' minutes · two run at a time. You can leave the page; you’ll be notified.') : '') + (ps ? ' ' + ps + L(' parts go to people.') : '');
+    };
+    var renumber = function () { rows().forEach(function (r, i) { r.querySelector('.prow-n').textContent = (i < 9 ? '0' : '') + (i + 1); }); summary(); };
+    var bindRow = function (r) {
+      r.querySelector('[data-who]').addEventListener('change', function () { r.__touched = true; syncRow(r); summary(); });
+      r.querySelector('[name=part_title]').addEventListener('input', function () { syncRow(r); summary(); });
+      r.querySelector('[data-remove-part]').addEventListener('click', function () {
+        var next = r.nextSibling, parent = r.parentNode; parent.removeChild(r); renumber();
+        toast(L('Part removed'), { label: L('Undo'), grey: true, onAct: function () { parent.insertBefore(r, next); renumber(); } });
+      });
+      syncRow(r);
+    };
+    var tmpl = rows()[0].cloneNode(true);
+    var addRow = function (p) {
+      var r = tmpl.cloneNode(true), k = Date.now() + Math.random();
+      r.querySelectorAll('[id]').forEach(function (el) { var id = el.id.replace(/\d.*$/, '') + String(k).replace('.', ''); var l = r.querySelector('label[for="' + el.id + '"]'); if (l) l.setAttribute('for', id); el.id = id; });
+      r.querySelector('[name=part_title]').value = p && p.title || ''; r.querySelector('[name=part_brief]').value = p && p.brief || ''; r.querySelector('[name=part_due]').value = '';
+      r.querySelector('[data-who]').value = mode() === 'agent' ? 'agent' : '';
+      rowsBox.appendChild(r); bindRow(r); renumber();
+      return r;
+    };
+    rows().forEach(bindRow);
+    var fill = function (list) {
+      var empty = rows().filter(function (r) { return !r.querySelector('[name=part_title]').value.trim(); });
+      list.forEach(function (p) { var r = empty.shift(); if (r) { r.querySelector('[name=part_title]').value = p.title; r.querySelector('[name=part_brief]').value = p.brief || ''; syncRow(r); } else addRow(p); });
+      empty.forEach(function (r) { if (rows().length > 1) r.parentNode.removeChild(r); });
+      renumber();
+    };
+    wiz.querySelectorAll('[data-add-part]').forEach(function (b) { b.addEventListener('click', function () { var r = addRow(); r.querySelector('[name=part_title]').focus(); }); });
+    var tpls = {}; try { tpls = JSON.parse(wiz.getAttribute('data-templates') || '{}'); } catch (e) { /* ignore */ }
+    wiz.querySelectorAll('[data-template]').forEach(function (b) { b.addEventListener('click', function () { b.closest('details').open = false; fill((tpls[b.getAttribute('data-template')] || []).map(function (x) { return { title: x[0], brief: x[1] }; })); toast(L('Template parts added — edit any of them')); }); });
+    var suggest = function () {
+      var q = wiz.querySelector('#question'), sb = wiz.querySelector('[data-suggest]');
+      if (!q || q.value.trim().length < 10) { toast(L('Write the research question first (step 1) and the AI can suggest parts.')); return; }
+      if (sb) { sb.disabled = true; sb.lastChild.textContent = L('Suggesting…'); }
+      fetch('/topics/suggest-parts', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, Accept: 'application/json' }, body: JSON.stringify({ question: q.value, title: (wiz.querySelector('#title') || {}).value }) })
+        .then(function (r) { return r.json(); }).then(function (d) {
+          if (d.ok && d.parts && d.parts.length) { fill(d.parts); toast(L('AI suggested ') + d.parts.length + L(' parts from your question — edit any of them')); } else toast(d.error || L('Something went wrong.'), { grey: true });
+        }).catch(function () { toast(L('Something went wrong.'), { grey: true }); })
+        .then(function () { if (sb) { sb.disabled = false; sb.lastChild.textContent = L('Suggest parts'); } });
+    };
+    var sb0 = wiz.querySelector('[data-suggest]'); if (sb0) sb0.addEventListener('click', suggest);
+    var team = function () { var n = picked().length; wiz.querySelectorAll('[data-team-n]').forEach(function (e) { e.textContent = n; }); };
+    wiz.querySelectorAll('input[name=invite]').forEach(function (c) { c.addEventListener('change', team); }); team();
+    var ps = wiz.querySelector('[data-people-search]');
+    if (ps) ps.addEventListener('input', function () { var q = ps.value.toLowerCase().trim(); wiz.querySelectorAll('[data-person]').forEach(function (p) { p.hidden = q && p.getAttribute('data-text').indexOf(q) < 0; }); });
+    var setMode = function () {
+      var m = mode(); wiz.setAttribute('data-mode', m);
+      rows().forEach(function (r) { if (!r.__touched) { var s = r.querySelector('[data-who]'); if (s.value === 'agent' || s.value === '') s.value = m === 'agent' ? 'agent' : ''; syncRow(r); } });
+      summary();
+    };
+    wiz.querySelectorAll('input[name=mode], input[name=depth]').forEach(function (r) { r.addEventListener('change', setMode); });
+    setMode();
+    go(1);
   }
   // Links that open a <details> section (e.g. "Add a part")
   document.querySelectorAll('[data-open]').forEach(function (a) {
@@ -423,4 +516,226 @@
   // Fade out flash messages
   var flash = document.querySelector('.alert[role=status]');
   if (flash) setTimeout(function () { flash.style.transition = 'opacity .4s'; flash.style.opacity = '0'; setTimeout(function () { flash.remove(); }, 400); }, 4000);
+
+  // ===== Toasts: short notices with an optional action (Review, Undo) =====
+  var toastBox = document.getElementById('toasts');
+  function toast(msg, opt) {
+    opt = opt || {};
+    if (!toastBox) return null;
+    var el = document.createElement('div'); el.className = 'toast2'; el.setAttribute('role', 'status');
+    var dot = document.createElement('span'); dot.className = 'td'; if (opt.grey) dot.style.background = '#A39E97'; el.appendChild(dot);
+    var m = document.createElement('span'); m.className = 'tm'; m.textContent = msg; el.appendChild(m);
+    if (opt.label) {
+      var a = document.createElement(opt.href ? 'a' : 'button'); a.className = 'ta'; a.textContent = opt.label;
+      if (opt.href) a.href = opt.href; else a.type = 'button';
+      if (opt.onAct) a.addEventListener('click', function (e) { if (!opt.href) e.preventDefault(); opt.onAct(); close(); });
+      el.appendChild(a);
+    }
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'tx'; x.setAttribute('aria-label', L('Dismiss')); x.textContent = '✕'; el.appendChild(x);
+    function close() { if (el.parentNode) el.parentNode.removeChild(el); if (opt.onClose) opt.onClose(); opt.onClose = null; }
+    x.addEventListener('click', close);
+    toastBox.appendChild(el);
+    while (toastBox.children.length > 3) toastBox.removeChild(toastBox.firstChild);
+    if (opt.ms !== 0) setTimeout(close, opt.ms || 5000);
+    return { close: close };
+  }
+  window.ctToast = toast;
+
+  // ===== Live agent progress: no reload — bars move, finished agents announce themselves =====
+  var poll = document.querySelector('[data-agent-poll]');
+  if (poll) {
+    var seen = null, baseTitle = document.title, timer = null;
+    var softRefresh = function () {
+      fetch(location.href, { headers: { Accept: 'text/html' } }).then(function (r) { return r.text(); }).then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var regions = document.querySelectorAll('[data-live]');
+        if (!regions.length) return;
+        regions.forEach(function (el) { var n = doc.querySelector('[data-live="' + el.getAttribute('data-live') + '"]'); if (n) el.replaceWith(document.importNode(n, true)); });
+        bindUndo(document);
+      }).catch(function () {});
+    };
+    var tick = function () {
+      fetch(poll.getAttribute('data-agent-poll'), { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
+        var now = {}, changed = false, working = 0, ready = 0;
+        (d.parts || []).forEach(function (p) {
+          now[p.id] = p.status;
+          if (p.status === 'queued' || p.status === 'running') working++;
+          if (p.status === 'review') ready++;
+          if (seen && seen[p.id] !== undefined && seen[p.id] !== p.status) {
+            changed = true;
+            if (p.status === 'review') toast(p.doneMsg, { label: L('Review'), href: p.href, ms: 12000 });
+            if (p.status === 'failed') toast(p.failMsg, { grey: true, ms: 8000 });
+          }
+          document.querySelectorAll('[data-agent="' + p.id + '"]').forEach(function (el) {
+            var bar = el.querySelector('[data-progress] .bar > span'); if (bar) bar.style.width = (p.progress || 0) + '%';
+            var st = el.querySelector('[data-step]'); if (st && p.step) st.textContent = p.step;
+            var pl = el.querySelector('[data-plain]'); if (pl && p.plain) pl.textContent = p.plain;
+            var lf = el.querySelector('[data-left]'); if (lf) lf.textContent = p.leftText || '';
+            var pc = el.querySelector('[data-pct]'); if (pc) pc.textContent = (p.progress || 0) + '%';
+          });
+        });
+        document.title = (ready ? '(' + ready + ') ' : '') + baseTitle;
+        var live = document.querySelector('[data-live-count]'); if (live) live.textContent = working ? working + L(' working') + ' · ' + ready + L(' ready') : ready + L(' ready');
+        if (changed) {
+          // The evidence page itself changes completely when its run finishes, so reload that one.
+          if (document.querySelector('[data-reload-on-change]')) { setTimeout(function () { location.reload(); }, 1200); return; }
+          softRefresh();
+        }
+        seen = now;
+        if (!working && timer) { clearInterval(timer); timer = null; }
+      }).catch(function () {});
+    };
+    tick(); timer = setInterval(tick, 4000);
+  }
+
+  // ===== Undo instead of “are you sure?”: hide now, delete after a few seconds =====
+  var pending = [];
+  function commit(p) {
+    if (p.done) return; p.done = true;
+    var fd = new FormData(p.form);
+    if (navigator.sendBeacon && p.beacon) { navigator.sendBeacon(p.form.action, fd); return; }
+    fetch(p.form.action, { method: 'POST', body: fd, headers: { 'x-csrf-token': csrf } }).catch(function () {});
+  }
+  function bindUndo(root) {
+    root.querySelectorAll('form[data-undo]').forEach(function (f) {
+      if (f.__undo) return; f.__undo = true;
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var target = f.closest('[data-undo-target]') || f;
+        var pop = f.closest('details'); if (pop) pop.open = false;
+        target.hidden = true;
+        var p = { form: f, done: false };
+        pending.push(p);
+        p.timer = setTimeout(function () { commit(p); }, 6000);
+        toast(f.getAttribute('data-undo'), { label: L('Undo'), grey: true, ms: 6000, onAct: function () { clearTimeout(p.timer); p.done = true; target.hidden = false; } });
+      });
+    });
+  }
+  bindUndo(document);
+  window.addEventListener('pagehide', function () { pending.forEach(function (p) { if (!p.done) { clearTimeout(p.timer); p.beacon = true; commit(p); } }); });
+
+  // ===== Quick-add: “/” anywhere opens a new research question =====
+  var qa = document.getElementById('quick-add');
+  if (qa) {
+    var qq = qa.querySelector('textarea'), guess = qa.querySelector('[data-qa-guess]'), gt = qa.querySelector('[data-qa-title]'), go2 = qa.querySelector('[data-qa-go]');
+    var last = null;
+    var open = function () { last = document.activeElement; qa.hidden = false; setTimeout(function () { qq.focus(); }, 20); };
+    var shut = function () { qa.hidden = true; if (last && last.focus) last.focus(); };
+    var titleOf = function (q) { return q.trim().replace(/\?$/, '').replace(/^(does|do|how|what|why|is|are|can|will|should)\s+/i, '').replace(/^./, function (c) { return c.toUpperCase(); }).slice(0, 80); };
+    var sync = function () {
+      var q = qq.value.trim(); guess.hidden = !q; gt.textContent = titleOf(q);
+      var m = qa.querySelector('input[name=mode]:checked');
+      go2.firstChild.textContent = m && m.value === 'manual' ? L('Create & pick team') + ' ' : L('Create & suggest parts') + ' ';
+    };
+    qq.addEventListener('input', sync); qa.querySelectorAll('input[name=mode]').forEach(function (r) { r.addEventListener('change', sync); }); sync();
+    document.querySelectorAll('[data-quick-add]').forEach(function (b) { b.addEventListener('click', open); });
+    qa.querySelector('[data-qa-close]').addEventListener('click', shut);
+    qa.addEventListener('click', function (e) { if (e.target === qa) shut(); });
+    qq.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (qq.value.trim().length >= 10) qa.querySelector('form').requestSubmit(); else qq.reportValidity(); } });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !qa.hidden) { shut(); return; }
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      var a = document.activeElement, tag = a && a.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (a && a.isContentEditable)) return;
+      e.preventDefault(); open();
+    });
+    qq.setAttribute('minlength', '10');
+  }
+
+  // ===== First-run tips: shown once per page, then never again =====
+  var tipsKey = document.body.getAttribute('data-tips');
+  var tipEls = tipsKey ? Array.prototype.slice.call(document.querySelectorAll('[data-tip]')).filter(function (el) { return el.offsetParent !== null; }).slice(0, 3) : [];
+  var seenTips = null;
+  try { seenTips = localStorage.getItem('ct-tips-' + tipsKey); } catch (e) { seenTips = '1'; }
+  if (tipEls.length && !seenTips) {
+    var veil = document.createElement('div'); veil.className = 'tip-veil';
+    var box = document.createElement('div'); box.className = 'tip-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-live', 'polite');
+    var i = 0;
+    var done = function () { try { localStorage.setItem('ct-tips-' + tipsKey, '1'); } catch (e) { /* ignore */ } tipEls.forEach(function (el) { el.classList.remove('tip-on'); }); veil.remove(); box.remove(); };
+    var show = function () {
+      tipEls.forEach(function (el) { el.classList.remove('tip-on'); });
+      var el = tipEls[i]; el.classList.add('tip-on');
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      box.innerHTML = '';
+      var n = document.createElement('span'); n.className = 'mono'; n.textContent = L('Tip') + ' ' + (i + 1) + ' ' + L('of') + ' ' + tipEls.length; box.appendChild(n);
+      if (el.getAttribute('data-tip-title')) { var b = document.createElement('b'); b.textContent = el.getAttribute('data-tip-title'); box.appendChild(b); }
+      var p = document.createElement('p'); p.textContent = el.getAttribute('data-tip'); box.appendChild(p);
+      var row = document.createElement('div'); row.className = 'tb';
+      var sk = document.createElement('button'); sk.type = 'button'; sk.className = 'skip'; sk.textContent = L('Skip tips'); sk.addEventListener('click', done);
+      var nx = document.createElement('button'); nx.type = 'button'; nx.className = 'go'; nx.textContent = i >= tipEls.length - 1 ? L('Got it') : L('Next');
+      nx.addEventListener('click', function () { if (i >= tipEls.length - 1) done(); else { i++; show(); } });
+      row.appendChild(sk); row.appendChild(nx); box.appendChild(row);
+      setTimeout(function () {
+        var r = el.getBoundingClientRect();
+        var top = r.bottom + window.scrollY + 12, left = Math.min(Math.max(16, r.left + window.scrollX), window.scrollX + document.documentElement.clientWidth - 336);
+        if (r.bottom + 200 > window.innerHeight && r.top > 220) top = r.top + window.scrollY - box.offsetHeight - 12;
+        box.style.top = top + 'px'; box.style.left = left + 'px'; nx.focus({ preventScroll: true });
+      }, 350);
+    };
+    document.body.appendChild(veil); document.body.appendChild(box);
+    veil.addEventListener('click', done);
+    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape' && box.parentNode) { done(); document.removeEventListener('keydown', esc); } });
+    setTimeout(show, 600);
+  }
+
+  // ===== Writing page: citation popovers, drag evidence into the text, search, phone sheet =====
+  var pv = document.querySelector('.paper-view[data-cites]');
+  var pop = document.querySelector('.cite-pop');
+  if (pv && pop) {
+    var cites = {}; try { cites = JSON.parse(pv.getAttribute('data-cites') || '{}'); } catch (e) { /* ignore */ }
+    var host = pop.parentNode, hideT = null, onChip = null;
+    var TIERS = { high: 'High reliability', medium: 'Medium reliability', low: 'Low reliability' };
+    var showPop = function (chip) {
+      var c = cites[chip.getAttribute('data-cite')]; if (!c) return;
+      clearTimeout(hideT); if (onChip) onChip.classList.remove('on'); onChip = chip; chip.classList.add('on');
+      pop.innerHTML = '';
+      var top = document.createElement('div'); top.className = 'split';
+      var tg = document.createElement('span'); tg.className = 'tag t-' + c.tier; tg.textContent = L(TIERS[c.tier] || c.tier); top.appendChild(tg);
+      (c.flags || []).forEach(function (f) { var x = document.createElement('span'); x.className = 'tag f-' + f; x.textContent = f === 'retracted' ? L('RETRACTED') : f === 'preprint' ? L('Preprint') : f; top.appendChild(x); });
+      var y = document.createElement('span'); y.className = 'hint'; y.textContent = '[' + c.n + '] · ' + c.year; top.appendChild(y); pop.appendChild(top);
+      var t1 = document.createElement('div'); t1.className = 'cp-t'; t1.textContent = c.title; pop.appendChild(t1);
+      if (c.authors) { var a = document.createElement('div'); a.className = 'hint'; a.textContent = c.authors; pop.appendChild(a); }
+      if (c.finding) { var f = document.createElement('div'); f.className = 'cp-sup'; f.textContent = L('Supports: ') + '“' + c.finding + '”'; pop.appendChild(f); }
+      if (c.url) { var l = document.createElement('a'); l.href = c.url; l.target = '_blank'; l.rel = 'noopener noreferrer'; l.textContent = L('Open source ↗'); l.style.fontSize = '13px'; l.style.fontWeight = '600'; pop.appendChild(l); }
+      pop.hidden = false;
+      var hr = host.getBoundingClientRect(), cr = chip.getBoundingClientRect();
+      var left = Math.max(12, Math.min(cr.left - hr.left - 40, hr.width - pop.offsetWidth - 12));
+      var topPx = cr.bottom - hr.top + 8;
+      if (cr.bottom + pop.offsetHeight + 16 > window.innerHeight && cr.top - pop.offsetHeight > 80) topPx = cr.top - hr.top - pop.offsetHeight - 8;
+      pop.style.left = left + 'px'; pop.style.top = topPx + 'px';
+    };
+    var hidePop = function () { hideT = setTimeout(function () { pop.hidden = true; if (onChip) onChip.classList.remove('on'); onChip = null; }, 180); };
+    pv.querySelectorAll('.cite-chip').forEach(function (b) {
+      b.addEventListener('mouseenter', function () { showPop(b); }); b.addEventListener('mouseleave', hidePop);
+      b.addEventListener('focus', function () { showPop(b); }); b.addEventListener('blur', hidePop);
+      b.addEventListener('click', function () { if (onChip === b && !pop.hidden) { pop.hidden = true; b.classList.remove('on'); onChip = null; } else showPop(b); });
+    });
+    pop.addEventListener('mouseenter', function () { clearTimeout(hideT); }); pop.addEventListener('mouseleave', hidePop);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') pop.hidden = true; });
+  }
+  var paperMain = document.querySelector('.w-paper[data-drop]');
+  if (paperMain && paperMain.getAttribute('data-drop')) {
+    var dragged = null;
+    document.querySelectorAll('.w-card[draggable="true"]').forEach(function (c) {
+      c.addEventListener('dragstart', function (e) { dragged = c; c.classList.add('drag'); paperMain.classList.add('dragging'); try { e.dataTransfer.setData('text/plain', c.getAttribute('data-finding')); e.dataTransfer.effectAllowed = 'copy'; } catch (x) { /* ignore */ } });
+      c.addEventListener('dragend', function () { c.classList.remove('drag'); paperMain.classList.remove('dragging', 'over'); dragged = null; });
+    });
+    paperMain.addEventListener('dragover', function (e) { if (!dragged) return; e.preventDefault(); paperMain.classList.add('over'); });
+    paperMain.addEventListener('dragleave', function (e) { if (!paperMain.contains(e.relatedTarget)) paperMain.classList.remove('over'); });
+    paperMain.addEventListener('drop', function (e) {
+      if (!dragged) return; e.preventDefault();
+      var form = dragged.querySelector('form'); paperMain.classList.remove('dragging', 'over');
+      if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
+    });
+  }
+  var evq = document.querySelector('[data-ev-search]');
+  if (evq) evq.addEventListener('input', function () { var q = evq.value.toLowerCase().trim(); document.querySelectorAll('.w-card').forEach(function (c) { c.hidden = q && c.getAttribute('data-text').indexOf(q) < 0; }); });
+  document.querySelectorAll('[data-sheet-toggle]').forEach(function (b) {
+    var sheet = b.closest('.w-ev');
+    b.addEventListener('click', function () { var on = !sheet.classList.contains('open'); sheet.classList.toggle('open', on); b.setAttribute('aria-expanded', on ? 'true' : 'false'); });
+    var y0 = null;
+    b.addEventListener('touchstart', function (e) { y0 = e.touches[0].clientY; }, { passive: true });
+    b.addEventListener('touchend', function (e) { if (y0 === null) return; var dy = e.changedTouches[0].clientY - y0; y0 = null; if (Math.abs(dy) > 30) { var on = dy < 0; sheet.classList.toggle('open', on); b.setAttribute('aria-expanded', on ? 'true' : 'false'); } }, { passive: true });
+  });
+  document.querySelectorAll('[data-reset-tips]').forEach(function (b) { b.addEventListener('click', function () { try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('ct-tips-') === 0) localStorage.removeItem(k); }); } catch (e) { /* ignore */ } toast(L('Tips will show again on each page')); }); });
 })();

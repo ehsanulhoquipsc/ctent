@@ -19,7 +19,7 @@ const encode = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/
 
 // Tags and the blocks we never touch (scripts, styles, user-typed text areas, code).
 const SPLIT = /(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<textarea[\s\S]*?<\/textarea>|<pre[\s\S]*?<\/pre>|<!--[\s\S]*?-->|<[^>]+>)/i;
-const ATTRS = /\s(placeholder|aria-label|title|data-confirm|data-confirm-btn|alt)="([^"]*)"/g;
+const ATTRS = /\s(placeholder|aria-label|title|data-confirm|data-confirm-btn|data-tip|data-tip-title|data-undo|alt)="([^"]*)"/g;
 // Elements whose text is user content and should not be translated even if it matches.
 const SKIP_OPEN = /^<(?:[^>]*\sdata-i18n-skip|[^>]*\sclass="[^"]*\b(?:user-text)\b)/i;
 

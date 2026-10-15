@@ -3,6 +3,7 @@ const express = require('express');
 const db = require('../db');
 const auth = require('../lib/auth');
 const { actionItems } = require('../lib/actions');
+const { journeyMany } = require('../lib/journey');
 const { todayStr, toDate, now, ago } = require('../lib/util');
 
 const r = express.Router();
@@ -30,42 +31,30 @@ async function topicProgress(ids) {
 r.get('/', async (req, res) => {
   const me = req.user;
   const ids = await auth.myTopicIds(me);
-  const myTasks = await db('tasks').join('topics', 'topics.id', 'tasks.topic_id').where('tasks.assignee_id', me.id).whereNot('tasks.status', 'done')
-    .orderByRaw('case when tasks.due_date is null then 1 else 0 end').orderBy('tasks.due_date').limit(8)
-    .select('tasks.*', 'topics.code', 'topics.title as topic_title');
-  const wids = await auth.workTopicIds(me);
-  const meetings = wids.length ? await db('meetings').join('topics', 'topics.id', 'meetings.topic_id').whereIn('meetings.topic_id', wids).where('meetings.starts_at', '>=', new Date(Date.now() - 3600000).toISOString())
-    .orderBy('meetings.starts_at').limit(4).select('meetings.*', 'topics.code') : [];
-  const progress = await topicProgress(ids);
-  // Tasks completed per week, last 8 weeks
-  const since = new Date(Date.now() - 56 * 86400000);
-  const runsDone0 = wids.length ? await db('agent_runs').whereIn('topic_id', wids).where('status', 'done').whereNotNull('finished_at').select('finished_at') : [];
-  const done = runsDone0.map((x) => ({ completed_at: x.finished_at }));
-  const weeks = Array.from({ length: 8 }, (_, i) => ({ n: 0, label: 'W' + (i + 1) }));
-  for (const t of done) {
-    const d = toDate(t.completed_at);
-    if (!d || d < since) continue;
-    const w = Math.min(7, Math.floor((d - since) / (7 * 86400000)));
-    weeks[w].n++;
-  }
-  weeks[7].label = 'This wk';
-  const max = Math.max(1, ...weeks.map((w) => w.n));
-  const activity = wids.length ? await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').leftJoin('topics', 'topics.id', 'audit_log.topic_id')
-    .whereIn('audit_log.topic_id', wids).orderBy('audit_log.id', 'desc').limit(7).select('audit_log.*', 'users.name', 'users.color', 'users.id as uid', 'topics.code') : [];
-  const agents = wids.length ? await db('parts').join('topics', 'topics.id', 'parts.topic_id').whereIn('parts.topic_id', wids).whereNot('topics.status', 'archived').whereNot('parts.agent_status', 'draft')
-    .orderByRaw("case parts.agent_status when 'review' then 0 when 'failed' then 1 when 'running' then 2 when 'queued' then 3 else 4 end").orderBy('parts.id', 'desc').limit(8)
-    .select('parts.id', 'parts.title', 'parts.topic_id', 'parts.agent_name', 'parts.agent_status', 'parts.agent_progress', 'topics.code') : [];
-  const toReview = wids.length ? Number((await db('parts').whereIn('topic_id', wids).where('agent_status', 'review').count({ n: '*' }).first()).n) : 0;
+  const show = req.query.show === 'finished' ? 'finished' : 'active';
+  const topics = ids.length ? await db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc') : [];
+  const roles = Object.fromEntries((await db('topic_members').where({ user_id: me.id }).select('topic_id', 'role')).map((x) => [x.topic_id, x.role]));
+  if (me.platform_role === 'admin') for (const t of topics) roles[t.id] = roles[t.id] || 'leader';
+  const js = await journeyMany(topics, roles);
+  const team = topics.length ? await db('topic_members').join('users', 'users.id', 'topic_members.user_id').whereIn('topic_members.topic_id', topics.map((t) => t.id)).whereNot('topic_members.role', 'guest')
+    .orderByRaw("case topic_members.role when 'leader' then 0 else 1 end").select('topic_members.topic_id', 'users.id', 'users.name', 'users.color') : [];
+  const list = topics.map((t) => ({ ...t, j: js[t.id], role: roles[t.id], team: team.filter((m) => m.topic_id === t.id) }));
+  const active = list.filter((t) => t.status !== 'completed');
+  const finished = list.filter((t) => t.status === 'completed');
+  // Up next: the most useful next step from each project you lead.
+  const rank = (n) => (/Review/.test(n.label || '') ? 0 : /Launch|Assign/.test(n.label || '') ? 1 : /writ/i.test(n.label || '') ? 2 : /Finish/.test(n.label || '') ? 3 : 5);
+  const upNext = active.filter((t) => t.j.next && (t.j.next.href || t.j.next.action) && t.role !== 'guest')
+    .map((t) => ({ topic: t, next: t.j.next, step: t.j.current ? t.j.current.n : null, r: rank(t.j.next) + (t.role === 'leader' ? 0 : 4) }))
+    .sort((a, b) => a.r - b.r).slice(0, 3);
   const actions = await actionItems(me);
-  const weekEnd = todayStr(7);
-  const dueSoon = await db('tasks').where({ assignee_id: me.id }).whereNot('status', 'done').where('due_date', '<=', weekEnd).count({ n: '*' }).first();
   res.render('pages/dashboard', {
-    title: 'Dashboard', active: 'dashboard', myTasks, agents, toReview, meetings, progress, weeks, max, activity, actions: actions.slice(0, 4), actionTotal: actions.length,
-    stats: { topics: progress.length, dueSoon: Number(dueSoon.n), meetings: meetings.length, actions: actions.length },
+    title: 'Home', active: 'dashboard', show, projects: show === 'finished' ? finished : active, nActive: active.length, nFinished: finished.length, upNext, needCount: actions.length,
     hour: Number(new Date().toLocaleString('en-AU', { hour: 'numeric', hour12: false, timeZone: 'Australia/Sydney' })),
-    cta: auth.atLeast(me, 'leader') ? { href: '/topics/new', label: 'New topic' } : null
+    tipsKey: 'home'
   });
 });
+
+r.get('/help', (req, res) => res.render('pages/help', { title: 'Help', active: 'help' }));
 
 r.get('/tasks', async (req, res) => {
   const filter = ['open', 'done', 'all'].includes(req.query.show) ? req.query.show : 'open';
@@ -76,37 +65,44 @@ r.get('/tasks', async (req, res) => {
   res.render('pages/tasks', { title: 'My tasks', active: 'tasks', tasks, filter });
 });
 
-r.get('/actions', async (req, res) => {
-  const items = await actionItems(req.user);
-  const type = req.query.type || 'All';
-  res.render('pages/actions', { title: 'Action centre', active: 'actions', items: type === 'All' ? items : items.filter((i) => i.type === type), all: items, type });
+// One Inbox: what needs you, plus messages, mentions, meetings and updates.
+const INBOX_KIND = { message: 'message', mention: 'mention', meeting: 'meeting', room: 'meeting' };
+const inboxKind = (k) => INBOX_KIND[k] || 'update';
+r.get('/inbox', async (req, res) => {
+  const f = ['all', 'needs', 'message', 'mention', 'meeting', 'update'].includes(req.query.f) ? req.query.f : 'all';
+  const needs = await actionItems(req.user);
+  const notes = (await db('notifications').where({ user_id: req.user.id }).orderBy('id', 'desc').limit(80)).map((n) => ({ ...n, k: inboxKind(n.kind) }));
+  const counts = { all: needs.length + notes.length, needs: needs.length };
+  for (const k of ['message', 'mention', 'meeting', 'update']) counts[k] = notes.filter((n) => n.k === k).length;
+  const rows = f === 'all' || f === 'needs' ? notes : notes.filter((n) => n.k === f);
+  const wids = await auth.workTopicIds(req.user);
+  const meetings = wids.length ? await db('meetings').join('topics', 'topics.id', 'meetings.topic_id').whereIn('meetings.topic_id', wids)
+    .where('meetings.starts_at', '>=', new Date(Date.now() - 3600000).toISOString()).where('meetings.starts_at', '<=', new Date(Date.now() + 7 * 86400000).toISOString())
+    .orderBy('meetings.starts_at').limit(4).select('meetings.*', 'topics.title as topic_title', 'topics.color as topic_color') : [];
+  const todayKey = new Date().toLocaleDateString('en-AU', { timeZone: require('../lib/util').TZ });
+  res.render('pages/inbox', { title: 'Inbox', active: 'inbox', f, needs, rows: f === 'needs' ? rows.slice(0, 10) : rows, counts, meetings, todayKey, unreadCount: notes.filter((n) => !n.read_at).length });
 });
-
-r.get('/notifications', async (req, res) => {
-  const show = req.query.show === 'unread' ? 'unread' : 'all';
-  let q = db('notifications').where({ user_id: req.user.id });
-  if (show === 'unread') q = q.whereNull('read_at');
-  const list = await q.orderBy('id', 'desc').limit(100);
-  res.render('pages/notifications', { title: 'Notifications', active: 'notifications', list, show });
-});
+r.get('/actions', (req, res) => res.redirect('/inbox?f=needs'));
+r.get('/notifications', (req, res) => res.redirect('/inbox'));
 r.post('/notifications/read-all', async (req, res) => {
   await db('notifications').where({ user_id: req.user.id }).whereNull('read_at').update({ read_at: now() });
-  res.redirect('/notifications');
+  req.flash('ok', 'All marked as read.');
+  res.redirect('/inbox');
 });
 r.post('/notifications/clear-read', async (req, res) => {
   const n = await db('notifications').where({ user_id: req.user.id }).whereNotNull('read_at').del();
   req.flash('ok', n ? 'Cleared ' + n + ' read notification' + (n === 1 ? '' : 's') + '.' : 'Nothing to clear.');
-  res.redirect('/notifications');
+  res.redirect('/inbox');
 });
 r.post('/notifications/:id/delete', async (req, res) => {
   await db('notifications').where({ id: parseInt(req.params.id, 10), user_id: req.user.id }).del();
-  res.redirect('/notifications' + (req.body.show === 'unread' ? '?show=unread' : ''));
+  res.redirect('/inbox');
 });
 r.get('/notifications/:id/go', async (req, res) => {
   const n = await db('notifications').where({ id: parseInt(req.params.id, 10), user_id: req.user.id }).first();
   if (!n) return auth.notFound(res);
   if (!n.read_at) await db('notifications').where({ id: n.id }).update({ read_at: now() });
-  const link = n.link && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : '/notifications';
+  const link = n.link && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : '/inbox';
   res.redirect(link);
 });
 
@@ -122,7 +118,7 @@ r.get('/meetings', async (req, res) => {
     const list = await require('../lib/rooms').roomsFor(t, req.user, req.user.platform_role === 'admin' ? 'leader' : roleOf[t.id]);
     roomGroups.push({ topic: t, rooms: list.filter((r) => r.kind === 'project' || r.people.some((p) => p.id === req.user.id)) });
   }
-  res.render('pages/meetings-all', { title: 'Meetings', active: 'meetings', roomGroups, upcoming: all.filter((m) => toDate(m.starts_at) >= cut), past: all.filter((m) => toDate(m.starts_at) < cut).reverse() });
+  res.render('pages/meetings-all', { title: 'Meetings', active: 'inbox', roomGroups, upcoming: all.filter((m) => toDate(m.starts_at) >= cut), past: all.filter((m) => toDate(m.starts_at) < cut).reverse() });
 });
 
 r.get('/search', async (req, res) => {

@@ -1,0 +1,51 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<%
+  const P = '/topics/' + topic.id + '/paper';
+  const ro = !isTopicLeader || topic.status === 'archived';
+  const C = { ok: ['var(--green)', 'var(--green-soft)', '✓'], warn: ['var(--amber)', 'var(--amber-soft)', '!'], bad: ['var(--red)', 'var(--red-soft)', '✕'] };
+  const total = h.checks.length, passed = h.checks.filter((c) => c.level === 'ok').length;
+  const pct = Math.round(100 * passed / total);
+  const maxS = Math.max(1, ...h.strength.map((s) => s.score));
+%>
+<a href="<%= P %>" style="font-size:14px;font-weight:500;text-decoration:none;color:var(--acc)">← Back to writing</a>
+<% if (undo) { %><div class="alert ok" style="justify-content:space-between"><span>Fixed: <%= undo.label.toLowerCase() %>.</span><% if (!ro) { %><form method="post" action="<%= P %>/check/undo" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn-link">Undo</button></form><% } %></div><% } %>
+<div class="hc">
+  <section class="hc-main">
+    <div class="card hc-top">
+      <div class="ring" style="background:conic-gradient(<%= h.bad ? 'var(--amber)' : 'var(--green)' %> <%= pct %>%, var(--line-2) 0)"><div><b><%= passed %>/<%= total %></b><span>checks</span></div></div>
+      <div style="flex:1 1 300px">
+        <h1><%= h.bad ? h.bad + ' problem' + (h.bad > 1 ? 's' : '') + ' to fix before finishing' : h.warn ? 'Almost there — ' + h.warn + ' warning' + (h.warn > 1 ? 's' : '') : 'Your paper is ready' %></h1>
+        <p class="text-2" style="margin-top:6px;font-size:15px">We checked citations, sources, length and references. Problems come with a fix or a “Show me” link.</p>
+      </div>
+    </div>
+    <% h.checks.forEach((c) => { const k = C[c.level]; %>
+      <article class="hc-row<%= c.level === 'bad' ? ' bad' : '' %>">
+        <span class="hc-ico" style="color:<%= k[0] %>;background:<%= k[1] %>"><%= k[2] %></span>
+        <div class="hc-body">
+          <b><%= c.title %></b>
+          <span class="text-2"><%= c.detail %></span>
+          <% if (c.where && c.level !== 'ok') { %><span class="hc-where" data-i18n-skip><%= c.where %></span><% } %>
+        </div>
+        <% if (c.level !== 'ok') { %><div class="split">
+          <% if (c.fix && !ro) { %><form method="post" action="<%= P %>/check/fix" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="key" value="<%= c.key %>"><button class="btn btn-p btn-sm"><%= c.fix %></button></form><% } %>
+          <% if (c.href) { %><a class="btn btn-s btn-sm" href="<%= c.href %>">Show me</a><% } %>
+        </div><% } %>
+      </article>
+    <% }) %>
+  </section>
+  <aside class="hc-side">
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <h2>Ready to finish?</h2>
+      <p class="text-2" style="font-size:14px"><%= h.bad ? 'Fix the problems in red first. Warnings are up to you.' : 'Everything important is fixed. You can save this as the final report.' %></p>
+      <% if (!ro) { %><form method="post" action="<%= P %>/final"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p" style="width:100%"<%= h.bad ? ' disabled title="Fix the problems in red first"' : '' %>>Save as final report →</button></form><% } %>
+      <span class="hint">Warnings won’t stop you, but problems in red should be fixed first.</span>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <h2 style="font-size:15px">Evidence strength by section</h2>
+      <% h.strength.forEach((s) => { %><div class="str-row"><span data-i18n-skip><%= s.name %></span><span class="str-bar"><span style="width:<%= Math.round(100 * s.score / maxS) %>%;background:<%= s.n <= 1 ? 'var(--amber)' : 'var(--acc)' %>"></span></span><b><%= s.n %></b></div><% }) %>
+      <span class="hint">Number of sources cited, weighted by reliability.</span>
+    </div>
+  </aside>
+</div>
+<%- include('../partials/bottom') %>

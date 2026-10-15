@@ -12,7 +12,7 @@ const MAX = parseInt(process.env.MAX_UPLOAD_MB || '10', 10) * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX, files: 1 } });
 const BLOCKED = /\.(exe|bat|cmd|com|msi|scr|ps1|vbs|js|jar|sh|dll)$/i;
 const clean = (v, max) => String(v || '').trim().slice(0, max || 200);
-const crumb = (t) => '<a href="/topics">Topics</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / ' + (t.status === 'completed' ? 'Final report' : 'Finish project');
+const crumb = (t) => '<a href="/topics">Projects</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / ' + (t.status === 'completed' ? 'Final report' : 'Finish project');
 
 // Files that could be the final report, best candidates first.
 async function candidates(topicId) {

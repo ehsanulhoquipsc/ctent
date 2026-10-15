@@ -184,7 +184,10 @@ const ICONS = {
   scale: 'M12 3v18M5 21h14M3 7h18M6 7l-3 7a3 3 0 0 0 6 0L6 7ZM18 7l-3 7a3 3 0 0 0 6 0l-3-7Z',
   copy: 'M9 9h11v11H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
   filter: 'M22 3H2l8 9.46V19l4 2v-8.54L22 3Z',
-  terminal: 'm4 17 6-6-6-6M12 19h8'
+  terminal: 'm4 17 6-6-6-6M12 19h8',
+  help: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01',
+  undo: 'M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 8',
+  x: 'M18 6 6 18M6 6l12 12'
 };
 function icon(name, size) {
   const n = size || 18;

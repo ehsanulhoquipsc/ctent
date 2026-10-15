@@ -584,4 +584,6 @@ async function draftSection(topic, section, items, lang) {
   return String(out.text || '').trim();
 }
 
-module.exports = { launch, recover, watchdog, stop, suggestParts, draftSection, rerunGaps, parseCard, DEPTH, OPTIONS, DEFAULT_OPTIONS, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };
+function queueInfo() { return { queue: queue.slice(), active, concurrency: CONCURRENCY }; }
+
+module.exports = { queueInfo, launch, recover, watchdog, stop, suggestParts, draftSection, rerunGaps, parseCard, DEPTH, OPTIONS, DEFAULT_OPTIONS, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };

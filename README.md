@@ -25,9 +25,17 @@ On the sign-in page, click any **demo account** to sign in as that person. Each 
 
 Every demo account uses the password `demo1234`. Everyone trying the demo shares the same data.
 
-## How research works now: AI agents
+## How research works now: two modes, one journey
 
-Every project follows five steps, shown as a bar at the top of each project page: **Question → Research → Review → Write → Finish**. The project's home page (**Journey**) always shows the one next step with a button for it. Each project has five tabs: **Journey**, **Research** (parts and agents), **Paper**, **Team** (chat, meetings, people, activity) and **Files** (files and submissions), plus **Settings** for leaders. New projects are created in a three-step wizard: question, how to split it (AI suggestion or a template), and co-authors.
+The menu has three places: **Home** (the next step in each of your projects, and every project with its journey bar), **Projects** and **Inbox** (everything that needs you, plus messages, mentions, meeting invites and updates, with filters). Press **/** anywhere to start a new research question.
+
+A new project is set up in three steps: **Details** (title, question, description, field, date, visibility, colour) → **Mode** → **Agents** or **Team**.
+
+- **Agent mode:** AI agents research each part. Journey: **Question → Research → Review → Write → Finish**.
+- **Manual mode:** you pick team members (their expertise and current task load are shown), give each part to a person with a due date, and they get a task and a notification. Any single part can still go to an AI agent. Journey: **Question → Assign → Research → Review work → Write → Finish**.
+- The mode badge at the top of a project switches mode at any time: finished parts are kept, each unfinished part goes to a person or an agent, and nothing is deleted.
+
+Each project has five tabs: **Journey**, **Research** (called **Parts & people** in Manual mode), **Paper**, **Team** (chat, meetings, people, activity) and **Files**, plus **Settings** for leaders. The project colour tints its header, journey bar and buttons.
 
 1. **Ask the question.** Create a topic and write the research question.
 2. **Split it into parts.** Each part gets its own agent with a brief, the sources it may use and how deep to go. Templates and **Suggest parts** do this for you.
@@ -37,11 +45,15 @@ Every project follows five steps, shown as a bar at the top of each project page
    - reads abstracts and free **open-access full texts**, and turns each source into an **evidence card**: key findings, data points, method, sample, limitations, a quote checked against the text, a reliability rating and a ready Harvard citation;
    - maps where sources **agree and contradict**, and finds **research gaps** with suggested research questions.
    Findings can be written in English or **Bangla** (বাংলা). Two agents run at a time; Quick takes about 3 minutes, Standard 8, Deep up to 25.
-4. **Review the evidence.** The part's page has five tabs: **Evidence** (cards with search, filters and sorting), **Agreement**, **Gaps**, **Overview** (charts) and **Log**. Tick the cards you want, then **accept** them or click **Write paper section from selected**. Export an evidence pack (.docx/.md), a literature matrix (.xlsx) or a research gaps brief (.docx). Ask the agent to dig deeper, or run it again. Co-authors can comment.
-5. **Write the final paper.** There's a section per part plus an introduction and conclusion.
-   - Insert accepted findings, which keep their citations, or click **Draft from findings**.
-   - The reference list (Harvard) builds itself.
-   - Export to Word or PDF, or save the paper as the project's **final report**.
+   Progress updates without reloading, in plain words ("Reading sources (2 of 4 batches)", "Starts after the Hydrology agent finishes (about 4 min)"). A notice pops up when an agent finishes, and the browser tab shows how many are ready.
+4. **Review the evidence.** Four tiles (cards, high reliability, claims and disputes, gaps) and three tabs: **Evidence**, **Agreement** and **Gaps**. Each card shows the finding and its key number; method, quote and citation fold away. Quick filters: *High reliability only* and *Has numbers*. Ticks save themselves; the bar at the bottom accepts them for the paper. Exports, the log, charts, run history and "dig deeper" are under **More**. On a phone, swipe a card right to keep it and left to skip it.
+5. **Write the final paper.** Sections with progress bars on the left, the paper in the middle, your accepted evidence on the right (a pull-up sheet on phones).
+   - Drag a card into the text or press **Insert** — its citation comes with it — or click **Draft this section**.
+   - Hover a citation to see the source, its reliability and the finding it supports. The reference list (Harvard) builds itself.
+   - **Check paper** runs a health check: empty sections, figures without a citation, retracted papers, abstract length, preprints, incomplete references and sections resting on one source — with one-click fixes (and Undo). **Save as final report** stays disabled while red problems remain.
+   - Export to Word or PDF.
+
+First-run tips explain each main page once. Removing a part shows an **Undo** notice instead of an "are you sure?" box. On phones there's a bottom tab bar: Projects, Home, Inbox, Me.
 
 ### Connect a free AI service
 

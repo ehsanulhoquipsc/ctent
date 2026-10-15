@@ -159,7 +159,7 @@ async function seedDemo() {
   // Notifications
   const N = [
     ['ehsan', 'review', 'Priya Nair submitted “Sampling frame” v2', 'Review it before Thursday’s sync.', '/topics/' + T.mig + '/submissions'],
-    ['ehsan', 'request', 'Rahul Mehta asked to join CT-0150', 'Hydrology & flood modelling.', '/actions'],
+    ['ehsan', 'request', 'Rahul Mehta asked to join CT-0150', 'Hydrology & flood modelling.', '/inbox?f=needs'],
     ['ehsan', 'mention', 'Aisha Rahman mentioned you in #methods', 'Should we drop Bhola district…', '/messages/' + ch.mm],
     ['aisha', 'task', 'Part approved: Downstream water security', 'You own this part in CT-0150.', '/topics/' + T.dam + '/plan'],
     ['aisha', 'meeting', 'Meeting in 3 days: Downstream water security check-in', 'Zoom', '/meetings'],

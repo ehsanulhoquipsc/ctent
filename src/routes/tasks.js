@@ -16,7 +16,7 @@ const validDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : null
 const list = (v) => [].concat(v || []).map((x) => String(x).trim()).filter(Boolean);
 const STAGE = { todo: 'assigned', doing: 'working', changes: 'changes', review: 'submitted', done: 'approved' };
 const DELIVERABLES = { doc: ['📄', 'Document'], data: ['📊', 'Dataset'], analysis: ['🔬', 'Analysis'], slides: ['🖥', 'Slides'], other: ['✳', 'Other'] };
-const crumb = (t, label) => '<a href="/topics">Topics</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / <a href="/topics/' + t.id + '/board">Board</a> / ' + label;
+const crumb = (t, label) => '<a href="/topics">Projects</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / <a href="/topics/' + t.id + '/board">Board</a> / ' + label;
 
 function writable(req, res, next) {
   if (req.topic.status === 'archived') { req.flash('error', 'This topic is archived and read-only.'); return res.redirect('/topics/' + req.topic.id); }

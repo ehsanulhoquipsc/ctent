@@ -7,11 +7,12 @@ const auth = require('../lib/auth');
 const llm = require('../lib/llm');
 const agent = require('../lib/agent');
 const { audit, notify, topicLeaders } = require('../lib/events');
-const { now, esc } = require('../lib/util');
+const u = require('../lib/util');
+const { now, esc } = u;
 
 const r = express.Router();
 const clean = (v, max) => String(v || '').trim().slice(0, max || 240);
-const crumb = (t, label) => '<a href="/topics">Topics</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / ' + label;
+const crumb = (t, label) => '<a href="/topics">Projects</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / ' + label;
 const MARK = /\[src:(\d+)\]/g;
 function writable(req, res, next) {
   if (req.topic.status === 'archived') { req.flash('error', 'This topic is archived and read-only.'); return res.redirect('/topics/' + req.topic.id); }
@@ -75,13 +76,17 @@ async function numbering(sections) {
   const byId = Object.fromEntries(rows.map((x) => [x.id, x]));
   return { num: Object.fromEntries(order.map((id, i) => [id, i + 1])), refs: order.map((id, i) => ({ n: i + 1, id, text: harvard(byId[id]), url: byId[id] && byId[id].url })) };
 }
-function renderBody(body, num) {
+function renderBody(body, num, interactive) {
   const paras = String(body || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   return paras.map((p) => '<p>' + esc(p).replace(/(?:\[src:(\d+)\])+/g, (all) => {
-    const ns = [...all.matchAll(/\[src:(\d+)\]/g)].map((m) => num[parseInt(m[1], 10)]).filter(Boolean);
-    return ns.length ? '<sup class="ref">[' + ns.map((n) => '<a href="#ref' + n + '">' + n + '</a>').join(', ') + ']</sup>' : '';
+    const ids = [...all.matchAll(/\[src:(\d+)\]/g)].map((m) => parseInt(m[1], 10)).filter((id) => num[id]);
+    if (!ids.length) return '';
+    if (interactive) return '<sup class="ref">' + ids.map((id) => '<button type="button" class="cite-chip" data-cite="' + id + '" aria-label="Citation ' + num[id] + '">[' + num[id] + ']</button>').join('') + '</sup>';
+    return '<sup class="ref">[' + ids.map((id) => '<a href="#ref' + num[id] + '">' + num[id] + '</a>').join(', ') + ']</sup>';
   }).replace(/\n/g, '<br>') + '</p>').join('');
 }
+const wordsIn = (body) => String(body || '').replace(MARK, '').split(/\s+/).filter(Boolean).length;
+const TARGET = (s) => (/^abstract$/i.test(s.title) ? 200 : /^(introduction|conclusion)/i.test(s.title) ? 300 : 500);
 const plain = (body, num) => String(body || '').replace(/(?:\[src:(\d+)\])+/g, (all) => { const ns = [...all.matchAll(/\[src:(\d+)\]/g)].map((m) => num[parseInt(m[1], 10)]).filter(Boolean); return ns.length ? ' [' + ns.join(', ') + ']' : ''; });
 const words = (sections) => sections.reduce((a, s) => a + String(s.body || '').replace(MARK, '').split(/\s+/).filter(Boolean).length, 0);
 
@@ -111,16 +116,23 @@ r.get('/topics/:tid/paper', auth.loadTopic('member'), async (req, res) => {
   const sections = await ensureSections(t);
   const cur = sections.find((s) => s.id === parseInt(req.query.s, 10)) || sections.find((s) => s.part_id) || sections[0];
   const { num, refs } = await numbering(sections);
-  const parts = await db('parts').where({ topic_id: t.id }).select('id', 'title', 'agent_status', 'agent_name');
+  const parts = await db('parts').where({ topic_id: t.id }).select('id', 'title', 'agent_status', 'agent_name', 'handler');
   const partOf = Object.fromEntries(parts.map((p) => [p.id, p]));
   const findings = await acceptedFindings(t.id, cur.part_id ? [cur.part_id] : null);
   const used = new Set();
   sections.forEach((s) => { String(s.body || '').split(/\n\s*\n/).forEach((p) => used.add(p.replace(MARK, '').trim())); });
   const comments = await db('paper_comments').leftJoin('users', 'users.id', 'paper_comments.user_id').where('paper_comments.section_id', cur.id).orderBy('paper_comments.id').select('paper_comments.*', 'users.name', 'users.color', 'users.id as uid');
+  // Citation popovers: what each cited source is and the finding it supports.
+  const curIds = [...new Set([...String(cur.body || '').matchAll(MARK)].map((m) => parseInt(m[1], 10)))].filter((id) => num[id]);
+  const srcRows = curIds.length ? (await db('agent_sources').whereIn('id', curIds)).map(agent.parseCard) : [];
+  const allF = await acceptedFindings(t.id, null);
+  const cites = Object.fromEntries(srcRows.map((c) => [c.id, { n: num[c.id], title: c.title, authors: c.authorsList.slice(0, 3).join(', ') + (c.authorsList.length > 3 ? ' et al.' : ''), year: c.year || 'n.d.', tier: c.tier, flags: c.flags, url: u.safeUrl(c.url) || '',
+    finding: ((allF.find((f) => f.srcIds.includes(c.id)) || {}).text || (c.findings || [])[0] || '').slice(0, 240) }]));
+  const usedIds = new Set(curIds);
   res.render('pages/paper', { title: 'Final paper · ' + t.code, active: 'topics', tab: 'Final paper', crumb: crumb(t, 'Final paper'),
-    sections: sections.map((s) => ({ ...s, part: s.part_id ? partOf[s.part_id] : null, filled: !!String(s.body || '').trim() })), cur: { ...cur, part: cur.part_id ? partOf[cur.part_id] : null, html: renderBody(cur.body, num) },
-    findings: findings.map((f) => ({ ...f, used: used.has(f.text.trim()) })), refs, comments, wordCount: words(sections), aiOn: llm.available(),
-    accepted: parts.filter((p) => p.agent_status === 'accepted').length, partCount: parts.length, editing: req.query.edit === '1' });
+    sections: sections.map((s) => ({ ...s, part: s.part_id ? partOf[s.part_id] : null, filled: !!String(s.body || '').trim(), words: wordsIn(s.body), target: TARGET(s) })), cur: { ...cur, part: cur.part_id ? partOf[cur.part_id] : null, html: renderBody(cur.body, num, true), words: wordsIn(cur.body), target: TARGET(cur) },
+    findings: findings.map((f) => ({ ...f, used: used.has(f.text.trim()) || (f.srcIds.length && f.srcIds.every((id) => usedIds.has(id))), citedAs: f.srcIds.map((id) => num[id]).filter(Boolean) })), refs, comments, wordCount: words(sections), aiOn: llm.available(),
+    accepted: parts.filter((p) => p.agent_status === 'accepted').length, partCount: parts.length, editing: req.query.edit === '1', cites, tipsKey: 'paper' });
 });
 
 async function loadSection(req, res, next) {
@@ -163,7 +175,7 @@ r.post('/topics/:tid/paper/sections/:sid', auth.loadTopic('leader'), writable, l
     if (!f) { req.flash('error', 'That finding isn’t accepted yet.'); return res.redirect(back(t, s)); }
     const body = (String(s.body || '').trim() ? String(s.body).trim() + '\n\n' : '') + f.text.trim() + ' ' + f.marks;
     await db('paper_sections').where({ id: s.id }).update({ body, updated_by: req.user.id, updated_at: now() });
-    req.flash('ok', 'Finding inserted with its citation. Rewrite it in your own words when you’re ready.');
+    req.flash('ok', 'Inserted with its citation' + (f.card ? ' ' + f.card.in_text : '') + '. Rewrite it in your own words when you’re ready.');
     return res.redirect(back(t, s));
   }
   if (action === 'draft') return draftInto(req, res, s);
@@ -189,6 +201,115 @@ r.post('/topics/:tid/paper/sections/:sid/comments', auth.loadTopic('member'), wr
     await notify(await topicLeaders(t.id), { kind: 'message', title: req.user.name + ' suggested an edit to “' + s.title + '”', body: body.slice(0, 140), link: back(t, s, '#comments') }, req.user.id);
   }
   res.redirect(back(t, s, '#comments'));
+});
+
+// ---------- Paper health check ----------
+const PARA = /\n\s*\n/;
+async function healthOf(t) {
+  const sections = await ensureSections(t);
+  const { num, refs } = await numbering(sections);
+  const ids = refs.map((x) => x.id);
+  const cards = ids.length ? Object.fromEntries((await db('agent_sources').whereIn('id', ids)).map((r) => [r.id, agent.parseCard(r)])) : {};
+  const checks = [];
+  const where = (list) => list.slice(0, 4).map((x) => x.sec.title + (x.para ? ', para ' + x.para : '') + (x.text ? ': “' + x.text.slice(0, 90) + (x.text.length > 90 ? '…' : '') + '”' : '')).join('\n');
+  // 1 Every section has text
+  const empty = sections.filter((s) => !String(s.body || '').trim());
+  checks.push(empty.length
+    ? { key: 'empty', level: empty.length === sections.length ? 'bad' : 'warn', title: empty.length + ' section' + (empty.length === 1 ? ' has' : 's have') + ' no text yet', detail: 'Write or draft them, or delete sections you don’t need. Empty sections are left out of the final report.', where: empty.map((s) => s.title).join(', '), href: '/topics/' + t.id + '/paper?s=' + empty[0].id, fix: null }
+    : { key: 'empty', level: 'ok', title: 'Every section has text', detail: 'All ' + sections.length + ' sections are written.' });
+  // 2 Claims without a citation (statistics are a problem, other paragraphs a warning)
+  const stat = [], loose = [];
+  sections.filter((s) => !/^(abstract|conclusion)/i.test(s.title)).forEach((s) => String(s.body || '').split(PARA).map((p) => p.trim()).filter(Boolean).forEach((p, i) => {
+    if (MARK.test(p)) { MARK.lastIndex = 0; return; }
+    MARK.lastIndex = 0;
+    const n = p.split(/\s+/).length;
+    if (/\d/.test(p.replace(/^\d+\.\s/, '')) && n >= 8) stat.push({ sec: s, para: i + 1, text: p });
+    else if (n >= 25) loose.push({ sec: s, para: i + 1, text: p });
+  }));
+  if (stat.length) checks.push({ key: 'uncited', level: 'bad', title: stat.length + ' paragraph' + (stat.length === 1 ? '' : 's') + ' with numbers but no citation', detail: 'Figures need a source so readers can check them. Insert the evidence card they come from.', where: where(stat), href: '/topics/' + t.id + '/paper?s=' + stat[0].sec.id + '&edit=1' });
+  else if (loose.length) checks.push({ key: 'uncited', level: 'warn', title: loose.length + ' paragraph' + (loose.length === 1 ? '' : 's') + ' with no citation', detail: 'That’s fine for your own argument; add a source where you state a fact.', where: where(loose), href: '/topics/' + t.id + '/paper?s=' + loose[0].sec.id + '&edit=1' });
+  else checks.push({ key: 'uncited', level: 'ok', title: 'Every factual paragraph has a citation', detail: 'Paragraphs with figures all point to a source.' });
+  // 3 Retracted papers cited
+  const retracted = ids.filter((id) => cards[id] && cards[id].flags.includes('retracted'));
+  checks.push(retracted.length
+    ? { key: 'retracted', level: 'bad', title: retracted.length + ' retracted paper' + (retracted.length === 1 ? ' is' : 's are') + ' cited', detail: retracted.map((id) => cards[id].in_text).join(', ') + ' — retracted according to Crossref.', fix: 'Remove citation' + (retracted.length === 1 ? '' : 's') }
+    : { key: 'retracted', level: 'ok', title: 'No retracted papers are cited', detail: 'Checked against Crossref retraction notices.' });
+  // 4 Abstract length
+  const abs = sections.find((s) => /^abstract$/i.test(s.title));
+  const absWords = abs ? wordsIn(abs.body) : 0;
+  checks.push(absWords > 250
+    ? { key: 'abstract', level: 'warn', title: 'Abstract is ' + absWords + ' words', detail: 'Most journals ask for 250 words or fewer.', href: '/topics/' + t.id + '/paper?s=' + abs.id + '&edit=1', fix: llm.available() ? 'Shorten with AI' : null }
+    : { key: 'abstract', level: 'ok', title: abs && absWords ? 'Abstract is ' + absWords + ' words' : 'Abstract length', detail: abs && absWords ? 'Within the usual 250-word limit.' : 'Write the abstract last — a short summary of the whole paper.' });
+  // 5 Preprints
+  const pre = ids.filter((id) => cards[id] && cards[id].flags.includes('preprint'));
+  const unmarked = pre.filter((id) => sections.some((s) => new RegExp('(?<!\\(preprint\\) )\\[src:' + id + '\\]').test(String(s.body || ''))));
+  checks.push(unmarked.length
+    ? { key: 'preprint', level: 'warn', title: unmarked.length + ' preprint' + (unmarked.length === 1 ? ' is' : 's are') + ' cited', detail: unmarked.map((id) => cards[id].in_text).join(', ') + ' — not peer-reviewed yet. Say so in the text, or replace it.', fix: 'Add “(preprint)” note' }
+    : { key: 'preprint', level: 'ok', title: pre.length ? 'Preprints are marked as preprints' : 'No preprints cited', detail: pre.length ? 'Readers can see which sources aren’t peer-reviewed.' : 'Every cited paper has been through peer review or is a book, report or reference.' });
+  // 6 References complete
+  const incomplete = ids.filter((id) => !cards[id] || !cards[id].authors || !cards[id].year || !(cards[id].doi || cards[id].url));
+  checks.push(!refs.length
+    ? { key: 'refs', level: 'warn', title: 'No references yet', detail: 'Insert evidence cards into the text — each one brings its citation.', href: '/topics/' + t.id + '/paper' }
+    : incomplete.length
+      ? { key: 'refs', level: 'warn', title: incomplete.length + ' of ' + refs.length + ' references are missing details', detail: 'Missing an author, year or link: ' + incomplete.slice(0, 4).map((id) => (cards[id] ? cards[id].in_text : 'removed source')).join(', ') + '.' }
+      : { key: 'refs', level: 'ok', title: 'References are complete and in Harvard style', detail: 'All ' + refs.length + ' references have authors, a year and a link or DOI.' });
+  // 7 Sections resting on one source
+  const single = sections.filter((s) => s.part_id && String(s.body || '').trim()).filter((s) => new Set([...String(s.body).matchAll(MARK)].map((m) => m[1])).size === 1);
+  checks.push(single.length
+    ? { key: 'single', level: 'warn', title: single.length + ' section' + (single.length === 1 ? ' rests' : 's rest') + ' on a single source', detail: 'Add a second source so the argument doesn’t depend on one study.', where: single.map((s) => s.title).join(', '), href: '/topics/' + t.id + '/paper?s=' + single[0].id }
+    : { key: 'single', level: 'ok', title: 'No section rests on a single source', detail: 'Every written part section cites at least 2 different sources (or none yet).' });
+  const W = { high: 1, medium: 0.6, low: 0.3 };
+  const strength = sections.map((s) => { const set = [...new Set([...String(s.body || '').matchAll(MARK)].map((m) => parseInt(m[1], 10)))]; return { name: s.title, n: set.length, score: set.reduce((a, id) => a + (cards[id] ? W[cards[id].tier] || 0.5 : 0), 0) }; });
+  return { checks, strength, bad: checks.filter((c) => c.level === 'bad').length, warn: checks.filter((c) => c.level === 'warn').length, sections, retracted, unmarked, abs };
+}
+r.get('/topics/:tid/paper/check', auth.loadTopic('member'), async (req, res) => {
+  const t = req.topic;
+  const h = await healthOf(t);
+  const undo = req.session.paperUndo && req.session.paperUndo.topic === t.id ? req.session.paperUndo : null;
+  res.render('pages/paper-check', { title: 'Paper health check · ' + t.code, active: 'topics', tab: 'Final paper', crumb: crumb(t, '<a href="/topics/' + t.id + '/paper">Final paper</a> / Health check'), h, undo });
+});
+r.post('/topics/:tid/paper/check/fix', auth.loadTopic('leader'), writable, async (req, res) => {
+  const t = req.topic;
+  const h = await healthOf(t);
+  const key = String(req.body.key || '');
+  const snapshot = h.sections.map((s) => ({ id: s.id, body: s.body }));
+  let label = '';
+  if (key === 'retracted' && h.retracted.length) {
+    for (const s of h.sections) {
+      let body = String(s.body || '');
+      for (const id of h.retracted) body = body.split('[src:' + id + ']').join('');
+      if (body !== s.body) await db('paper_sections').where({ id: s.id }).update({ body, updated_by: req.user.id, updated_at: now() });
+    }
+    label = 'Removed citations to retracted papers';
+  } else if (key === 'preprint' && h.unmarked.length) {
+    for (const s of h.sections) {
+      let body = String(s.body || '');
+      for (const id of h.unmarked) body = body.replace(new RegExp('(?<!\\(preprint\\) )\\[src:' + id + '\\]', 'g'), '(preprint) [src:' + id + ']');
+      if (body !== s.body) await db('paper_sections').where({ id: s.id }).update({ body, updated_by: req.user.id, updated_at: now() });
+    }
+    label = 'Marked preprints in the text';
+  } else if (key === 'abstract' && h.abs && llm.available()) {
+    try {
+      const res0 = await llm.json('You edit academic writing. Reply with JSON: {"abstract": "..."}', 'Shorten this academic abstract to at most 230 words, in the same language. Keep every [src:N] marker that stays relevant exactly as written.\n\n' + h.abs.body);
+      const out = String(res0.abstract || '');
+      if (out && out.trim() && wordsIn(out) <= 250) { await db('paper_sections').where({ id: h.abs.id }).update({ body: out.trim(), updated_by: req.user.id, updated_at: now() }); label = 'Shortened the abstract'; }
+    } catch (e) { req.flash('error', 'The AI service couldn’t shorten it right now. Edit the abstract yourself.'); return res.redirect('/topics/' + t.id + '/paper/check'); }
+  }
+  if (label) {
+    req.session.paperUndo = { topic: t.id, label, bodies: snapshot };
+    await audit(req.user.id, t.id, 'paper.fixed', label);
+  } else req.flash('error', 'Nothing to fix there.');
+  res.redirect('/topics/' + t.id + '/paper/check');
+});
+r.post('/topics/:tid/paper/check/undo', auth.loadTopic('leader'), writable, async (req, res) => {
+  const t = req.topic;
+  const u0 = req.session.paperUndo;
+  if (u0 && u0.topic === t.id) {
+    for (const b of u0.bodies) await db('paper_sections').where({ id: b.id, topic_id: t.id }).update({ body: b.body, updated_at: now() });
+    req.flash('ok', 'Undone: ' + u0.label.toLowerCase() + '.');
+  }
+  req.session.paperUndo = null;
+  res.redirect('/topics/' + t.id + '/paper/check');
 });
 
 // ---------- Export ----------
@@ -307,3 +428,4 @@ module.exports = r;
 module.exports.ensureSections = ensureSections;
 module.exports.draftInto = draftInto;
 module.exports.acceptedFindings = acceptedFindings;
+module.exports.healthOf = healthOf;

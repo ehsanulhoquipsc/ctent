@@ -1,6 +1,37 @@
     </main>
   </div>
 </div>
+<nav class="tabbar" aria-label="Main">
+  <a href="/topics"<%- typeof active !== 'undefined' && active === 'topics' ? ' class="on" aria-current="page"' : '' %>><%- u.icon('folder', 22) %><span>Projects</span></a>
+  <a href="/"<%- typeof active !== 'undefined' && active === 'dashboard' ? ' class="on" aria-current="page"' : '' %>><%- u.icon('home', 22) %><span>Home</span></a>
+  <a href="/inbox"<%- typeof active !== 'undefined' && active === 'inbox' ? ' class="on" aria-current="page"' : '' %>><%- u.icon('inbox', 22) %><span>Inbox</span><% if (inboxCount) { %><i><%= inboxCount %></i><% } %></a>
+  <a href="/profile"<%- typeof active !== 'undefined' && active === 'profile' ? ' class="on" aria-current="page"' : '' %>><%- u.icon('user', 22) %><span>Me</span></a>
+</nav>
+<% if (me.platform_role === 'leader' || me.platform_role === 'admin') { %>
+<div class="qa" id="quick-add" hidden>
+  <form class="qa-box" role="dialog" aria-modal="true" aria-labelledby="qa-t" method="post" action="/topics/quick">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="qa-top">
+      <div style="display:flex;align-items:center;gap:10px"><b id="qa-t" style="flex:1">New research question</b><span class="muted" style="font-size:12px">Press <kbd>/</kbd> anywhere</span></div>
+      <label class="sr" for="qa-q">Question</label>
+      <textarea id="qa-q" name="question" rows="3" maxlength="600" required placeholder="What do you want to find out?"></textarea>
+      <span class="muted" style="font-size:13px" data-qa-guess hidden>Title will be: <b data-qa-title></b> · you can change it later</span>
+    </div>
+    <div class="qa-bar">
+      <span class="text-2" style="font-size:13.5px">Research by</span>
+      <label class="qa-pill"><input type="radio" name="mode" value="agent" checked><span>✦ AI agents</span></label>
+      <label class="qa-pill"><input type="radio" name="mode" value="manual"><span>My team</span></label>
+      <span style="flex:1"></span>
+      <button type="button" class="btn btn-s" data-qa-close>Cancel <kbd>Esc</kbd></button>
+      <button class="btn btn-p" data-qa-go>Create project <kbd class="inv">↵</kbd></button>
+    </div>
+    <% if (pinned.length) { %><div class="qa-recent"><span class="mono">Or jump to</span>
+      <% pinned.slice(0, 3).forEach((t) => { %><a href="/topics/<%= t.id %>"><span class="dot" style="background:<%= u.color(t.color)[0] %>"></span><span style="flex:1" data-i18n-skip><%= t.title %></span><span class="muted" style="font-size:12px"><%= t.j ? t.j.stepLabel : '' %></span></a><% }) %>
+    </div><% } %>
+  </form>
+</div>
+<% } %>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="/static/js/app.js?v=<%= assetV %>"></script>
 </body>
 </html>

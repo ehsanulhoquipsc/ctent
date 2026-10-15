@@ -1,15 +1,13 @@
 <%- include('../partials/top') %>
 <%- include('../partials/topic-header') %>
 <% const P = '/topics/' + topic.id + '/paper'; const ro = !isTopicLeader || topic.status === 'archived'; const S = P + '/sections/' + cur.id; %>
-<section class="split" style="flex-wrap:wrap;align-items:flex-end">
-  <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:6px">
-    <span class="mono">Final paper</span>
-    <h1 style="font-size:24px"><%= topic.title %></h1>
-    <div class="split" style="flex-wrap:wrap;gap:14px;font-size:13px;color:var(--text-2)"><span><b style="color:var(--text)"><%= sections.filter((s) => s.filled).length %> of <%= sections.length %></b> sections written</span><span><b style="color:var(--text)"><%= accepted %> of <%= partCount %></b> parts’ findings accepted</span><span>~<%= wordCount.toLocaleString('en') %> words</span><span><%= refs.length %> references</span></div>
+<div class="write-head">
+  <div style="flex:1 1 360px;min-width:0" class="split">
+    <span class="text-2" style="font-size:13.5px"><b style="color:var(--text)"><%= sections.filter((s) => s.filled).length %> of <%= sections.length %></b> sections written · ~<%= wordCount.toLocaleString('en') %> words · <%= refs.length %> references</span>
   </div>
-  <a class="btn btn-s" href="<%= P %>.docx"><%- u.icon('download', 16) %>Word</a>
-  <a class="btn btn-s" href="<%= P %>/print" target="_blank" rel="noopener">Print / PDF</a>
-  <details class="ed"><summary class="btn btn-s">Showcase page</summary>
+  <a class="btn btn-s btn-sm" href="<%= P %>.docx"><%- u.icon('download', 15) %>Word</a>
+  <a class="btn btn-s btn-sm" href="<%= P %>/print" target="_blank" rel="noopener">Print / PDF</a>
+  <details class="ed"><summary class="btn btn-s btn-sm">Showcase page</summary>
     <div class="ed-pop" style="gap:8px">
       <h3>Showcase page</h3>
       <p class="hint">A public web page of this paper — plain HTML and CSS, ready for the showcase website.</p>
@@ -18,68 +16,76 @@
       <% if (isTopicLeader) { %><form method="post" action="/topics/<%= topic.id %>/showcase"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="<%= P %>"><button class="btn btn-s btn-sm" style="width:100%" name="action" value="<%= topic.showcase ? 'unpublish' : 'publish' %>"><%= topic.showcase ? 'Remove from showcase website' : 'Add to showcase website' %></button></form><% } %>
     </div>
   </details>
-  <% if (!ro) { %><form method="post" action="<%= P %>/final" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p">Save as final report →</button></form><% } %>
-</section>
-<% if (!accepted) { %><div class="alert info"><span>No findings are accepted yet. <a href="/topics/<%= topic.id %>/agents">Review your agents’ evidence</a> — accepted findings appear on the right, ready to insert with their citations.</span></div><% } %>
-<div class="paper-cols">
-  <nav class="card" aria-label="Paper outline" style="flex:1 1 220px;max-width:290px;min-width:0;display:flex;flex-direction:column;gap:2px;padding:12px">
-    <span class="mono" style="padding:4px 8px 8px">Outline</span>
-    <% sections.forEach((s) => { const st = s.filled ? 'var(--green)' : s.part && s.part.agent_status === 'accepted' ? 'var(--amber)' : 'var(--line)'; %>
-      <a class="outline<%= s.id === cur.id ? ' on' : '' %>" href="<%= P %>?s=<%= s.id %>"<%- s.id === cur.id ? ' aria-current="true"' : '' %>><span class="dot" style="background:<%= st %>"></span><span style="flex:1;min-width:0"><span style="display:block"><%= s.title %></span><span class="hint"><%= s.filled ? 'Written' : s.part ? (s.part.agent_status === 'accepted' ? 'Findings ready to use' : 'Waiting for findings') : 'Your words' %></span></span></a>
+  <a class="btn btn-s btn-sm" href="<%= P %>/check" data-tip-title="Check before you finish" data-tip="The health check looks for uncited figures, retracted papers, a long abstract and missing references — with one-click fixes.">Check paper</a>
+  <% if (!ro) { %><a class="btn btn-p btn-sm" href="<%= P %>/check">Finish →</a><% } %>
+</div>
+<% if (!accepted && partCount) { %><div class="alert info"><span>No evidence is accepted yet. <a href="/topics/<%= topic.id %>/agents">Review the evidence</a> — accepted cards appear on the right, ready to insert with their citations.</span></div><% } %>
+<div class="write">
+  <nav class="w-secs" aria-label="Sections">
+    <span class="mono">Sections</span>
+    <% sections.forEach((s) => { const pct = Math.min(100, Math.round(100 * s.words / s.target)); %>
+      <a class="w-sec<%= s.id === cur.id ? ' on' : '' %>" href="<%= P %>?s=<%= s.id %>"<%- s.id === cur.id ? ' aria-current="true"' : '' %>>
+        <span class="w-sec-t"><span class="dot" style="background:<%= s.filled ? 'var(--green)' : s.part && s.part.agent_status === 'accepted' ? 'var(--amber)' : 'var(--line)' %>"></span><span class="w-sec-n" data-i18n-skip><%= s.title %></span><span class="hint"><%= s.words %></span></span>
+        <span class="w-bar" title="<%= s.words %> of about <%= s.target %> words"><span style="width:<%= pct %>%"></span></span>
+      </a>
     <% }) %>
-    <span class="outline" style="cursor:default"><span class="dot" style="background:<%= refs.length ? 'var(--green)' : 'var(--line)' %>"></span><span><span style="display:block">References</span><span class="hint">Automatic</span></span></span>
     <% if (!ro) { %><form method="post" action="<%= P %>/sections" class="split" style="margin-top:8px"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="ns">New section</label><input class="in" id="ns" name="title" placeholder="New section" style="height:36px;flex:1" required><button class="btn btn-s btn-sm">Add</button></form><% } %>
   </nav>
 
-  <section class="card" style="flex:3 1 480px;min-width:0;padding:0;display:flex;flex-direction:column">
-    <div class="split" style="flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-2)">
-      <span class="mono" style="flex:1"><%= cur.part ? 'From Part · ' + (cur.part.agent_name || 'agent') : 'Your words' %></span>
+  <main class="w-paper card" data-drop="<%= ro || editing ? '' : S %>">
+    <div class="w-paper-head">
+      <div style="flex:1 1 260px;min-width:0"><div class="mono"><%= cur.part ? 'From ' + (cur.part.agent_name || 'the part') : 'Your words' %> · <%= cur.words %> of about <%= cur.target %> words</div><h1 data-i18n-skip><%= cur.title %></h1></div>
       <% if (!ro) { %>
         <form method="post" action="<%= S %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm" name="action" value="up" aria-label="Move section up" title="Move up">↑</button><button class="btn btn-s btn-sm" name="action" value="down" aria-label="Move section down" title="Move down">↓</button></form>
-        <form method="post" action="<%= S %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="draft"><button class="btn btn-s btn-sm"><%- u.icon('spark', 16) %>Draft from findings</button></form>
-        <% if (!editing) { %><a class="btn btn-p btn-sm" href="<%= P %>?s=<%= cur.id %>&edit=1"><%- u.icon('edit', 16) %>Edit</a><% } %>
+        <form method="post" action="<%= S %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="draft"><button class="btn btn-p btn-sm"><%- u.icon('spark', 15) %>Draft this section</button></form>
+        <% if (!editing) { %><a class="btn btn-s btn-sm" href="<%= P %>?s=<%= cur.id %>&edit=1"><%- u.icon('edit', 15) %>Edit</a><% } %>
       <% } %>
     </div>
     <% if (editing && !ro) { %>
-      <form method="post" action="<%= S %>" style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <form method="post" action="<%= S %>" style="display:flex;flex-direction:column;gap:12px">
         <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="save">
         <div class="field"><label for="st">Section title</label><input id="st" name="title" value="<%= cur.title %>" maxlength="240" required></div>
         <div class="field"><label for="sb">Text</label><textarea id="sb" name="body" rows="18" class="paper-edit"><%= cur.body || '' %></textarea><span class="hint">Leave a blank line between paragraphs. Citations look like [src:12] — keep each one next to the sentence it supports and the reference list updates itself.</span></div>
         <div class="split" style="flex-wrap:wrap"><button class="btn btn-p">Save section</button><a class="btn btn-s" href="<%= P %>?s=<%= cur.id %>">Cancel</a><span style="flex:1"></span><%- u.delForm(S, csrf, 'Delete the section “' + cur.title + '”?', 'Delete section', { action: 'delete' }) %></div>
       </form>
     <% } else { %>
-      <article class="paper-view">
-        <h2><%= cur.title %></h2>
-        <% if (cur.html) { %><%- cur.html %><% } else { %><div class="empty" style="padding:24px;border:1.5px dashed var(--line);border-radius:10px"><span><%= cur.part && cur.part.agent_status !== 'accepted' ? 'This section waits for its agent’s findings. Accept them, then insert or draft from them.' : ro ? 'Nothing written yet.' : 'Nothing written yet. Insert findings from the right, draft from them, or press Edit and start typing.' %></span></div><% } %>
+      <article class="paper-view" data-cites="<%= JSON.stringify(cites) %>">
+        <% if (cur.html) { %><div data-i18n-skip><%- cur.html %></div><% } else { %><div class="empty2" style="border:1.5px dashed var(--line);border-radius:12px"><span class="e-ico"><%- u.icon('edit', 24) %></span><b><%= cur.part && cur.part.agent_status !== 'accepted' && cur.part.handler !== 'person' ? 'Nothing accepted to write from yet' : 'Nothing written yet' %></b><span><%= cur.part && cur.part.agent_status !== 'accepted' && cur.part.handler !== 'person' ? 'Accept some evidence first — it shows up here ready to insert with citations.' : ro ? 'The project leader writes the paper.' : 'Drag a card from the right, press Insert, or let the AI draft this section from your evidence.' %></span><% if (cur.part && cur.part.agent_status !== 'accepted' && cur.part.handler !== 'person') { %><a class="btn btn-p btn-sm" href="/topics/<%= topic.id %>/agents/<%= cur.part.id %>">Review evidence</a><% } %></div><% } %>
+        <% if (!ro) { %><div class="drop-hint" aria-hidden="true">Drop evidence here — its citation comes with it</div><% } %>
       </article>
     <% } %>
-  </section>
+    <div class="cite-pop" role="tooltip" hidden></div>
+  </main>
 
-  <aside style="flex:1 1 290px;min-width:0;display:flex;flex-direction:column;gap:16px">
-    <section class="card" style="display:flex;flex-direction:column;gap:4px">
-      <div class="split" style="padding-bottom:6px"><h3 style="flex:1"><%= cur.part ? 'Findings for this section' : 'All accepted findings' %></h3><span class="mono"><%= findings.length %></span></div>
-      <% if (!findings.length) { %><span class="hint"><%= cur.part ? 'None accepted for this part yet.' : 'Accept findings on the Findings tab to use them here.' %></span><% } %>
+  <aside class="w-ev" id="evidence">
+    <button type="button" class="w-ev-toggle" data-sheet-toggle aria-expanded="false" aria-controls="evidence"><span class="grab" aria-hidden="true"></span><b>Your evidence</b><span class="mono"><%= findings.filter((f) => f.used).length %> of <%= findings.length %> used</span></button>
+    <div class="w-ev-body">
+      <div class="split"><h2 style="flex:1;font-size:16px">Your evidence</h2><span class="mono"><%= findings.filter((f) => f.used).length %> of <%= findings.length %> used</span></div>
+      <% if (findings.length > 3) { %><label class="searchbox" style="flex:none;height:40px"><%- u.icon('search', 15) %><span class="sr">Search evidence</span><input type="search" placeholder="Search accepted evidence" data-ev-search></label><% } %>
+      <% if (!ro && findings.length) { %><p class="hint">Drag a card into the text, or press Insert. Its citation comes with it.</p><% } %>
+      <% if (!findings.length) { %><div class="empty2" style="padding:18px 6px"><span><%= cur.part ? 'Nothing accepted for this part yet.' : 'Accept evidence cards on the Research tab to use them here.' %></span><a class="btn btn-s btn-sm" href="/topics/<%= topic.id %>/agents">Review evidence</a></div><% } %>
       <% findings.forEach((f) => { %>
-        <div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--line-2)">
-          <span style="font-size:14px;line-height:1.5" data-i18n-skip><%= f.text %></span>
-          <div class="split" style="flex-wrap:wrap"><span class="hint" style="flex:1"><% if (!cur.part) { %><%= f.part.title %> · <% } %><% if (f.card) { %><span data-i18n-skip><%= f.card.in_text %></span> · <%= f.card.tier %> reliability<%= f.card.data_points.length ? ' · ' + f.card.data_points.length + ' data points' : '' %><% } else { %><%= f.confidence %> · <%= f.srcIds.length %> source<%= f.srcIds.length === 1 ? '' : 's' %><% } %></span>
-            <% if (!ro) { %><form method="post" action="<%= S %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="insert"><input type="hidden" name="finding" value="<%= f.id %>"><button class="btn btn-s btn-sm"<%= f.used ? ' disabled' : '' %>><%= f.used ? 'Inserted' : 'Insert' %></button></form><% } %>
+        <div class="w-card<%= f.used ? ' used' : '' %>"<%- !ro && !f.used ? ' draggable="true"' : '' %> data-finding="<%= f.id %>" data-text="<%= (f.text + ' ' + (f.card ? f.card.in_text + ' ' + f.card.title : '')).toLowerCase() %>">
+          <div class="split" style="gap:6px"><% if (!ro && !f.used) { %><span class="grip" aria-hidden="true">⋮⋮</span><% } %><% if (f.card) { %><span class="tag t-<%= f.card.tier %>"><%= f.card.tier === 'high' ? 'High' : f.card.tier === 'medium' ? 'Medium' : 'Low' %></span><span class="hint" data-i18n-skip><%= f.card.in_text %></span><% } %><% if (!cur.part) { %><span class="hint" data-i18n-skip>· <%= f.part.title %></span><% } %></div>
+          <span class="w-card-t" data-i18n-skip><%= f.text %></span>
+          <div class="split"><span class="hint" style="flex:1"><%= f.used ? (f.citedAs.length ? 'Cited as [' + f.citedAs.join(', ') + ']' : 'Used') : 'Not used yet' %></span>
+            <% if (!ro) { %><form method="post" action="<%= S %>" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="insert"><input type="hidden" name="finding" value="<%= f.id %>"><button class="btn btn-s btn-sm"<%= f.used ? ' disabled' : '' %>><%= f.used ? 'Used' : 'Insert' %></button></form><% } %>
           </div>
         </div>
       <% }) %>
-    </section>
-    <section class="card" id="comments" style="display:flex;flex-direction:column;gap:10px">
-      <div class="split"><h3 style="flex:1">Suggestions</h3><span class="mono"><%= comments.filter((c) => !c.resolved).length %> open</span></div>
-      <% if (!comments.length) { %><span class="hint">Co-authors can suggest edits to this section here.</span><% } %>
-      <% comments.forEach((c) => { %><div class="split" style="align-items:flex-start;<%= c.resolved ? 'opacity:.6' : '' %>"><%- u.avatar({ id: c.uid, name: c.name || '?', color: c.color }, 'sm') %><div style="flex:1;min-width:0"><div class="split"><b style="font-size:13px"><%= c.name || 'Former member' %></b><span class="mono" style="text-transform:none"><%= c.resolved ? 'Resolved' : u.ago(c.created_at) %></span></div><p style="font-size:14px;line-height:1.5;white-space:pre-wrap"><%= c.body %></p>
-        <% if (!c.resolved && (isTopicLeader || c.uid === me.id) && topic.status !== 'archived') { %><form method="post" action="<%= S %>/comments" class="split" style="margin-top:6px"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="id" value="<%= c.id %>"><button class="btn btn-s btn-sm" name="action" value="resolve">Resolve</button><button class="mini del" name="action" value="delete"><%- u.icon('trash') %>Delete</button></form><% } %></div></div><% }) %>
-      <% if (!isGuest && topic.status !== 'archived') { %><form method="post" action="<%= S %>/comments" style="display:flex;flex-direction:column;gap:8px"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="cm">Suggestion</label><textarea class="in" id="cm" name="body" rows="2" maxlength="2000" required placeholder="Suggest an edit to this section…"></textarea><button class="btn btn-s btn-sm" style="align-self:flex-start">Post</button></form><% } %>
-    </section>
-    <section class="card" style="display:flex;flex-direction:column;gap:8px">
-      <h3>References</h3>
-      <% if (!refs.length) { %><span class="hint">Built automatically from the sources behind every finding you use.</span><% } %>
-      <ol class="refs"><% refs.forEach((x) => { %><li id="ref<%= x.n %>"><% if (x.url) { %><a href="<%= u.safeUrl(x.url) || '#' %>" target="_blank" rel="noopener noreferrer"><%= x.text %></a><% } else { %><%= x.text %><% } %></li><% }) %></ol>
-    </section>
+      <details class="fold" id="comments"<%= comments.some((c) => !c.resolved) ? ' open' : '' %>><summary><b>Suggestions</b> <span class="mono"><%= comments.filter((c) => !c.resolved).length %> open</span></summary>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <% if (!comments.length) { %><span class="hint">Co-authors can suggest edits to this section here.</span><% } %>
+        <% comments.forEach((c) => { %><div class="split" style="align-items:flex-start;<%= c.resolved ? 'opacity:.6' : '' %>"><%- u.avatar({ id: c.uid, name: c.name || '?', color: c.color }, 'sm') %><div style="flex:1;min-width:0"><div class="split"><b style="font-size:13px"><%= c.name || 'Former member' %></b><span class="mono" style="text-transform:none"><%= c.resolved ? 'Resolved' : u.ago(c.created_at) %></span></div><p style="font-size:14px;line-height:1.5;white-space:pre-wrap" data-i18n-skip><%= c.body %></p>
+          <% if (!c.resolved && (isTopicLeader || c.uid === me.id) && topic.status !== 'archived') { %><form method="post" action="<%= S %>/comments" class="split" style="margin-top:6px"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="id" value="<%= c.id %>"><button class="btn btn-s btn-sm" name="action" value="resolve">Resolve</button><button class="mini del" name="action" value="delete"><%- u.icon('trash') %>Delete</button></form><% } %></div></div><% }) %>
+        <% if (!isGuest && topic.status !== 'archived') { %><form method="post" action="<%= S %>/comments" style="display:flex;flex-direction:column;gap:8px"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="cm">Suggestion</label><textarea class="in" id="cm" name="body" rows="2" maxlength="2000" required placeholder="Suggest an edit to this section…"></textarea><button class="btn btn-s btn-sm" style="align-self:flex-start">Post</button></form><% } %>
+        </div>
+      </details>
+      <details class="fold"><summary><b>References</b> <span class="mono"><%= refs.length %></span></summary>
+        <% if (!refs.length) { %><span class="hint">Built automatically from the sources behind every card you insert.</span><% } %>
+        <ol class="refs" style="margin-top:8px"><% refs.forEach((x) => { %><li id="ref<%= x.n %>" data-i18n-skip><% if (x.url) { %><a href="<%= u.safeUrl(x.url) || '#' %>" target="_blank" rel="noopener noreferrer"><%= x.text %></a><% } else { %><%= x.text %><% } %></li><% }) %></ol>
+      </details>
+    </div>
   </aside>
 </div>
 <%- include('../partials/bottom') %>

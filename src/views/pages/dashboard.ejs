@@ -1,85 +1,66 @@
-<%- include('../partials/top', { crumb: 'Dashboard' }) %>
-<div class="page-head">
+<%- include('../partials/top', { crumb: 'Home' }) %>
+<% const first = me.name.replace(/^Dr\.\s*/, '').split(' ')[0]; const canCreate = me.platform_role === 'leader' || me.platform_role === 'admin'; %>
+<div class="home">
   <div>
-    <h1>Good <%= hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening' %>, <%= me.name.replace(/^Dr\.\s*/, '').split(' ')[0] %></h1>
-    <p><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', timeZone: u.TZ }) %> · <%= toReview %> part<%= toReview === 1 ? '' : 's' %> waiting for your review<% if (stats.actions) { %> · <%= stats.actions %> items need you<% } %></p>
+    <h1 class="hello">Good <%= hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening' %>, <span data-i18n-skip><%= first %></span></h1>
+    <p class="text-2" style="font-size:16px;margin-top:8px"><%= nActive %> project<%= nActive === 1 ? '' : 's' %> · <%= needCount %> thing<%= needCount === 1 ? '' : 's' %> need<%= needCount === 1 ? 's' : '' %> you</p>
   </div>
-  <% if (me.platform_role !== 'guest') { %><a class="btn btn-s" href="/meetings"><%- u.icon('video') %>Meetings</a>
-<% } %>
-</div>
 
-<% if (actionTotal) { %>
-<a href="/actions" class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;text-decoration:none;color:var(--text);background:var(--pri-soft);border-color:transparent">
-  <span class="kind" style="background:var(--pri);color:#fff;font-size:14px"><%= actionTotal %></span>
-  <span style="flex:1 1 300px"><b style="font-size:15px"><%= actionTotal %> item<%= actionTotal > 1 ? 's' : '' %> need<%= actionTotal > 1 ? '' : 's' %> your action</b><br><span class="text-2"><%= actions.map((a) => a.title).slice(0, 2).join(' · ') %></span></span>
-  <b style="color:var(--pri-text)">Open Action centre →</b>
-</a>
-<% } %>
-
-<div class="grid">
-  <div class="card stat"><span class="text-2">Active topics</span><b><%= stats.topics %></b><span>you’re part of</span></div>
-  <div class="card stat"><span class="text-2">Findings to review</span><b><%= toReview %></b><span>from your agents</span></div>
-  <div class="card stat"><span class="text-2">Upcoming meetings</span><b><%= stats.meetings %></b><span>next 4 shown below</span></div>
-  <div class="card stat"><span class="text-2">Waiting on you</span><b><%= stats.actions %></b><span>approvals, reviews, requests</span></div>
-</div>
-
-<div class="cols">
-  <div class="wide">
-    <section class="card flush">
-      <div class="card-head" style="padding:18px 20px 0"><h2>Your agents</h2><a href="/topics" style="font-size:13px">All topics</a></div>
-      <div class="list">
-        <% if (!agents.length) { %><div class="empty"><b>No agents running yet</b><span>Open a topic → Plan &amp; agents, write the research question and launch its agents.</span></div><% } %>
-        <% agents.forEach((p) => { const s = u.agentStatus(p.agent_status); %>
-          <a class="row" href="/topics/<%= p.topic_id %>/agents/<%= p.id %>" style="text-decoration:none;color:var(--text);padding:12px 20px">
-            <span class="agent-ico sm" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('bot', 16) %></span>
-            <span style="flex:1;min-width:0"><b style="font-weight:500"><%= p.title %></b><br><span class="mono"><%= p.code %> · <span data-i18n-skip><%= p.agent_name || 'Research agent' %></span></span></span>
-            <span class="tag dotted" style="background:<%= s.c[1] %>;color:<%= s.c[0] %>"><%= s.label %><%= p.agent_status === 'running' ? ' ' + (p.agent_progress || 0) + '%' : '' %></span>
-          </a>
-        <% }) %>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>Growth</h2><span class="mono">Agent runs finished per week</span></div>
-      <div class="chart" role="img" aria-label="Agent runs finished per week over the last 8 weeks">
-        <% weeks.forEach((w) => { %><div><span class="mono" style="text-transform:none"><%= w.n %></span><span class="b" style="height:<%= Math.max(3, Math.round(w.n / max * 120)) %>px"></span></div><% }) %>
-      </div>
-      <div class="chart-x" style="margin-top:6px"><% weeks.forEach((w) => { %><span><%= w.label %></span><% }) %></div>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>Topic progress</h2><a href="/topics" style="font-size:13px">All topics</a></div>
-      <% if (!progress.length) { %><div class="empty">You’re not in any topics yet.</div><% } %>
-      <% progress.forEach((t) => { const c = u.color(t.color); %>
-        <a class="row" href="/topics/<%= t.id %>" style="text-decoration:none;color:var(--text)">
-          <span class="dot" style="background:<%= c[0] %>"></span>
-          <span style="flex:1 1 220px;min-width:0"><b style="font-weight:500"><%= t.title %></b><br><span class="mono"><%= t.code %> · <%= t.done %>/<%= t.total %> <%= t.unit === 'parts' ? 'parts accepted' : 'tasks' %></span></span>
-          <span class="bar" style="flex:0 1 180px;width:180px"><span style="width:<%= t.pct %>%;background:<%= c[0] %>"></span></span>
-          <b style="width:44px;text-align:right"><%= t.pct %>%</b>
+  <% if (upNext.length) { %>
+  <section class="stack" data-tip-title="Up next" data-tip="Up next shows the most useful step in each of your projects. Click one to go straight there.">
+    <h2>Up next</h2>
+    <div class="upnext">
+      <% upNext.forEach((x) => { const c = u.color(x.topic.color); const n = x.next; %>
+        <% if (n.action) { %>
+        <form class="un-card" method="post" action="<%= n.action %>" style="--acc:<%= c[0] %>;--acc-soft:<%= c[1] %>"><input type="hidden" name="_csrf" value="<%= csrf %>">
+          <span class="un-top"><% if (x.step) { %><span class="un-num"><%= x.step %></span><% } %><span class="ptag" data-i18n-skip><%= x.topic.title.length > 34 ? x.topic.title.slice(0, 32) + '…' : x.topic.title %></span></span>
+          <b class="un-t"><%= n.title %></b><span class="un-x"><%= n.text %></span>
+          <button class="un-go"><%= n.label %> →</button>
+        </form>
+        <% } else { %>
+        <a class="un-card" href="<%= n.href %>" style="--acc:<%= c[0] %>;--acc-soft:<%= c[1] %>">
+          <span class="un-top"><% if (x.step) { %><span class="un-num"><%= x.step %></span><% } %><span class="ptag" data-i18n-skip><%= x.topic.title.length > 34 ? x.topic.title.slice(0, 32) + '…' : x.topic.title %></span></span>
+          <b class="un-t"><%= n.title %></b><span class="un-x"><%= n.text %></span>
+          <span class="un-go"><%= n.label %> →</span>
         </a>
+        <% } %>
       <% }) %>
-    </section>
-  </div>
+    </div>
+  </section>
+  <% } %>
 
-  <div class="narrow">
-    <section class="card">
-      <div class="card-head"><h2>Upcoming meetings</h2></div>
-      <% if (!meetings.length) { %><div class="empty" style="padding:16px">No meetings scheduled.</div><% } %>
-      <% meetings.forEach((m) => { %>
-        <div class="row" style="align-items:flex-start">
-          <span class="kind" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('video', 16) %></span>
-          <span style="flex:1;min-width:0"><b style="font-weight:500"><%= m.title %></b><br><span class="text-2" style="font-size:12px"><%= u.fmtDateTime(m.starts_at) %> · <%= m.platform || 'Link' %> · <%= m.code %></span></span>
-          <% if (m.link) { %><a class="btn btn-s btn-sm" href="<%= m.link %>" target="_blank" rel="noopener">Join</a><% } %>
+  <section class="stack">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="flex:1">Your projects</h2>
+      <nav class="seg" aria-label="Show"><a href="/"<%- show === 'active' ? ' class="on" aria-current="true"' : '' %>>Active · <%= nActive %></a><a href="/?show=finished"<%- show === 'finished' ? ' class="on" aria-current="true"' : '' %>>Finished · <%= nFinished %></a></nav>
+    </div>
+    <% if (!projects.length) { %>
+      <div class="card empty2">
+        <span class="e-ico"><%- u.icon(show === 'finished' ? 'check' : 'folder', 24) %></span>
+        <b><%= show === 'finished' ? 'No finished projects yet' : 'No projects yet' %></b>
+        <span><%= show === 'finished' ? 'When you save a final report, the project moves here.' : canCreate ? 'Start with a research question. AI agents or your team split it into parts and find the evidence.' : 'When a project leader adds you to a project, it shows up here.' %></span>
+        <% if (show !== 'finished' && canCreate) { %><a class="btn btn-p" href="/topics/new"><%- u.icon('plus') %>Start a project</a><% } %>
+      </div>
+    <% } %>
+    <% projects.forEach((t) => { const c = u.color(t.color); const j = t.j; const cn = j.counts; %>
+      <article class="card pj" style="--acc:<%= c[0] %>;--acc-soft:<%= c[1] %>">
+        <div class="pj-top">
+          <span class="pj-badge"><%= String(t.code).replace(/^CT-0*/, '') %></span>
+          <div style="flex:1 1 320px;min-width:0"><div class="mono"><%= t.code %><%= t.field ? ' · ' + t.field : '' %><%= t.status === 'completed' ? ' · finished ' + u.fmtDate(t.completed_at) : t.due_date ? ' · due ' + u.fmtDate(t.due_date) : '' %> · <%= j.mode === 'manual' ? 'Manual mode' : 'Agent mode' %></div><a class="pj-title" href="/topics/<%= t.id %>" data-i18n-skip><%= t.title %></a></div>
+          <span class="avs"><% t.team.slice(0, 4).forEach((m) => { %><%- u.avatar(m, 'sm') %><% }) %><% if (t.team.length > 4) { %><span class="av sm more">+<%= t.team.length - 4 %></span><% } %></span>
         </div>
-      <% }) %>
-    </section>
-    <section class="card">
-      <div class="card-head"><h2>Recent activity</h2></div>
-      <% if (!activity.length) { %><div class="empty" style="padding:16px">Nothing yet.</div><% } %>
-      <% activity.forEach((a) => { %>
-        <div class="row" style="align-items:flex-start"><%- u.avatar(a.uid ? { id: a.uid, name: a.name, color: a.color } : null, 'sm') %><span style="flex:1;font-size:13px"><b style="font-weight:500"><%= a.name || 'CTENT' %></b> <span class="text-2"><%= a.detail %></span><br><span class="mono"><%= a.code %> · <%= u.ago(a.created_at) %></span></span></div>
-      <% }) %>
-    </section>
-  </div>
+        <ol class="jbar" aria-label="Journey"<%- t === projects[0] ? ' data-tip-title="Every project has a journey" data-tip="From question to finished paper. The coloured step is where the project is now."' : '' %>>
+          <% j.steps.forEach((s) => { %><li class="<%= s.done ? 'done' : s.current ? 'cur' : '' %>"><span></span><b><%= s.label %></b></li><% }) %>
+        </ol>
+        <div class="pj-foot">
+          <span class="live<%= cn.working ? ' on' : '' %>" aria-hidden="true"></span>
+          <span class="pj-status"><%= t.status === 'completed' ? 'Finished · final report saved' : (j.current ? 'Step ' + j.current.n + ' of ' + j.steps.length : '') + (cn.parts ? ' · ' + cn.accepted + ' of ' + cn.parts + ' parts accepted' : '') + (cn.working ? ' · ' + cn.working + ' still researching' : '') + (cn.sections && j.current && j.current.key === 'write' ? ' · ' + cn.filled + ' of ' + cn.sections + ' sections written' : '') %></span>
+          <a class="btn btn-s btn-sm" href="/topics/<%= t.id %>">Open</a>
+          <% if (j.next && j.next.action) { %><form method="post" action="<%= j.next.action %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm acc"><%= j.next.label %> →</button></form>
+          <% } else if (j.next && j.next.href && j.next.label && j.next.label !== 'Open') { %><a class="btn btn-p btn-sm acc" href="<%= j.next.href %>"><%= j.next.label %> →</a><% } %>
+        </div>
+      </article>
+    <% }) %>
+    <% if (canCreate && show === 'active' && projects.length) { %><a class="new-dash" href="/topics/new"><%- u.icon('plus') %>Start a new research project</a><% } %>
+  </section>
 </div>
 <%- include('../partials/bottom') %>

@@ -18,12 +18,14 @@
   const J = typeof journey !== 'undefined' ? journey : null;
   const showNext = J && J.next && isTopicLeader && mainTab !== 'Journey' && J.next.label && topic.status !== 'archived';
 %>
-<div class="topic-head">
+<%- include('accent') %>
+<div class="topic-head acc-top">
   <div class="topic-title">
-    <span class="topic-badge" style="background:<%= u.color(topic.color)[1] %>;color:<%= u.color(topic.color)[0] %>"><%= String(topic.code).replace(/^CT-0*/, '') %></span>
+    <span class="topic-badge" style="background:var(--acc-soft);color:var(--acc)"><%= String(topic.code).replace(/^CT-0*/, '') %></span>
     <div>
       <span class="mono"><%= topic.code %><%= topic.field ? ' · ' + topic.field : '' %></span>
-      <div class="split" style="flex-wrap:wrap"><h1><%= topic.title %></h1><% if (topic.status !== 'active') { %><%- u.tag(topic.status) %><% } %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Read only</span><% } %></div>
+      <% if (J && !isGuest) { %><% if (isTopicLeader && topic.status !== 'archived' && topic.status !== 'completed') { %><a class="mode-badge" href="<%= base %>/mode" title="Switch how this project is researched"><%= J.mode === 'manual' ? 'Manual mode' : 'Agent mode' %> · <u>Switch</u></a><% } else { %><span class="mode-badge"><%= J.mode === 'manual' ? 'Manual mode' : 'Agent mode' %></span><% } %><% } %>
+      <div class="split" style="flex-wrap:wrap"><h1 data-i18n-skip><%= topic.title %></h1><% if (topic.status !== 'active') { %><%- u.tag(topic.status) %><% } %><% if (isGuest) { %><span class="tag" style="background:var(--violet-soft);color:var(--violet)">Read only</span><% } %></div>
     </div>
     <a class="stack" href="<%= isGuest ? base : base + '/members' %>" title="People in this project"><% (topicMembersPreview || []).forEach((m) => { %><%- u.avatar(m, 'sm', true) %><% }) %></a>
     <% if (showNext) { %>
@@ -32,12 +34,12 @@
     <% } %>
   </div>
   <% if (J) { %>
-  <ol class="journey-bar" aria-label="Project journey">
+  <ol class="journey-bar" aria-label="Project journey" style="grid-template-columns:repeat(<%= J.steps.length %>,minmax(0,1fr))">
     <% J.steps.forEach((s) => { %><li class="<%= s.done ? 'done' : s.current ? 'cur' : '' %>"><a href="<%= isGuest ? base : s.href %>"<%- s.current ? ' aria-current="step"' : '' %>><span class="n"><%= s.done ? '✓' : s.n %></span><span class="t"><b><%= s.label %></b><span><%= s.detail %></span></span></a></li><% }) %>
   </ol>
   <% } %>
   <nav class="ptabs" aria-label="Project sections">
-    <% TABS.forEach(([label, href, ic]) => { %><a class="<%= label === mainTab ? 'on' : '' %>" href="<%= href %>"<%- label === mainTab ? ' aria-current="page"' : '' %>><%- u.icon(ic, 16) %><%= label %></a><% }) %>
+    <% TABS.forEach(([label, href, ic]) => { %><a class="<%= label === mainTab ? 'on' : '' %>" href="<%= href %>"<%- label === mainTab ? ' aria-current="page"' : '' %>><%- u.icon(ic, 16) %><%= label === 'Research' && J && J.mode === 'manual' ? 'Parts & people' : label %></a><% }) %>
     <% if (isTopicLeader) { %><a class="gear<%= mainTab === 'Settings' ? ' on' : '' %>" href="<%= base %>/settings" title="Project settings" aria-label="Project settings"><%- u.icon('settings', 16) %><span>Settings</span></a><% } %>
   </nav>
   <% if (subs) { %><nav class="subs" aria-label="<%= mainTab %>"><% subs.forEach(([label, key, href]) => { %><a class="<%= key === subTab ? 'on' : '' %>" href="<%= href %>"<%- key === subTab ? ' aria-current="page"' : '' %>><%= label %></a><% }) %></nav><% } %>

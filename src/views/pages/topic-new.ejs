@@ -1,53 +1,130 @@
-<%- include('../partials/top', { crumb: '<a href="/topics">Topics</a> / New project' }) %>
-<div class="page-head"><div><h1>Start a research project</h1><p>Three quick steps. You can change everything later.</p></div></div>
+<%- include('../partials/top', { crumb: '<a href="/topics">Projects</a> / New project' }) %>
+<%
+  const mode = v.mode === 'manual' ? 'manual' : 'agent';
+  const rows = (v.parts && v.parts.length) ? v.parts : [{}, {}, {}];
+  const personOpts = (sel) => people.filter((m) => m.platform_role !== 'guest').map((m) => '<option value="' + m.id + '"' + (String(sel) === String(m.id) ? ' selected' : '') + ' data-skills="' + u.esc((m.skills || []).map((s) => s.name).join('|')) + '">' + u.esc(m.name) + ((m.skills || []).length ? ' — ' + u.esc(m.skills.slice(0, 2).map((s) => s.name).join(', ')) : '') + '</option>').join('');
+  const TIP_MODE = { agent: 'Agent mode', manual: 'Manual mode' };
+%>
 <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
-<form method="post" action="/topics/new" class="wizard" data-wizard>
+<form method="post" action="/topics/new" class="wizard wiz2" data-wizard data-mode="<%= mode %>" data-ai="<%= aiOn ? 1 : 0 %>" data-templates="<%= JSON.stringify(Object.fromEntries(Object.entries(templates).filter(([k]) => k !== 'blank').map(([k, t]) => [k, t.parts]))) %>">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <ol class="wiz-steps" aria-hidden="true"><li class="on" data-wstep="1"><span>1</span>Question</li><li data-wstep="2"><span>2</span>Parts</li><li data-wstep="3"><span>3</span>Team</li></ol>
+  <ol class="wiz-steps" aria-hidden="true"><li class="on" data-wstep="1"><span>1</span>Details</li><li data-wstep="2"><span>2</span>Mode</li><li data-wstep="3"><span>3</span><span class="m-agent">Agents</span><span class="m-manual">Team</span></li></ol>
 
-  <section class="card wiz-pane" data-pane="1">
-    <h2>What do you want to find out?</h2>
-    <div class="field"><label for="title">Project title</label><input id="title" name="title" required minlength="4" maxlength="240" value="<%= v.title || '' %>" placeholder="e.g. How China’s Medog dam affects the geopolitics of Asia"></div>
-    <div class="field"><label for="question">Research question</label><textarea id="question" name="question" rows="3" maxlength="2000" placeholder="The question you want answered. Your research agents work from this. English or Bangla."><%= v.question || '' %></textarea><span class="hint">One or two sentences is enough.</span></div>
-    <details class="adv"><summary>More details <span class="hint">field, description, dates, colour, visibility</span></summary>
-      <div class="adv-body">
-        <div class="field"><label for="description">Short description</label><textarea id="description" name="description" rows="2" maxlength="2000" placeholder="Why does this question matter?"><%= v.description || '' %></textarea></div>
-        <div class="form-grid">
-          <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= v.field || '' %>" placeholder="e.g. Geopolitics"></div>
-          <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= v.due_date || '' %>"></div>
-          <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility">
-            <option value="private"<%= v.visibility === 'private' ? ' selected' : '' %>>Private — invited people only</option>
-            <option value="institution"<%= v.visibility === 'institution' ? ' selected' : '' %>>Institution — others can ask to join</option>
-            <option value="open"<%= v.visibility === 'open' ? ' selected' : '' %>>Open — anyone signed in can ask to join</option>
-          </select></div>
-        </div>
-        <fieldset style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:8px">Colour</legend>
-          <div class="split" style="flex-wrap:wrap"><% colors.forEach((c) => { %><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="color" value="<%= c %>"<%= v.color === c ? ' checked' : '' %>><span class="dot" style="width:16px;height:16px;border-radius:50%;background:<%= u.color(c)[0] %>"></span><%= c %></label><% }) %></div>
-        </fieldset>
+  <section class="wiz-pane" data-pane="1">
+    <div><h1>Tell us about the project</h1><p class="text-2" style="margin-top:6px;font-size:15px">Next you’ll choose whether AI agents or your team do the research.</p></div>
+    <div class="card" style="display:flex;flex-direction:column;gap:18px;padding:24px">
+      <div class="field"><label for="title">Project title</label><input id="title" name="title" required minlength="4" maxlength="240" value="<%= v.title || '' %>" placeholder="e.g. Microplastics in Bangladesh rivers"></div>
+      <div class="field"><label for="question">Research question</label><textarea id="question" name="question" rows="3" maxlength="2000" placeholder="What do you want to find out? English or Bangla."><%= v.question || '' %></textarea><span class="hint">One or two sentences. Agents and team members both work from this.</span></div>
+      <div class="field"><label for="description">Short description <span class="hint">optional</span></label><textarea id="description" name="description" rows="2" maxlength="2000" placeholder="Why does it matter? Any context the team should know."><%= v.description || '' %></textarea></div>
+      <div class="form-grid">
+        <div class="field"><label for="field">Field</label><input id="field" name="field" value="<%= v.field || '' %>" placeholder="e.g. Environmental science"></div>
+        <div class="field"><label for="due_date">Target end date</label><input id="due_date" name="due_date" type="date" value="<%= v.due_date || '' %>"></div>
+        <div class="field"><label for="visibility">Who can find it</label><select id="visibility" name="visibility">
+          <option value="private"<%= v.visibility === 'private' ? ' selected' : '' %>>Private — invited only</option>
+          <option value="institution"<%= v.visibility === 'institution' ? ' selected' : '' %>>Institution — can ask to join</option>
+          <option value="open"<%= v.visibility === 'open' ? ' selected' : '' %>>Open — anyone signed in can ask to join</option>
+        </select></div>
       </div>
-    </details>
-    <div class="form-actions"><a class="btn btn-s" href="/topics">Cancel</a><button type="button" class="btn btn-p" data-wnext="2">Next: parts →</button></div>
-  </section>
-
-  <section class="card wiz-pane" data-pane="2">
-    <h2>How should the research be split?</h2>
-    <p class="text-2">Each part gets its own AI research agent that finds evidence for it.</p>
-    <div class="pick-grid">
-      <label class="pick-card"><input type="radio" name="template" value="ai"<%= v.template === 'ai' ? ' checked' : '' %><%= aiOn ? '' : ' disabled' %>><span class="start-ico" style="background:var(--pri-soft);color:var(--pri-text)"><%- u.icon('spark', 20) %></span><b>Let AI suggest parts</b><span class="hint"><%= aiOn ? 'From your research question. Recommended.' : 'Needs an AI service.' %></span></label>
-      <% Object.entries(templates).filter(([k]) => k !== 'blank').forEach(([k, t]) => { %>
-        <label class="pick-card"><input type="radio" name="template" value="<%= k %>"<%= v.template === k ? ' checked' : '' %>><span class="start-ico" style="background:var(--teal-soft);color:var(--teal)"><%- u.icon('layers', 20) %></span><b><%= t.name %></b><span class="hint"><%= t.parts.map((x) => x[0]).join(' · ') %></span></label>
-      <% }) %>
-      <label class="pick-card"><input type="radio" name="template" value="blank"<%= v.template === 'blank' ? ' checked' : '' %>><span class="start-ico" style="background:var(--indigo-soft);color:var(--indigo)"><%- u.icon('plus', 20) %></span><b>I’ll add parts myself</b><span class="hint">Start with an empty plan.</span></label>
+      <fieldset class="swatches"><legend class="label">Colour</legend>
+        <div class="split"><% colors.forEach((c) => { %><label class="sw" title="<%= c %>"><input type="radio" name="color" value="<%= c %>"<%= v.color === c ? ' checked' : '' %>><span style="background:<%= u.color(c)[0] %>;--sw:<%= u.color(c)[0] %>"></span><span class="sr"><%= c %></span></label><% }) %></div>
+      </fieldset>
     </div>
-    <div class="form-actions"><button type="button" class="btn btn-s" data-wnext="1">← Back</button><button type="button" class="btn btn-p" data-wnext="3">Next: team →</button></div>
+    <div class="form-actions"><a class="btn btn-s" href="/">Cancel</a><button type="button" class="btn btn-p" data-wnext="2">Next: choose mode →</button></div>
   </section>
 
-  <section class="card wiz-pane" data-pane="3">
-    <h2>Who else is involved? <span class="hint" style="font-weight:400">Optional</span></h2>
-    <p class="text-2">Co-authors can read the evidence, comment and suggest edits to the paper. You can invite people later too.</p>
-    <% if (!people.length) { %><div class="empty">No one else has an account yet. Invite people later from Team → People.</div><% } %>
-    <div class="people-pick"><% people.forEach((m) => { %><label class="person-opt"><input type="checkbox" name="invite" value="<%= m.id %>"<%= (v.invite || []).includes(String(m.id)) ? ' checked' : '' %>><%- u.avatar(m, 'sm') %><span style="min-width:0"><b style="font-weight:500"><%= m.name %></b><br><span class="hint"><%= m.title || m.institution || m.email %></span></span></label><% }) %></div>
-    <div class="form-actions"><button type="button" class="btn btn-s" data-wnext="2">← Back</button><button class="btn btn-p">Create project</button></div>
+  <section class="wiz-pane" data-pane="2">
+    <div><div class="mono" data-echo-title></div><h1>Who does the research?</h1><p class="text-2" style="margin-top:6px;font-size:15px">Either way you split the question into parts and write the final paper. You can switch mode later.</p></div>
+    <div class="mode-grid" role="radiogroup" aria-label="Research mode">
+      <label class="mode-card m-a">
+        <input type="radio" name="mode" value="agent"<%= mode === 'agent' ? ' checked' : '' %>>
+        <span class="mc-top"><span class="mc-ico"><%- u.icon('bot', 28) %></span><span><b>Agent mode</b><span>AI agents research each part</span></span><span class="mc-radio"></span></span>
+        <span class="mc-pts"><span>Each part gets an AI agent that searches 21 free sources</span><span>Evidence comes back as cards with findings, data and citations</span><span>You tick the evidence you trust and write the paper</span><span>Co-authors are optional — they comment and suggest edits</span></span>
+        <span class="mc-j"><span class="mono">The journey</span><span>Question → Agents research → Review evidence → Write → Finish</span></span>
+        <span class="mc-best">Best for literature reviews, background research and working alone.</span>
+      </label>
+      <label class="mode-card m-m">
+        <input type="radio" name="mode" value="manual"<%= mode === 'manual' ? ' checked' : '' %>>
+        <span class="mc-top"><span class="mc-ico"><%- u.icon('user', 28) %></span><span><b>Manual mode</b><span>Your team researches each part</span></span><span class="mc-radio"></span></span>
+        <span class="mc-pts"><span>Pick team members — their expertise is shown to help you choose</span><span>Give each part to a person, with a brief and a due date</span><span>Members hand in their work; you review and approve it</span><span>Any single part can still go to an AI agent</span></span>
+        <span class="mc-j"><span class="mono">The journey</span><span>Question → Assign parts → Members research → Review work → Write → Finish</span></span>
+        <span class="mc-best">Best for field work, lab work, interviews and group assignments.</span>
+      </label>
+    </div>
+    <div class="note-row"><%- u.icon('undo', 18) %><span>Not sure? Start with either. The <b>mode badge</b> at the top of the project lets you switch at any time — nothing found so far is lost.</span></div>
+    <div class="form-actions"><button type="button" class="btn btn-s" data-wnext="1">← Back</button><button type="button" class="btn btn-p" data-wnext="3"><span class="m-agent">Next: set up agents</span><span class="m-manual">Next: pick your team</span> →</button></div>
+  </section>
+
+  <section class="wiz-pane" data-pane="3">
+    <div><div class="mono"><span data-echo-title></span> · <span class="m-agent">Agent mode</span><span class="m-manual">Manual mode</span></div>
+      <h1><span class="m-agent">Your research agents</span><span class="m-manual">Pick your team and give each a part</span></h1>
+      <p class="text-2" style="margin-top:6px;font-size:15px"><span class="m-agent">Each part gets its own agent. Edit anything, then launch.</span><span class="m-manual">Tick the people you want, then choose who takes each part. Their expertise is shown to help you match.</span></p></div>
+
+    <section class="card m-agent shared-set">
+      <span class="label">Settings for all agents</span>
+      <span class="split" role="radiogroup" aria-label="Depth"><% [['quick', 'Quick ~3 min'], ['standard', 'Standard ~8 min'], ['deep', 'Deep ~20 min']].forEach(([k, l]) => { %><label class="qa-pill"><input type="radio" name="depth" value="<%= k %>"<%= (v.depth || 'standard') === k ? ' checked' : '' %>><span><%= l %></span></label><% }) %></span>
+      <span class="split" role="radiogroup" aria-label="Language" data-lang-pick><label class="qa-pill"><input type="radio" name="lang" value="en"<%= v.lang !== 'bn' ? ' checked' : '' %>><span>English</span></label><label class="qa-pill"><input type="radio" name="lang" value="bn"<%= v.lang === 'bn' ? ' checked' : '' %>><span data-i18n-skip>বাংলা</span></label></span>
+    </section>
+
+    <div class="team-grid">
+      <section class="card team-col">
+        <div class="split"><h2 style="flex:1"><span class="m-manual">1 · Team members</span><span class="m-agent">Co-authors <span class="hint" style="font-weight:400">optional</span></span></h2><span class="mono"><span data-team-n>0</span> picked</span></div>
+        <p class="hint m-agent">They can read the evidence, comment and suggest edits to the paper.</p>
+        <% if (!people.length) { %><div class="empty2" style="padding:14px"><span>No one else has an account yet. Invite people later from Team → People.</span></div><% } else { %>
+        <label class="searchbox" style="flex:none"><%- u.icon('search', 16) %><span class="sr">Search people or skills</span><input type="search" placeholder="Search people or skills" data-people-search></label>
+        <% } %>
+        <div class="people-list"><% people.forEach((m) => { %>
+          <label class="person2" data-person="<%= m.id %>" data-text="<%= (m.name + ' ' + (m.title || '') + ' ' + (m.skills || []).map((s) => s.name).join(' ')).toLowerCase() %>">
+            <input type="checkbox" name="invite" value="<%= m.id %>"<%= (v.invite || []).includes(String(m.id)) ? ' checked' : '' %>>
+            <%- u.avatar(m) %>
+            <span class="p2-body"><span class="split" style="gap:6px"><b data-i18n-skip><%= m.name %></b><span class="hint"><%= m.platform_role === 'guest' ? 'Guest · read only' : (m.title || m.institution || '') %></span></span>
+              <span class="skill-chips"><% (m.skills || []).slice(0, 3).forEach((s) => { %><span class="sk" data-i18n-skip><%= s.name %></span><% }) %><% if (!(m.skills || []).length) { %><span class="hint">No expertise added yet</span><% } %></span></span>
+            <span class="p2-load<%= m.load >= 3 ? ' busy' : '' %>"><%= m.load ? m.load + ' open task' + (m.load === 1 ? '' : 's') : 'Free' %></span>
+          </label>
+        <% }) %></div>
+      </section>
+
+      <section class="parts-col">
+        <div class="split"><h2 style="flex:1"><span class="m-manual">2 · Parts and who does them</span><span class="m-agent">Parts</span></h2>
+          <% if (aiOn) { %><button type="button" class="btn btn-s btn-sm" data-suggest><%- u.icon('spark', 15) %>Suggest parts</button><% } %>
+          <details class="ed"><summary class="btn btn-s btn-sm">Use a template</summary><div class="ed-pop" style="width:260px;padding:6px;gap:2px"><% Object.entries(templates).filter(([k]) => k !== 'blank').forEach(([k, t]) => { %><button type="button" class="lang-opt" style="border:0;background:none;text-align:left;font:inherit;cursor:pointer" data-template="<%= k %>"><b style="font-weight:600"><%= t.name %></b><br><span class="hint"><%= t.parts.length %> parts</span></button><% }) %></div></details>
+          <button type="button" class="btn btn-s btn-sm" data-add-part><%- u.icon('plus', 15) %>Add part</button>
+        </div>
+        <input type="hidden" name="parts_present" value="1">
+        <div class="prows" data-prows>
+          <% rows.forEach((p, i) => { const who = p.who !== undefined ? String(p.who) : (mode === 'agent' ? 'agent' : ''); %>
+          <article class="card prow" data-prow>
+            <div class="prow-top">
+              <span class="mono prow-n"><%= String(i + 1).padStart(2, '0') %></span>
+              <div class="prow-txt">
+                <label class="sr" for="pt<%= i %>">Part title</label><input class="in prow-title" id="pt<%= i %>" name="part_title" maxlength="240" value="<%= p.title || '' %>" placeholder="Part title, e.g. Sources of river microplastics">
+                <label class="sr" for="pb<%= i %>">Brief</label><textarea class="in" id="pb<%= i %>" name="part_brief" rows="2" maxlength="1500" placeholder="What should this part find out?"><%= p.brief || '' %></textarea>
+              </div>
+              <button type="button" class="icon-btn sm" data-remove-part aria-label="Remove this part" title="Remove"><%- u.icon('x', 16) %></button>
+            </div>
+            <div class="prow-who">
+              <label class="mono" for="pw<%= i %>">Who</label>
+              <select class="in" id="pw<%= i %>" name="part_who" data-who>
+                <option value="agent"<%= who === 'agent' ? ' selected' : '' %>>✦ AI agent</option>
+                <option value=""<%= who === '' ? ' selected' : '' %>>Choose a member…</option>
+                <%- personOpts(who) %>
+              </select>
+              <label class="mono due-l" for="pd<%= i %>">Due</label>
+              <input class="in due-i" id="pd<%= i %>" type="date" name="part_due" value="<%= p.due || '' %>">
+            </div>
+            <span class="match" data-match hidden></span>
+          </article>
+          <% }) %>
+        </div>
+        <button type="button" class="new-dash" style="min-height:56px;background:none;font:inherit;cursor:pointer;width:100%" data-add-part>+ Add a part</button>
+      </section>
+    </div>
+
+    <div class="wiz-foot">
+      <span class="text-2" data-wiz-summary style="flex:1 1 280px">Each part goes to an agent or a person. You can change it later.</span>
+      <button type="button" class="btn btn-s" data-wnext="2">← Back</button>
+      <button class="btn btn-p" name="action" value="launch"><span class="m-agent">Create project &amp; launch agents</span><span class="m-manual">Create project &amp; notify team</span> →</button>
+    </div>
+    <p class="hint" style="text-align:right">Prefer to set it up later? <button class="btn-link" name="action" value="save">Create without launching</button></p>
   </section>
 </form>
 <%- include('../partials/bottom') %>

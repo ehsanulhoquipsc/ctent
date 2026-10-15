@@ -66,6 +66,7 @@ function createApp() {
     res.locals.unread = 0;
     res.locals.actionCount = 0;
     res.locals.pinned = [];
+    res.locals.inboxCount = 0;
     if (req.user) {
       const r = await db('notifications').where({ user_id: req.user.id }).whereNull('read_at').count({ n: '*' }).first();
       res.locals.unread = Number(r.n);
@@ -75,8 +76,14 @@ function createApp() {
         res.locals.actionCount = (await actionItems(req.user)).length;
         res.locals.showActions = true;
       }
+      res.locals.inboxCount = res.locals.actionCount + res.locals.unread;
       const ids = await auth.myTopicIds(req.user);
-      res.locals.pinned = ids.length ? await db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc').limit(4).select('id', 'code', 'title', 'color') : [];
+      res.locals.pinned = ids.length ? await db('topics').whereIn('id', ids).whereNotIn('status', ['archived', 'completed']).orderBy('id', 'desc').limit(4).select('*') : [];
+      if (res.locals.pinned.length) {
+        const roles = Object.fromEntries((await db('topic_members').where({ user_id: req.user.id }).select('topic_id', 'role')).map((x) => [x.topic_id, x.role]));
+        const js = await require('./lib/journey').journeyMany(res.locals.pinned, roles);
+        res.locals.pinned = res.locals.pinned.map((t) => ({ id: t.id, code: t.code, title: t.title, color: t.color, j: js[t.id] }));
+      }
     }
     next();
   });

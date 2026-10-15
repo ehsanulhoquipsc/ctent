@@ -1,28 +1,33 @@
 <%- include('head') %>
 <%
   const A = typeof active !== 'undefined' ? active : '';
-  const nav = (key, href, iconName, label, count, red) => '<a class="nav' + (A === key ? ' on' : '') + '" href="' + href + '"' + (A === key ? ' aria-current="page"' : '') + '>' + u.icon(iconName) + '<span>' + u.esc(label) + '</span>' + (count ? '<span class="badge' + (red ? ' red' : '') + '">' + count + '</span>' : '') + '</a>';
+  const nav = (key, href, iconName, label, count, red) => '<a class="nav' + (A === key ? ' on' : '') + '" href="' + href + '"' + (A === key ? ' aria-current="page"' : '') + '>' + u.icon(iconName, 20) + '<span>' + u.esc(label) + '</span>' + (count ? '<span class="badge' + (red ? ' red' : '') + '">' + count + '</span>' : '') + '</a>';
+  const isGuestUser = me.platform_role === 'guest';
+  const canCreate = me.platform_role === 'leader' || me.platform_role === 'admin';
 %>
-<body>
+<body<% if (typeof tipsKey !== 'undefined' && tipsKey) { %> data-tips="<%= tipsKey %>"<% } %>>
 <a class="sr" href="#main">Skip to content</a>
 <div class="shell">
   <nav class="side" id="side" aria-label="Main">
     <a class="logo" href="/"><img src="/static/img/logo.png" alt="CTENT home"></a>
-    <%- nav('dashboard', '/', 'home', 'Dashboard') %>
-    <% if (typeof showActions !== 'undefined' && showActions) { %><%- nav('actions', '/actions', 'inbox', 'Action centre', actionCount, true) %><% } %>
-    <% const isGuestUser = me.platform_role === 'guest'; %>
-    <% if (!isGuestUser) { %><%- nav('messages', '/messages', 'chat', 'Messages') %><% } %>
-    <%- nav('topics', '/topics', 'folder', isGuestUser ? 'Shared with me' : isMemberOnly ? 'My topics' : (isAdmin ? 'All topics' : 'Research topics')) %>
-    <% if (!isGuestUser) { %><%- nav('meetings', '/meetings', 'video', 'Meetings') %><% } %>
-    <%- nav('notifications', '/notifications', 'bell', 'Notifications', unread) %>
-    <% if (pinned.length) { %><div class="sec mono">Your topics</div><% } %>
-    <% pinned.forEach((t) => { %><a class="pin" href="/topics/<%= t.id %>"><span class="dot" style="background:<%= u.color(t.color)[0] %>"></span><span><%= t.title %></span></a><% }) %>
+    <%- nav('dashboard', '/', 'home', 'Home') %>
+    <%- nav('topics', '/topics', 'folder', isGuestUser ? 'Shared with me' : 'Projects') %>
+    <%- nav('inbox', '/inbox', 'inbox', 'Inbox', inboxCount, true) %>
+    <% if (pinned.length || canCreate) { %><div class="sec mono">Your projects</div><% } %>
+    <% pinned.forEach((t) => { const j = t.j; %>
+      <a class="pin2" href="/topics/<%= t.id %>" style="--acc:<%= u.color(t.color)[0] %>">
+        <span class="pin2-t"><span class="dot" style="background:<%= u.color(t.color)[0] %>"></span><span data-i18n-skip><%= t.title %></span></span>
+        <% if (j) { %><span class="pips" aria-hidden="true"><% j.steps.forEach((s) => { %><span class="<%= s.done ? 'd' : s.current ? 'c' : '' %>"></span><% }) %></span>
+        <span class="pin2-s"><%= j.stepLabel %></span><% } %>
+      </a>
+    <% }) %>
+    <% if (canCreate) { %><a class="pin-new" href="/topics/new"><%- u.icon('plus', 16) %>New project</a><% } %>
     <div style="flex:1;min-height:20px"></div>
     <% if (isAdmin) { %><%- nav('admin', '/admin', 'shield', 'Admin console') %><% } %>
-    <%- nav('profile', '/profile', 'user', 'Profile & expertise') %>
+    <%- nav('help', '/help', 'help', 'Help') %>
     <div class="me">
       <%- u.avatar(me) %>
-      <div class="who"><b><%= me.name %></b><%- u.roleTag(me.platform_role) %></div>
+      <a class="who" href="/profile" style="text-decoration:none;color:var(--text)"><b><%= me.name %></b><span class="muted" style="font-size:12px">Profile &amp; settings</span></a>
       <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" style="width:34px;height:34px;border:0" title="Sign out" aria-label="Sign out"><%- u.icon('out') %></button></form>
     </div>
   </nav>
@@ -30,10 +35,11 @@
     <header class="top">
       <button class="icon-btn mobile-only" type="button" data-toggle-side aria-label="Open menu"><%- u.icon('menu') %></button>
       <div class="crumb"><%- typeof crumb !== 'undefined' ? crumb : u.esc(title) %></div>
-      <form class="search" role="search" method="get" action="/search"><%- u.icon('search', 16) %><label class="sr" for="q">Search</label><input id="q" name="q" placeholder="Search topics, tasks, files, people" value="<%= typeof q !== 'undefined' ? q : '' %>"></form>
+      <form class="search" role="search" method="get" action="/search"><%- u.icon('search', 16) %><label class="sr" for="q">Search</label><input id="q" name="q" placeholder="Search projects, people, files" value="<%= typeof q !== 'undefined' ? q : '' %>"></form>
+      <% if (canCreate) { %><button class="qa-btn" type="button" data-quick-add><%- u.icon('plus', 16) %><span>New research question</span><kbd>/</kbd></button><% } %>
       <%- include('lang-menu') %>
       <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch light or dark theme" title="Light / dark"><%- u.icon('moon') %></button>
-      <a class="icon-btn" href="/notifications" aria-label="Notifications (<%= unread %> unread)"><%- u.icon('bell') %><% if (unread) { %><span class="ping"><%= unread %></span><% } %></a>
+      <a class="icon-btn" href="/inbox" aria-label="Inbox (<%= inboxCount %> new)"><%- u.icon('bell') %><% if (inboxCount) { %><span class="ping"><%= inboxCount %></span><% } %></a>
       <% if (typeof cta !== 'undefined' && cta) { %><a class="btn btn-p" href="<%= cta.href %>"><%- u.icon('plus') %><%= cta.label %></a><% } %>
     </header>
     <main id="main" class="<%= typeof mainClass !== 'undefined' && mainClass ? mainClass : 'content' %>">

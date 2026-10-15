@@ -25,7 +25,7 @@ async function actionItems(user) {
     const reqs = await db('join_requests').join('topics', 'topics.id', 'join_requests.topic_id').join('users', 'users.id', 'join_requests.user_id')
       .whereIn('join_requests.topic_id', led).where('join_requests.status', 'pending')
       .select('join_requests.id', 'join_requests.message', 'join_requests.topic_id', 'join_requests.created_at', 'topics.code', 'users.name', 'users.id as uid');
-    for (const r of reqs) items.push({ type: 'Request', title: r.name + ' asked to join', detail: r.message || 'No message.', topic: r.code, href: '/actions#req-' + r.id, urgent: false, at: r.created_at, requestId: r.id, personHref: '/people/' + r.uid });
+    for (const r of reqs) items.push({ type: 'Request', title: r.name + ' asked to join', detail: r.message || 'No message.', topic: r.code, href: '/inbox#req-' + r.id, urgent: false, at: r.created_at, requestId: r.id, personHref: '/people/' + r.uid });
   }
   // Tasks with a brief waiting for this user's review, and blocked tasks they lead
   const taskReviews = await db('tasks').join('topics', 'topics.id', 'tasks.topic_id').leftJoin('users', 'users.id', 'tasks.assignee_id')

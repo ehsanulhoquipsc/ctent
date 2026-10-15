@@ -1,0 +1,45 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<%
+  const B = '/topics/' + topic.id;
+  const toManual = target === 'manual';
+  const opts = (sel) => members.map((m) => '<option value="' + m.id + '"' + (String(sel) === String(m.id) ? ' selected' : '') + '>' + u.esc(m.name) + (m.skills.length ? ' — ' + u.esc(m.skills.slice(0, 2).join(', ')) : '') + (m.load ? ' (' + m.load + ' open)' : '') + '</option>').join('');
+%>
+<form method="post" action="<%= B %>/mode" class="card switch-box">
+  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="mode" value="<%= target %>">
+  <div>
+    <span class="mono">Switch mode</span>
+    <h1 style="margin-top:4px">Switch to <%= toManual ? 'Manual mode' : 'Agent mode' %></h1>
+    <p class="text-2" style="margin-top:6px;font-size:15px"><%= toManual ? 'Your team takes over the research. Choose who gets each unfinished part — finished parts stay as they are.' : 'AI agents take over the unfinished parts. Work your members already did stays with each part.' %></p>
+  </div>
+  <div class="sw-list">
+    <% if (!parts.length) { %><div class="empty2"><span>There are no parts yet, so nothing moves. The project just changes mode.</span></div><% } %>
+    <% parts.forEach((p, i) => { const fixed = p.state === 'accepted' || p.state === 'review'; const now = p.handler === 'person' ? (p.owner ? p.owner.name + ' · ' : '') + p.plain : (p.agent_name || 'AI agent') + ' · ' + p.plain; %>
+      <div class="sw-row">
+        <div class="sw-t"><span class="mono">Part <%= String(i + 1).padStart(2, '0') %></span><b data-i18n-skip><%= p.title %></b><span class="hint">Now: <%= now %></span></div>
+        <% if (fixed) { %>
+          <span class="tag" style="background:var(--green-soft);color:var(--green)"><%= p.state === 'accepted' ? 'Kept as finished' : 'Kept — you still review it' %></span>
+        <% } else { %>
+          <div class="sw-pick">
+            <label class="sr" for="w<%= p.id %>">Who takes “<%= p.title %>”</label>
+            <select class="in" id="w<%= p.id %>" name="who_<%= p.id %>">
+              <% if (toManual) { %>
+                <option value="keep"<%= p.handler === 'person' ? ' selected' : '' %>><%= p.handler === 'person' ? 'Keep with ' + (p.owner ? p.owner.name : 'no one yet') : 'Keep with the AI agent' %></option>
+                <% if (p.handler !== 'person') { %><option value="" disabled<%= '' %>>— or give it to —</option><% } %>
+                <%- opts(p.handler === 'person' ? '' : '') %>
+              <% } else { %>
+                <option value="agent"<%= p.handler === 'person' ? ' selected' : '' %>>✦ AI agent takes over<%= p.task ? ' — notes kept' : '' %></option>
+                <option value="keep"<%= p.handler !== 'person' ? ' selected' : '' %>><%= p.handler === 'person' ? 'Keep with ' + (p.owner ? p.owner.name : 'no one yet') : 'Keep with the AI agent' %></option>
+              <% } %>
+            </select>
+            <% if (toManual) { %><label class="sr" for="d<%= p.id %>">Due</label><input class="in" type="date" id="d<%= p.id %>" name="due_<%= p.id %>" value="<%= p.due || topic.due_date || '' %>" title="Due date"><% } %>
+          </div>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+  <div class="note-row"><%- u.icon('check', 18) %><span><b>Nothing is deleted.</b> Evidence, tasks and files stay with each part. The journey changes: <%= toManual ? 'Manual mode adds “Assign” and “Review work” steps.' : 'Agent mode goes Question → Research → Review → Write → Finish.' %></span></div>
+  <% if (!toManual) { %><label class="split" style="font-size:14px"><input type="checkbox" name="launch" value="1" checked> Launch the agents straight away</label><% } %>
+  <div class="form-actions"><a class="btn btn-s" href="<%= B %>/agents">Cancel</a><button class="btn btn-p">Switch to <%= toManual ? 'Manual' : 'Agent' %> mode</button></div>
+</form>
+<%- include('../partials/bottom') %>

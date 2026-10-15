@@ -10,7 +10,7 @@ const r = express.Router();
 const clean = (v, max) => String(v || '').trim().slice(0, max || 240);
 const validDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : null);
 const STATUSES = ['todo', 'doing', 'review', 'done'];
-const crumb = (t, label) => '<a href="/topics">Topics</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / ' + label;
+const crumb = (t, label) => '<a href="/topics">Projects</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / ' + label;
 
 // Archived topics are read-only.
 function writable(req, res, next) {
