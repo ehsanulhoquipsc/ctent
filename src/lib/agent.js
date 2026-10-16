@@ -459,7 +459,7 @@ async function execute(runId) {
     await db('agent_runs').where({ id: runId }).update({
       status: 'done', summary, confidence: high >= items.length / 2 ? 'High' : high >= items.length / 5 ? 'Medium' : 'Low',
       gaps: gapResult ? gapResult.gaps.map((g) => g.title).join('\n') : null, synthesis: JSON.stringify(synthJson), gap_data: gapResult ? JSON.stringify(gapResult) : null,
-      model: llm.available() ? llm.label() : 'none', finished_at: now()
+      model: (llm.available() ? llm.label() : 'none').slice(0, 200), finished_at: now()
     });
     await log(runId, msg(lang, 'done', { n: items.length }) + (nClaims ? ' · ' + msg(lang, 'claims', { n: nClaims }) : '') + (gapResult && gapResult.gaps.length ? ' · ' + msg(lang, 'gaps_done', { n: gapResult.gaps.length }) : ''));
     await db('parts').where({ id: part.id }).update({ agent_status: 'review', agent_progress: 100, agent_step: 'Evidence cards ready for review' });
@@ -468,8 +468,10 @@ async function execute(runId) {
     await audit(null, topic.id, 'agent.finished', (part.agent_name || 'Agent') + ' handed back ' + items.length + ' evidence cards for “' + part.title + '”');
   } catch (e) {
     if (e instanceof Stopped || !(await alive(runId))) return; // already stopped by the researcher or the watchdog
-    await db('agent_runs').where({ id: runId }).update({ status: 'failed', error: String(e.message).slice(0, 1000), finished_at: now() });
-    await db('parts').where({ id: part.id }).update({ agent_status: 'failed', agent_step: String(e.message).slice(0, 240) });
+    // Database errors are for the log, not for the researcher.
+    const shown = /\b(insert into|update|select|delete from)\b.*"|SQLITE_|violates|value too long/i.test(String(e.message)) ? 'Saving the results failed — run it again' : String(e.message);
+    await db('agent_runs').where({ id: runId }).update({ status: 'failed', error: shown.slice(0, 1000), finished_at: now() });
+    await db('parts').where({ id: part.id }).update({ agent_status: 'failed', agent_step: shown.slice(0, 240) });
     await log(runId, msg(lang, 'error') + ': ' + e.message);
   }
 }
