@@ -972,6 +972,27 @@ test('paper: writing page citations, health check with fixes and undo', async ()
   assert.doesNotMatch((await db('paper_sections').where({ id: sec.id }).first()).body, /\(preprint\)/, 'undo restores the text');
 });
 
+test('agents finish even when several AI services are connected (long AI label)', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const tid = await topicId('CT-0150');
+  if (db.isPg) await db.raw('ALTER TABLE agent_runs ALTER COLUMN model TYPE varchar(80)'); // like an older database
+  Object.assign(process.env, { GEMINI_API_KEY: 'test-key', GROQ_API_KEY: 'test-key', OPENROUTER_API_KEY: 'test-key' });
+  const m = mockServices();
+  try {
+    assert.ok(require('../src/lib/llm').label().length > 80);
+    await leader.post('/topics/' + tid + '/agents/parts').type('form').send({ _csrf: leader.csrf, title: 'Long label check', brief: 'Downstream flow and floods', who: 'agent' });
+    const part = await db('parts').where({ topic_id: tid, title: 'Long label check' }).first();
+    const done = new Promise((resolve) => agentLib._onFinish(resolve));
+    await leader.post('/topics/' + tid + '/agents/' + part.id + '/launch').type('form').send({ _csrf: leader.csrf });
+    await done;
+    const p2 = await db('parts').where({ id: part.id }).first();
+    assert.strictEqual(p2.agent_status, 'review', p2.agent_step);
+  } finally {
+    m.restore(); for (const k of ['GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENROUTER_API_KEY']) delete process.env[k];
+    if (db.isPg) await db.raw('ALTER TABLE agent_runs ALTER COLUMN model TYPE text');
+  }
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

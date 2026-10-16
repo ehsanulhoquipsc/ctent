@@ -459,7 +459,7 @@ async function execute(runId) {
     await db('agent_runs').where({ id: runId }).update({
       status: 'done', summary, confidence: high >= items.length / 2 ? 'High' : high >= items.length / 5 ? 'Medium' : 'Low',
       gaps: gapResult ? gapResult.gaps.map((g) => g.title).join('\n') : null, synthesis: JSON.stringify(synthJson), gap_data: gapResult ? JSON.stringify(gapResult) : null,
-      model: (llm.available() ? llm.label() : 'none').slice(0, 200), finished_at: now()
+      model: (llm.available() ? llm.label() : 'none').slice(0, 80), finished_at: now()
     });
     await log(runId, msg(lang, 'done', { n: items.length }) + (nClaims ? ' · ' + msg(lang, 'claims', { n: nClaims }) : '') + (gapResult && gapResult.gaps.length ? ' · ' + msg(lang, 'gaps_done', { n: gapResult.gaps.length }) : ''));
     await db('parts').where({ id: part.id }).update({ agent_status: 'review', agent_progress: 100, agent_step: 'Evidence cards ready for review' });
@@ -494,7 +494,21 @@ async function launch(topic, part, userId, followup) {
 }
 
 // After a restart, runs that were in progress can't continue.
+// Runs that failed only because the AI label didn't fit the database: their cards were saved, so give them back.
+async function rescueSaved() {
+  const runs = await db('agent_runs').where('status', 'failed').where((w) => w.where('error', 'like', '%value too long for type character varying%').orWhere('error', 'Saving the results failed — run it again')).select('id', 'part_id');
+  for (const r of runs) {
+    const n = Number((await db('agent_sources').where({ run_id: r.id }).count({ n: '*' }).first()).n);
+    if (!n) continue;
+    await db('agent_runs').where({ id: r.id }).update({ status: 'done', error: null, summary: n + ' evidence cards. Tick the cards you want to use in the paper.', finished_at: now() });
+    const latest = await db('agent_runs').where({ part_id: r.part_id }).orderBy('id', 'desc').first('id');
+    if (latest && latest.id === r.id) await db('parts').where({ id: r.part_id }).whereIn('agent_status', ['failed', 'draft']).update({ agent_status: 'review', agent_progress: 100, agent_step: 'Evidence cards ready for review' });
+  }
+  return runs.length;
+}
+
 async function recover() {
+  try { await rescueSaved(); } catch (e) { console.error('Could not restore earlier runs:', e.message); }
   try {
     const stuck = await db('agent_runs').where({ status: 'running' }).select('id', 'part_id');
     if (!stuck.length) return;
@@ -588,4 +602,4 @@ async function draftSection(topic, section, items, lang) {
 
 function queueInfo() { return { queue: queue.slice(), active, concurrency: CONCURRENCY }; }
 
-module.exports = { queueInfo, launch, recover, watchdog, stop, suggestParts, draftSection, rerunGaps, parseCard, DEPTH, OPTIONS, DEFAULT_OPTIONS, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };
+module.exports = { rescueSaved, queueInfo, launch, recover, watchdog, stop, suggestParts, draftSection, rerunGaps, parseCard, DEPTH, OPTIONS, DEFAULT_OPTIONS, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };
