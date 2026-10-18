@@ -10,7 +10,9 @@ function csrfToken(req) {
   return req.session.csrf;
 }
 function csrfOk(req) {
-  const sent = (req.body && req.body._csrf) || req.get('x-csrf-token') || '';
+  let sent = (req.body && req.body._csrf) || req.get('x-csrf-token') || '';
+  if (Array.isArray(sent)) sent = sent[0] || ''; // a form nested in another sends the token twice
+  sent = String(sent);
   const real = req.session && req.session.csrf;
   if (!real || !sent || sent.length !== real.length) return false;
   return crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(real));

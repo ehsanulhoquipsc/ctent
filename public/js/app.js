@@ -6,7 +6,7 @@
     '(edited)': '(সম্পাদিত)', 'This message was deleted.': 'বার্তাটি মুছে ফেলা হয়েছে।', 'Delete this message for everyone?': 'সবার জন্য বার্তাটি মুছবেন?',
     'Save': 'সংরক্ষণ', 'Cancel': 'বাতিল', 'Message not sent. Check your connection and try again.': 'বার্তা পাঠানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।', 'Something went wrong.': 'কিছু একটা ভুল হয়েছে।' };
   BN['Add a sentence on why it matters'] = 'কেন গুরুত্বপূর্ণ তা এক বাক্যে লিখুন'; BN['Add a title and at least one “done when” point to send.'] = 'পাঠাতে একটি শিরোনাম এবং কমপক্ষে একটি “সম্পন্ন হবে যখন” শর্ত যোগ করুন।'; BN['Clear title'] = 'স্পষ্ট শিরোনাম'; BN['Excellent'] = 'চমৎকার'; BN['Give it a specific title'] = 'নির্দিষ্ট একটি শিরোনাম দিন'; BN['Goal explains why'] = 'লক্ষ্যে কারণ বলা আছে'; BN['Good — it starts with an action.'] = 'ভালো — এটি একটি কাজ দিয়ে শুরু হয়েছে।'; BN['Good'] = 'ভালো'; BN['Link at least one file'] = 'অন্তত একটি ফাইল যুক্ত করুন'; BN['Looks great. '] = 'দারুণ হয়েছে। '; BN['Needs work'] = 'আরও ভালো করা দরকার'; BN['None'] = 'কিছু নেই'; BN['Normal'] = 'সাধারণ'; BN['Say how you’ll judge it’s done'] = 'কীভাবে বুঝবেন কাজ শেষ, তা লিখুন'; BN['Start with a verb like Draft, Collect, Analyse'] = 'খসড়া, সংগ্রহ, বিশ্লেষণ — এমন একটি ক্রিয়া দিয়ে শুরু করুন'; BN['Starter file linked'] = 'শুরুর ফাইল যুক্ত'; BN['Starts with an action'] = 'কাজ দিয়ে শুরু'; BN['They’ll be notified straight away.'] = 'তাদের সঙ্গে সঙ্গে জানানো হবে।'; BN['Tip: start with a verb so it reads like a to-do.'] = 'পরামর্শ: ক্রিয়া দিয়ে শুরু করুন, যাতে করণীয়র মতো পড়া যায়।'; BN['Untitled task'] = 'শিরোনামহীন কাজ'; BN['You can send now, or improve the brief first. '] = 'এখনই পাঠাতে পারেন, অথবা আগে নির্দেশনা আরও ভালো করুন। '; 
-  Object.assign(BN, {"Dismiss": "বন্ধ করুন", "Undo": "ফিরিয়ে নিন", "Tip": "পরামর্শ", "of": "/", "Skip tips": "পরামর্শ বাদ দিন", "Got it": "বুঝেছি", "Next": "পরবর্তী", "Review": "পর্যালোচনা", " working": "টি কাজ করছে", " ready": "টি প্রস্তুত", "Part removed": "অংশ সরানো হয়েছে", "Template parts added — edit any of them": "টেমপ্লেটের অংশ যোগ হয়েছে — যেকোনোটি সম্পাদনা করুন", "Create & pick team": "তৈরি করে দল বাছুন", "Create & suggest parts": "তৈরি করে অংশ প্রস্তাব করুন", "Good match: ": "ভালো মিল: ", " knows ": " জানেন ", "An AI agent will research this part — you review its evidence": "একটি AI এজেন্ট এই অংশ গবেষণা করবে — আপনি তার প্রমাণ পর্যালোচনা করবেন", "Kept": "রাখা হয়েছে", "Skipped": "বাদ দেওয়া হয়েছে", "Selected ": "নির্বাচিত ", " high-reliability cards": "টি উচ্চ-নির্ভরযোগ্য কার্ড", "All high-reliability cards are already selected": "সব উচ্চ-নির্ভরযোগ্য কার্ড আগেই নির্বাচিত", "Supports: ": "সমর্থন করে: ", "Open source ↗": "উৎস খুলুন ↗", "High reliability": "উচ্চ নির্ভরযোগ্যতা", "Medium reliability": "মাঝারি নির্ভরযোগ্যতা", "Low reliability": "নিম্ন নির্ভরযোগ্যতা", "RETRACTED": "প্রত্যাহৃত", "Preprint": "প্রিপ্রিন্ট", "Tips will show again on each page": "প্রতিটি পৃষ্ঠায় আবার পরামর্শ দেখাবে", "Write the research question first (step 1) and the AI can suggest parts.": "আগে গবেষণা প্রশ্ন লিখুন (ধাপ ১), তাহলে AI অংশ প্রস্তাব করতে পারবে।", "Suggesting…": "প্রস্তাব করা হচ্ছে…", "Suggest parts": "অংশ প্রস্তাব করুন", "AI suggested ": "AI প্রস্তাব করেছে ", " parts from your question — edit any of them": "টি অংশ — যেকোনোটি সম্পাদনা করুন", "Accept N and use in paper": "Nটি গ্রহণ করে গবেষণাপত্রে ব্যবহার করুন", "Update accepted cards (N)": "গৃহীত কার্ড হালনাগাদ করুন (N)", " of ": " / ", " parts have someone.": "টি অংশে দায়িত্ব দেওয়া হয়েছে।", " go to an AI agent.": "টি যাবে AI এজেন্টের কাছে।", "Members get a notification with their brief and due date.": "সদস্যরা বিবরণ ও শেষ তারিখসহ নোটিফিকেশন পাবেন।", " agents": "টি এজেন্ট", "about ": "প্রায় ", " minutes · two run at a time. You can leave the page; you’ll be notified.": " মিনিট · একসঙ্গে দুটি চলে। পৃষ্ঠা ছেড়ে যেতে পারেন; আপনাকে জানানো হবে।", " parts go to people.": "টি অংশ যাবে সদস্যদের কাছে।"});
+  Object.assign(BN, {"You were signed out. Your text is kept — sign in again in another tab, then press Save.": "আপনি সাইন আউট হয়ে গেছেন। আপনার লেখা রাখা আছে — অন্য ট্যাবে আবার সাইন ইন করে সংরক্ষণ চাপুন।", "Restored your unsaved text from this browser.": "এই ব্রাউজার থেকে আপনার অসংরক্ষিত লেখা ফিরিয়ে আনা হয়েছে।", "Dismiss": "বন্ধ করুন", "Undo": "ফিরিয়ে নিন", "Tip": "পরামর্শ", "of": "/", "Skip tips": "পরামর্শ বাদ দিন", "Got it": "বুঝেছি", "Next": "পরবর্তী", "Review": "পর্যালোচনা", " working": "টি কাজ করছে", " ready": "টি প্রস্তুত", "Part removed": "অংশ সরানো হয়েছে", "Template parts added — edit any of them": "টেমপ্লেটের অংশ যোগ হয়েছে — যেকোনোটি সম্পাদনা করুন", "Create & pick team": "তৈরি করে দল বাছুন", "Create & suggest parts": "তৈরি করে অংশ প্রস্তাব করুন", "Good match: ": "ভালো মিল: ", " knows ": " জানেন ", "An AI agent will research this part — you review its evidence": "একটি AI এজেন্ট এই অংশ গবেষণা করবে — আপনি তার প্রমাণ পর্যালোচনা করবেন", "Kept": "রাখা হয়েছে", "Skipped": "বাদ দেওয়া হয়েছে", "Selected ": "নির্বাচিত ", " high-reliability cards": "টি উচ্চ-নির্ভরযোগ্য কার্ড", "All high-reliability cards are already selected": "সব উচ্চ-নির্ভরযোগ্য কার্ড আগেই নির্বাচিত", "Supports: ": "সমর্থন করে: ", "Open source ↗": "উৎস খুলুন ↗", "High reliability": "উচ্চ নির্ভরযোগ্যতা", "Medium reliability": "মাঝারি নির্ভরযোগ্যতা", "Low reliability": "নিম্ন নির্ভরযোগ্যতা", "RETRACTED": "প্রত্যাহৃত", "Preprint": "প্রিপ্রিন্ট", "Tips will show again on each page": "প্রতিটি পৃষ্ঠায় আবার পরামর্শ দেখাবে", "Write the research question first (step 1) and the AI can suggest parts.": "আগে গবেষণা প্রশ্ন লিখুন (ধাপ ১), তাহলে AI অংশ প্রস্তাব করতে পারবে।", "Suggesting…": "প্রস্তাব করা হচ্ছে…", "Suggest parts": "অংশ প্রস্তাব করুন", "AI suggested ": "AI প্রস্তাব করেছে ", " parts from your question — edit any of them": "টি অংশ — যেকোনোটি সম্পাদনা করুন", "Accept N and use in paper": "Nটি গ্রহণ করে গবেষণাপত্রে ব্যবহার করুন", "Update accepted cards (N)": "গৃহীত কার্ড হালনাগাদ করুন (N)", " of ": " / ", " parts have someone.": "টি অংশে দায়িত্ব দেওয়া হয়েছে।", " go to an AI agent.": "টি যাবে AI এজেন্টের কাছে।", "Members get a notification with their brief and due date.": "সদস্যরা বিবরণ ও শেষ তারিখসহ নোটিফিকেশন পাবেন।", " agents": "টি এজেন্ট", "about ": "প্রায় ", " minutes · two run at a time. You can leave the page; you’ll be notified.": " মিনিট · একসঙ্গে দুটি চলে। পৃষ্ঠা ছেড়ে যেতে পারেন; আপনাকে জানানো হবে।", " parts go to people.": "টি অংশ যাবে সদস্যদের কাছে।"});
   var L = function (s) { return document.documentElement.lang === 'bn' && BN[s] ? BN[s] : s; };
 
   // Light / dark theme
@@ -738,4 +738,43 @@
     b.addEventListener('touchend', function (e) { if (y0 === null) return; var dy = e.changedTouches[0].clientY - y0; y0 = null; if (Math.abs(dy) > 30) { var on = dy < 0; sheet.classList.toggle('open', on); b.setAttribute('aria-expanded', on ? 'true' : 'false'); } }, { passive: true });
   });
   document.querySelectorAll('[data-reset-tips]').forEach(function (b) { b.addEventListener('click', function () { try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('ct-tips-') === 0) localStorage.removeItem(k); }); } catch (e) { /* ignore */ } toast(L('Tips will show again on each page')); }); });
+
+  // ===== Forms never fail with "Session expired" just because the page was open for a while =====
+  // Before a form is sent, fetch the current token (signing in again in another tab changes it).
+  var setToken = function (tok) { document.querySelectorAll('input[name=_csrf]').forEach(function (i) { i.value = tok; }); csrf = tok; var m = document.querySelector('meta[name="csrf"]'); if (m) m.setAttribute('content', tok); };
+  var freshToken = function () { return fetch('/csrf.json', { headers: { Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }); };
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || f.__fresh || e.defaultPrevented || (f.method || '').toLowerCase() !== 'post' || !f.querySelector('input[name=_csrf]') || f.hasAttribute('data-undo')) return;
+    e.preventDefault();
+    var btn = e.submitter;
+    var go = function () {
+      f.__fresh = true;
+      if (btn && btn.name) { var h = document.createElement('input'); h.type = 'hidden'; h.name = btn.name; h.value = btn.value; f.appendChild(h); }
+      f.submit();
+    };
+    freshToken().then(function (d) {
+      if (!d.signedIn && !/\/(login|forgot|setup)/.test(f.action)) { saveDrafts(); toast(L('You were signed out. Your text is kept — sign in again in another tab, then press Save.'), { grey: true, ms: 0 }); return; }
+      setToken(d.token); go();
+    }).catch(go);
+  }, false);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && document.querySelector('input[name=_csrf]')) freshToken().then(function (d) { if (d.signedIn) setToken(d.token); }).catch(function () {}); });
+
+  // ===== Long text keeps a local draft until it is saved =====
+  var draftKey = function (t) { return 'ct-draft:' + location.pathname + location.search + ':' + (t.name || t.id); };
+  var drafts = Array.prototype.slice.call(document.querySelectorAll('textarea.paper-edit, textarea[data-draft]'));
+  function saveDrafts() { drafts.forEach(function (t) { try { localStorage.setItem(draftKey(t), JSON.stringify({ v: t.value, at: Date.now(), orig: t.defaultValue.length })); } catch (x) { /* ignore */ } }); }
+  drafts.forEach(function (t) {
+    try {
+      var d = JSON.parse(localStorage.getItem(draftKey(t)) || 'null');
+      if (d && d.v !== t.defaultValue && Date.now() - d.at < 7 * 86400000) {
+        var before = t.value; t.value = d.v;
+        toast(L('Restored your unsaved text from this browser.'), { label: L('Undo'), ms: 10000, onAct: function () { t.value = before; try { localStorage.removeItem(draftKey(t)); } catch (x) { /* ignore */ } } });
+      }
+    } catch (x) { /* ignore */ }
+    var tm = null;
+    t.addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(saveDrafts, 600); });
+  });
+  // A saved form clears its draft when the page it lands on no longer shows the editor.
+  if (!drafts.length) { try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('ct-draft:' + location.pathname) === 0) localStorage.removeItem(k); }); } catch (x) { /* ignore */ } }
 })();

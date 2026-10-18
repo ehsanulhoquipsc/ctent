@@ -993,6 +993,21 @@ test('agents finish even when several AI services are connected (long AI label)'
   }
 });
 
+test('no form is nested inside another (browsers would send the token twice)', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const tid = await topicId('CT-0150');
+  const sec = await db('paper_sections').where({ topic_id: tid }).first();
+  const pages = ['/', '/inbox', '/topics/' + tid, '/topics/' + tid + '/agents', '/topics/' + tid + '/paper?s=' + sec.id, '/topics/' + tid + '/paper?s=' + sec.id + '&edit=1', '/topics/' + tid + '/paper/check', '/topics/' + tid + '/mode', '/topics/new', '/topics/' + tid + '/settings', '/topics/' + tid + '/board', '/topics/' + tid + '/files'];
+  for (const pg of pages) {
+    const html = (await leader.get(pg)).text;
+    let depth = 0;
+    for (const m of html.matchAll(/<(\/?)form\b/g)) { depth += m[1] ? -1 : 1; assert.ok(depth <= 1, 'nested form on ' + pg); }
+  }
+  // A repeated token is still accepted
+  const r = await leader.post('/topics/' + tid + '/paper/sections/' + sec.id).type('form').send('_csrf=' + leader.csrf + '&_csrf=' + leader.csrf + '&action=save&title=Intro&body=Hello');
+  assert.strictEqual(r.status, 302);
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

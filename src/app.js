@@ -54,6 +54,8 @@ function createApp() {
   }));
   app.use(auth.loadUser);
   app.use(auth.csrf);
+  // A fresh form token for pages left open while the session changed (signing in again in another tab, for example).
+  app.get('/csrf.json', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ token: auth.csrfToken(req), signedIn: !!req.user }); });
 
   // Values every page can use
   app.use(async (req, res, next) => {
