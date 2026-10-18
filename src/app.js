@@ -39,7 +39,7 @@ function createApp() {
   if (process.env.NODE_ENV !== 'test') app.use(morgan(prod ? 'combined' : 'dev'));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: prod ? '7d' : 0 }));
   app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'img', 'favicon.png')));
-  app.get('/healthz', async (req, res) => { await db.raw('select 1'); res.json({ ok: true }); });
+  app.get('/healthz', async (req, res) => { await db.raw('select 1'); res.json({ ok: true, version: (process.env.RENDER_GIT_COMMIT || 'local').slice(0, 7) }); });
 
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));

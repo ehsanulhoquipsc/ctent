@@ -79,7 +79,7 @@ async function researchPage(req, res) {
     templates: require('./topics').TEMPLATES, aiOn: llm.available(), aiLabel: llm.label(), busy: parts.filter((p) => p.handler !== 'person' && ['queued', 'running'].includes(p.agent_status)).length,
     members: await teamOf(t.id), tipsKey: parts.length ? 'research' : '' });
 }
-r.get('/topics/:tid/agents', auth.loadTopic('member'), researchPage);
+r.get('/topics/:tid/agents', auth.loadTopic('member'), async (req, res, next) => { try { await agent.rescueSaved(); } catch (e) { /* ignore */ } next(); }, researchPage);
 // Add a template's parts (when starting from scratch on the Research page).
 r.post('/topics/:tid/agents/template', auth.loadTopic('leader'), writable, async (req, res) => {
   const t = req.topic;
@@ -254,6 +254,7 @@ async function cardsOf(runId) { return (await db('agent_sources').where({ run_id
 
 r.get('/topics/:tid/agents/:pid', auth.loadTopic('member'), loadPart, async (req, res) => {
   const t = req.topic, p = req.part;
+  if (p.agent_status === 'failed') { try { if (await agent.rescueSaved()) req.part = Object.assign(p, await db('parts').where({ id: p.id }).first()); } catch (e) { /* show the page anyway */ } }
   const runs = await db('agent_runs').where({ part_id: p.id }).orderBy('id', 'desc');
   const run = runs.find((x) => x.id === parseInt(req.query.run, 10)) || runs.find((x) => x.status === 'done') || runs[0] || null;
   const commentsQ = db('agent_comments').leftJoin('users', 'users.id', 'agent_comments.user_id').where('agent_comments.part_id', p.id).orderBy('agent_comments.id').select('agent_comments.*', 'users.name', 'users.color', 'users.id as uid');

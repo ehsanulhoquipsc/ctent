@@ -8,6 +8,9 @@ async function main() {
   if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
     console.warn('WARNING: SESSION_SECRET is not set. Set it in your host’s environment settings.');
   }
+  // A deploy that was stopped mid-migration leaves the migration lock set, and every later start-up would
+  // fail on it. Only one instance migrates at a time here, so a lock found at start-up is stale.
+  try { await db.migrate.forceFreeMigrationsLock(); } catch (e) { /* no migration tables yet */ }
   await db.migrate.latest();
   if (await ensureSeeded()) console.log('Demo data loaded. Sign in with any @ctent.demo account (password: demo1234).');
   await require('./lib/agent').recover();
