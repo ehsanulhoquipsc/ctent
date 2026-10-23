@@ -191,6 +191,22 @@ Free-plan limits to know before sharing the link:
 - Render's free database expires 30 days after it's created. Upgrade it, or create a new one, to keep the demo running.
 - Uploaded files are stored in the database. That's fine for a demo, but large files should move to object storage for real use.
 
+### Keep it free for good: Neon database, your own domain, no sleeping
+
+Render's free database is deleted 30 days after it was made. Move to a free Neon database (it doesn't expire) without losing anything:
+
+1. Sign up at [neon.tech](https://neon.tech), create a project and copy its **connection string**.
+2. In Render → **ctent** → **Environment**:
+   - add `COPY_FROM_DATABASE_URL` = your **current** `DATABASE_URL` value (copy it first);
+   - change `DATABASE_URL` to the Neon connection string;
+   - save. Render redeploys.
+3. On start-up CTENT sees the empty Neon database and copies everything into it — people, projects, evidence, papers, files. The log says `Copied data from the old database: …`. It copies only into an empty database, so restarts are safe.
+4. Check the site, then delete `COPY_FROM_DATABASE_URL`.
+
+**Custom domain:** Render → ctent → **Settings → Custom Domains** → add e.g. `ctent.doctren.com`, then add a DNS record where the domain is managed: `CNAME  ctent  ctent.onrender.com`. HTTPS is set up automatically.
+
+**No sleeping:** free Render services sleep after 15 minutes without visitors. A free monitor such as [cron-job.org](https://cron-job.org) or UptimeRobot opening `https://ctent.doctren.com/healthz` every 10 minutes keeps it awake. One service running all month fits inside Render's 750 free hours.
+
 ## Run it on your computer
 
 You need [Node.js](https://nodejs.org) 20 or newer.

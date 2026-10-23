@@ -12,6 +12,8 @@ async function main() {
   // fail on it. Only one instance migrates at a time here, so a lock found at start-up is stale.
   try { await db.migrate.forceFreeMigrationsLock(); } catch (e) { /* no migration tables yet */ }
   await db.migrate.latest();
+  // Moving databases: copy everything from the old one into this empty one (see README).
+  try { await require('./lib/copy-db').copyIfAsked(); } catch (e) { console.error('Copying from the old database failed — nothing was changed here:', e.message); }
   if (await ensureSeeded()) console.log('Demo data loaded. Sign in with any @ctent.demo account (password: demo1234).');
   await require('./lib/agent').recover();
   console.log('AI agents: ' + require('./lib/llm').label());
