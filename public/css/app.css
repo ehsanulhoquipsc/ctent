@@ -1098,3 +1098,6 @@ html[data-theme="dark"] .ev2.sel { box-shadow: 0 0 0 3px var(--acc-soft); }
 .act-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 22px; }
 .act-head h1 { font-size: 24px; }
 .act-list .row { display: flex; gap: 12px; align-items: baseline; padding: 10px 20px; border-top: 1px solid var(--line-2); flex-wrap: wrap; }
+.nav-btn { border: 0; background: transparent; font-family: var(--font); cursor: pointer; width: 100%; text-align: left; }
+.nav-btn[hidden] { display: none; }
+.nav-btn:hover { background: var(--surface-2); color: var(--text); }

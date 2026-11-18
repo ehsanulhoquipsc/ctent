@@ -1196,14 +1196,14 @@ test('installable app: manifest, service worker, icons, offline page and head ta
   assert.equal(man.display, 'standalone');
   assert.equal(man.short_name, 'CTENT');
   assert.ok(man.icons.some((i) => i.sizes === '512x512' && i.purpose === 'maskable'));
-  for (const i of man.icons) assert.equal((await request(app).get(i.src)).status, 200);
+  for (const i of man.icons) { assert.match(i.src, /\?v=/); assert.equal((await request(app).get(i.src)).status, 200); }
   const sw = await request(app).get('/sw.js');
   assert.equal(sw.status, 200);
   assert.match(sw.headers['content-type'], /javascript/);
   assert.match(sw.text, /offline\.html/);
   assert.equal((await request(app).get('/static/pwa/offline.html')).status, 200);
   const login = await request(app).get('/login');
-  assert.match(login.text, /rel="manifest" href="\/manifest.webmanifest"/);
+  assert.match(login.text, /rel="manifest" href="\/manifest.webmanifest\?v=/);
   assert.match(login.text, /name="theme-color"/);
   assert.match(login.text, /data-install-card hidden/);
   assert.match(login.headers['content-security-policy'], /manifest-src 'self'/);

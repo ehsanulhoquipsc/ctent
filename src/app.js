@@ -42,15 +42,15 @@ function createApp() {
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: prod ? '7d' : 0 }));
   // Installable app (PWA): the manifest and a service worker at the site root so it controls every page.
   app.get('/manifest.webmanifest', (req, res) => {
-    res.type('application/manifest+json').set('Cache-Control', 'public, max-age=3600').send(JSON.stringify({
+    res.type('application/manifest+json').set('Cache-Control', 'no-cache').send(JSON.stringify({
       id: '/', name: 'CTENT — Conducting from Interior', short_name: 'CTENT',
       description: 'Your research group’s workspace: projects, AI research agents, papers and team chat.',
       start_url: '/?source=app', scope: '/', display: 'standalone', orientation: 'any',
       background_color: '#F7F6F4', theme_color: '#8E2433',
       icons: [
-        { src: '/static/img/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: '/static/img/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: '/static/img/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        { src: '/static/img/icon-192.png?v=' + ASSET_V, sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/static/img/icon-512.png?v=' + ASSET_V, sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/static/img/icon-maskable-512.png?v=' + ASSET_V, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ],
       shortcuts: [
         { name: 'Inbox', url: '/inbox', icons: [{ src: '/static/img/icon-192.png', sizes: '192x192' }] },

@@ -24,6 +24,7 @@
     <% if (canCreate) { %><a class="pin-new" href="/topics/new"><%- u.icon('plus', 16) %>New project</a><% } %>
     <div style="flex:1;min-height:20px"></div>
     <% if (isAdmin) { %><%- nav('admin', '/admin', 'shield', 'Admin console') %><% } %>
+    <button class="nav nav-btn" type="button" data-install-app hidden><%- u.icon('download', 20) %><span>Install app</span></button>
     <%- nav('help', '/help', 'help', 'Help') %>
     <div class="me">
       <%- u.avatar(me) %>
