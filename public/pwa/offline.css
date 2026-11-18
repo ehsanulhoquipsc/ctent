@@ -1,0 +1,7 @@
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #F7F6F4; color: #0E0E0E; font: 16px/1.55 'DM Sans', system-ui, sans-serif; padding: 24px; box-sizing: border-box; }
+main { max-width: 380px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+img { border-radius: 18px; }
+h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+p { margin: 0; color: #5C5A57; }
+a { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 12px; background: #8E2433; color: #fff; text-decoration: none; font-weight: 600; }
+@media (prefers-color-scheme: dark) { body { background: #161413; color: #F3F0EC; } p { color: #B8B2AB; } }

@@ -18,6 +18,47 @@
     });
   });
 
+  // Installable app: service worker, install prompt and the unread count on the app icon.
+  BN['Install CTENT'] = 'CTENT ইনস্টল করুন'; BN['Opens like an app, with no browser bar. Free.'] = 'অ্যাপের মতো খোলে, ব্রাউজার বার ছাড়া। বিনামূল্যে।'; BN['Not now'] = 'এখন না'; BN['Install'] = 'ইনস্টল';
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {}); });
+  }
+  (function () {
+    var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    var card = document.querySelector('[data-install-card]');
+    var installBtns = document.querySelectorAll('[data-install-app]');
+    var later = function () { try { return Number(localStorage.getItem('ctent-install-later') || 0) > Date.now(); } catch (e) { return false; } };
+    var deferred = null;
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
+    if (standalone) { installBtns.forEach(function (b) { b.hidden = true; }); return; }
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault(); deferred = e;
+      installBtns.forEach(function (b) { if (!b.closest('[data-install-card]')) b.hidden = false; });
+      if (card && !later()) card.hidden = false;
+    });
+    if (ios && card && !later()) {
+      card.hidden = false;
+      var t = card.querySelector('[data-install-text]'), i = card.querySelector('[data-install-ios]'), y = card.querySelector('.install-yes');
+      if (t) t.hidden = true; if (i) i.hidden = false; if (y) y.hidden = true;
+    }
+    installBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred.userChoice.then(function () { deferred = null; if (card) card.hidden = true; installBtns.forEach(function (x) { if (!x.closest('[data-install-card]')) x.hidden = true; }); });
+      });
+    });
+    var no = document.querySelector('[data-install-dismiss]');
+    if (no) no.addEventListener('click', function () { card.hidden = true; try { localStorage.setItem('ctent-install-later', String(Date.now() + 14 * 86400000)); } catch (e) {} });
+    window.addEventListener('appinstalled', function () { if (card) card.hidden = true; });
+  })();
+  (function () {
+    var bar = document.querySelector('.tabbar[data-badge]');
+    if (!bar || !('setAppBadge' in navigator)) return;
+    var n = Number(bar.getAttribute('data-badge')) || 0;
+    try { (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(function () {}); } catch (e) {}
+  })();
+
   // Mobile sidebar
   document.querySelectorAll('[data-toggle-side]').forEach(function (b) {
     b.addEventListener('click', function () { document.getElementById('side').classList.toggle('open'); });

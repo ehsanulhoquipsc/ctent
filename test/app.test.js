@@ -1187,3 +1187,43 @@ test('with DEMO_LOGINS=false, demo accounts cannot sign in and open demo session
     assert.equal((await agent.post('/login/demo').type('form').send({ _csrf: c2, id: 1 })).status, 404);
   } finally { delete process.env.DEMO_LOGINS; }
 });
+
+test('installable app: manifest, service worker, icons, offline page and head tags', async () => {
+  const m = await request(app).get('/manifest.webmanifest');
+  assert.equal(m.status, 200);
+  assert.match(m.headers['content-type'], /manifest\+json/);
+  const man = JSON.parse(m.text);
+  assert.equal(man.display, 'standalone');
+  assert.equal(man.short_name, 'CTENT');
+  assert.ok(man.icons.some((i) => i.sizes === '512x512' && i.purpose === 'maskable'));
+  for (const i of man.icons) assert.equal((await request(app).get(i.src)).status, 200);
+  const sw = await request(app).get('/sw.js');
+  assert.equal(sw.status, 200);
+  assert.match(sw.headers['content-type'], /javascript/);
+  assert.match(sw.text, /offline\.html/);
+  assert.equal((await request(app).get('/static/pwa/offline.html')).status, 200);
+  const login = await request(app).get('/login');
+  assert.match(login.text, /rel="manifest" href="\/manifest.webmanifest"/);
+  assert.match(login.text, /name="theme-color"/);
+  assert.match(login.text, /data-install-card hidden/);
+  assert.match(login.headers['content-security-policy'], /manifest-src 'self'/);
+});
+
+test('phone tab bar: Home, Projects, Inbox, More; More lists account, admin and sign-out', async () => {
+  const a = await agentFor('nadia@ctent.demo');
+  const home = await a.get('/');
+  const bar = home.text.slice(home.text.indexOf('<nav class="tabbar"'));
+  for (const t of ['Home', 'Projects', 'Inbox', 'More']) assert.match(bar, new RegExp('<span>' + t + '</span>'));
+  assert.match(bar, /data-badge="\d+"/);
+  const more = await a.get('/more');
+  assert.equal(more.status, 200);
+  assert.match(more.text, /href="\/more" class="on"/);
+  assert.match(more.text, /Admin console/);
+  assert.match(more.text, /Invite people/);
+  assert.match(more.text, /action="\/logout"/);
+  assert.match(more.text, /data-install-app hidden/);
+  const m = await agentFor('tom@ctent.demo');
+  const mm = await m.get('/more');
+  assert.equal(mm.status, 200);
+  assert.doesNotMatch(mm.text, /Admin console/);
+});

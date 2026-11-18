@@ -31,6 +31,8 @@ function createApp() {
         scriptSrc: ["'self'"],
         connectSrc: ["'self'"],
         formAction: ["'self'"],
+        manifestSrc: ["'self'"],
+        workerSrc: ["'self'"],
         frameAncestors: ["'self'"]
       }
     }
@@ -38,6 +40,28 @@ function createApp() {
   app.use(compression());
   if (process.env.NODE_ENV !== 'test') app.use(morgan(prod ? 'combined' : 'dev'));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: prod ? '7d' : 0 }));
+  // Installable app (PWA): the manifest and a service worker at the site root so it controls every page.
+  app.get('/manifest.webmanifest', (req, res) => {
+    res.type('application/manifest+json').set('Cache-Control', 'public, max-age=3600').send(JSON.stringify({
+      id: '/', name: 'CTENT — Conducting from Interior', short_name: 'CTENT',
+      description: 'Your research group’s workspace: projects, AI research agents, papers and team chat.',
+      start_url: '/?source=app', scope: '/', display: 'standalone', orientation: 'any',
+      background_color: '#F7F6F4', theme_color: '#8E2433',
+      icons: [
+        { src: '/static/img/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/static/img/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/static/img/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      ],
+      shortcuts: [
+        { name: 'Inbox', url: '/inbox', icons: [{ src: '/static/img/icon-192.png', sizes: '192x192' }] },
+        { name: 'Projects', url: '/topics', icons: [{ src: '/static/img/icon-192.png', sizes: '192x192' }] }
+      ]
+    }));
+  });
+  app.get('/sw.js', (req, res) => {
+    res.set('Cache-Control', 'no-cache').set('Service-Worker-Allowed', '/');
+    res.sendFile(path.join(__dirname, '..', 'public', 'pwa', 'sw.js'));
+  });
   app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'img', 'favicon.png')));
   app.get('/healthz', async (req, res) => { await db.raw('select 1'); res.json({ ok: true, version: (process.env.RENDER_GIT_COMMIT || 'local').slice(0, 7) }); });
 

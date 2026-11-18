@@ -1,0 +1,44 @@
+<%- include('../partials/top', { crumb: 'More' }) %>
+<div class="morepage">
+  <a class="card more-me" href="/profile">
+    <%- u.avatar(me) %>
+    <span class="more-who"><b data-i18n-skip><%= me.name %></b><span class="muted" data-i18n-skip><%= me.email %></span></span>
+    <span class="tag"><%= me.platform_role %></span>
+  </a>
+
+  <% if (pinned.length || canCreate) { %>
+  <section class="more-sec">
+    <span class="mono">Your projects</span>
+    <div class="card more-list">
+      <% pinned.forEach((t) => { %><a href="/topics/<%= t.id %>"><span class="dot" style="background:<%= u.color(t.color)[0] %>"></span><span class="more-l" data-i18n-skip><%= t.title %></span><span class="muted more-s"><%= t.j ? t.j.stepLabel : '' %></span></a><% }) %>
+      <% if (canCreate) { %><a href="/topics/new"><%- u.icon('plus', 20) %><span class="more-l">New project</span></a><% } %>
+    </div>
+  </section>
+  <% } %>
+
+  <section class="more-sec">
+    <span class="mono">Account &amp; workspace</span>
+    <div class="card more-list">
+      <a href="/profile"><%- u.icon('user', 20) %><span class="more-l">Profile &amp; settings</span></a>
+      <% if (isAdmin) { %>
+        <a href="/admin"><%- u.icon('shield', 20) %><span class="more-l">Admin console</span></a>
+        <a href="/admin#invite"><%- u.icon('send', 20) %><span class="more-l">Invite people</span></a>
+      <% } %>
+      <a href="/search"><%- u.icon('search', 20) %><span class="more-l">Search</span></a>
+      <a href="/help"><%- u.icon('help', 20) %><span class="more-l">Help</span></a>
+      <button type="button" data-install-app hidden><%- u.icon('download', 20) %><span class="more-l">Install CTENT as an app</span></button>
+    </div>
+  </section>
+
+  <section class="more-sec">
+    <span class="mono">Look &amp; language</span>
+    <div class="card more-list">
+      <button type="button" data-theme-toggle><%- u.icon('moon', 20) %><span class="more-l">Light / dark</span></button>
+      <div class="more-row"><%- u.icon('globe', 20) %><span class="more-l">Language</span><%- include('../partials/lang-menu') %></div>
+    </div>
+  </section>
+
+  <form method="post" action="/logout" class="more-out"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s" type="submit">Sign out</button></form>
+  <p class="muted more-foot"><a href="/privacy">Privacy policy</a></p>
+</div>
+<%- include('../partials/bottom') %>

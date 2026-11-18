@@ -54,6 +54,8 @@ r.get('/', async (req, res) => {
   });
 });
 
+// Phones: everything that isn't Home, Projects or Inbox, from the bottom tab bar's More tab.
+r.get('/more', (req, res) => res.render('pages/more', { title: 'More', active: 'more', canCreate: ['leader', 'admin'].includes(req.user.platform_role) }));
 r.get('/help', (req, res) => res.render('pages/help', { title: 'Help', active: 'help' }));
 
 r.get('/tasks', async (req, res) => {

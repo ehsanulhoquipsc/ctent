@@ -820,19 +820,65 @@ details.fold > summary::before { content: '▸'; color: var(--muted); }
 details.fold[open] > summary::before { content: '▾'; }
 @media (max-width: 700px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ev2-more { margin-left: 0; } .hello { font-size: 24px; } }
 
-/* Mobile bottom tab bar */
+/* Mobile bottom tab bar — Home · Projects · Inbox · More (replaces the side menu on phones and small tablets) */
 .tabbar { display: none; }
-@media (max-width: 700px) {
-  .tabbar { display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: var(--surface); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
-  .tabbar a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; font-size: 11.5px; font-weight: 500; color: var(--text-2); text-decoration: none; position: relative; min-height: 48px; justify-content: center; }
-  .tabbar a.on { color: var(--pri-text); font-weight: 600; }
-  .tabbar i { position: absolute; top: 2px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font: 600 10px var(--mono); font-style: normal; display: inline-flex; align-items: center; justify-content: center; }
-  body { padding-bottom: 72px; }
-  .top [data-toggle-side], .qa-btn span, .qa-btn kbd { display: none; }
+@media (max-width: 900px) {
+  .tabbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: var(--surface); border-top: 1px solid var(--line); padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); }
+  .tabbar a { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; font-weight: 500; color: var(--text-2); text-decoration: none; position: relative; min-height: 52px; justify-content: center; border-radius: 10px; }
+  .tabbar a.on { color: var(--pri-text); font-weight: 700; }
+  .tabbar i { position: absolute; top: 3px; left: calc(50% + 4px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font: 700 11px var(--font); font-style: normal; display: inline-flex; align-items: center; justify-content: center; }
+  body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .side, .top [data-toggle-side] { display: none; }
+  .top .lang-menu, .top [data-theme-toggle], .top a.icon-btn[href="/inbox"] { display: none; }
+  .top .crumb { font-size: 17px; font-weight: 700; color: var(--text); }
+  .qa-btn span, .qa-btn kbd { display: none; }
   .qa-btn { padding: 0 10px; }
-  .selbar { bottom: 70px; }
-  .toasts { bottom: 84px !important; }
+  .selbar { bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .toasts { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+  /* Inside a project: section tabs become swipeable chips */
+  .ptabs { gap: 6px; border-bottom: 0; padding: 2px 0 4px; }
+  .ptabs a { height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 19px; margin: 0; background: var(--surface); font-size: 14px; }
+  .ptabs a.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .ptabs a.on svg { color: var(--surface); }
+  .ptabs .gear { margin-left: 0; }
 }
+/* Opened as an installed app: leave room for the phone's status bar */
+@media (display-mode: standalone) {
+  .top { padding-top: max(10px, env(safe-area-inset-top)); }
+  .auth { padding-top: max(24px, env(safe-area-inset-top)); }
+}
+
+/* More (phones) */
+.morepage { max-width: 640px; width: 100%; min-width: 0; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.more-me { display: flex; align-items: center; gap: 12px; padding: 14px 16px; text-decoration: none; color: var(--text); }
+.more-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.more-who .muted { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.more-sec { display: flex; flex-direction: column; gap: 8px; }
+.more-list { padding: 0; overflow: visible; display: flex; flex-direction: column; }
+.more-list > a, .more-list > button, .more-row { min-height: 54px; padding: 0 16px; display: flex; align-items: center; gap: 14px; color: var(--text); text-decoration: none; border: 0; border-bottom: 1px solid var(--line-2); background: transparent; font: 500 15px var(--font); text-align: left; cursor: pointer; width: 100%; }
+.more-list > :last-child { border-bottom: 0; }
+.more-list > a svg, .more-list > button svg, .more-row > svg { color: var(--text-2); flex: none; }
+.more-list > a:hover, .more-list > button:hover { background: var(--surface-2); filter: none; }
+.more-list .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; margin: 0 4px; }
+.more-l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.more-s { font-size: 12.5px; white-space: nowrap; }
+.more-row { cursor: default; }
+.more-out .btn { width: 100%; height: 48px; justify-content: center; color: var(--red); }
+.more-foot { text-align: center; font-size: 13px; }
+
+/* Install prompt (sign-in page) */
+.install-card { position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 90; max-width: 440px; margin: 0 auto; padding: 16px; border-radius: 18px; background: var(--pri-deep); color: #fff; box-shadow: 0 14px 34px rgba(0,0,0,.22); display: flex; flex-direction: column; gap: 12px; }
+.install-card[hidden] { display: none; }
+.install-top { display: flex; gap: 12px; align-items: center; }
+.install-top img { border-radius: 12px; flex: none; }
+.install-top div { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; line-height: 1.4; color: #E7C9C3; }
+.install-top div b { color: #fff; font-size: 15px; }
+.install-top svg { vertical-align: -2px; }
+.install-btns { display: flex; gap: 10px; }
+.install-btns button { flex: 1; height: 44px; border-radius: 11px; font: 600 14px var(--font); cursor: pointer; }
+.install-btns button[hidden] { display: none; }
+.install-no { border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; }
+.install-yes { border: 0; background: #fff; color: var(--pri-deep); font-weight: 700 !important; }
 
 /* Quick-add dialog */
 .qa { position: fixed; inset: 0; z-index: 100; background: rgba(14,14,14,.4); display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; }
