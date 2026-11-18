@@ -1012,7 +1012,7 @@ test('sign in with Google, invite links, and joining a project', async () => {
   const anon = request.agent(app);
   assert.doesNotMatch((await anon.get('/login')).text, /Continue with Google/);
   assert.strictEqual((await anon.get('/auth/google')).status, 404);
-  Object.assign(process.env, { GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'secret', APP_URL: 'https://ctent.doctren.com' });
+  Object.assign(process.env, { GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'secret', APP_URL: 'https://ctent.doctren.com', REQUIRE_APPROVAL: 'false' });
   const real = global.fetch;
   let who = null, aud = 'cid.apps.googleusercontent.com';
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -1094,8 +1094,55 @@ test('sign in with Google, invite links, and joining a project', async () => {
     assert.strictEqual((await db('users').where({ email: 'open@gmail.com' }).first()).platform_role, 'member');
   } finally {
     global.fetch = real;
-    for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'APP_URL', 'GOOGLE_SIGNUP']) delete process.env[k];
+    for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'APP_URL', 'GOOGLE_SIGNUP', 'REQUIRE_APPROVAL']) delete process.env[k];
   }
+});
+
+test('new accounts wait for an admin; admins see each person’s activity', async () => {
+  const leader = await agentFor('ehsan@ctent.demo');
+  const admin = await agentFor('nadia@ctent.demo');
+  const tid = await topicId('CT-0150');
+  await leader.post('/topics/' + tid + '/invites').type('form').send({ _csrf: leader.csrf, role: 'member', days: '7' });
+  const token = (await leader.get('/topics/' + tid + '/members')).text.match(/\/join\/([A-Za-z0-9_-]{16,})/)[1];
+  // Sign up from the invite page: the account waits, the project isn't joined yet
+  const pw = request.agent(app);
+  const jp = await pw.get('/join/' + token);
+  const res = await pw.post('/join/' + token).type('form').send({ _csrf: jp.text.match(/name="_csrf" value="([^"]+)"/)[1], name: 'Selim Reza', email: 'selim@example.org', password: 'long-enough-pw' });
+  assert.match(res.text, /An admin needs to approve your account/);
+  const sel = await db('users').where({ email: 'selim@example.org' }).first();
+  assert.strictEqual(sel.status, 'pending');
+  assert.ok(!(await db('topic_members').where({ topic_id: tid, user_id: sel.id }).first()));
+  assert.strictEqual((await pw.get('/')).status, 302, 'no access while waiting');
+  // Signing in again shows the waiting page, not the app
+  const again = request.agent(app);
+  const lp = await again.get('/login');
+  assert.match((await again.post('/login').type('form').send({ _csrf: lp.text.match(/name="_csrf" value="([^"]+)"/)[1], email: 'selim@example.org', password: 'long-enough-pw', next: '/' })).text, /An admin needs to approve/);
+  // The admin is told, sees the request and approves it as a member
+  assert.ok(await db('notifications').where('title', 'Selim Reza is waiting for approval').first());
+  const page = await admin.get('/admin');
+  assert.match(page.text, /Waiting for approval/);
+  assert.match(page.text, /selim@example.org/);
+  assert.match((await admin.get('/inbox')).text, /Approve Selim Reza/);
+  assert.strictEqual((await leader.post('/admin/approvals/' + sel.id).type('form').send({ _csrf: leader.csrf, action: 'approve' })).status, 403, 'only admins approve');
+  await admin.post('/admin/approvals/' + sel.id).type('form').send({ _csrf: admin.csrf, action: 'approve', role: 'member' });
+  const after = await db('users').where({ id: sel.id }).first();
+  assert.strictEqual(after.status, 'active');
+  assert.strictEqual((await db('topic_members').where({ topic_id: tid, user_id: sel.id }).first()).role, 'member', 'joins the invited project once approved');
+  const ok = request.agent(app);
+  const lp2 = await ok.get('/login');
+  assert.strictEqual((await ok.post('/login').type('form').send({ _csrf: lp2.text.match(/name="_csrf" value="([^"]+)"/)[1], email: 'selim@example.org', password: 'long-enough-pw', next: '/' })).headers.location, '/');
+  // Activity: sign-ins and joining are recorded
+  const act = await admin.get('/admin/users/' + sel.id + '/activity');
+  assert.match(act.text, /Signed in/);
+  assert.match(act.text, /CT-0150/);
+  assert.strictEqual((await leader.get('/admin/users/' + sel.id + '/activity')).status, 403);
+  // Declining removes the request
+  const pw2 = request.agent(app);
+  const jp2 = await pw2.get('/join/' + token);
+  await pw2.post('/join/' + token).type('form').send({ _csrf: jp2.text.match(/name="_csrf" value="([^"]+)"/)[1], name: 'Spam Bot', email: 'spam@example.org', password: 'long-enough-pw' });
+  const bot = await db('users').where({ email: 'spam@example.org' }).first();
+  await admin.post('/admin/approvals/' + bot.id).type('form').send({ _csrf: admin.csrf, action: 'decline' });
+  assert.ok(!(await db('users').where({ email: 'spam@example.org' }).first()));
 });
 
 test('admin can clear workspace data; accounts are kept', async () => {

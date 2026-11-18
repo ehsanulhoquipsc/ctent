@@ -8,6 +8,10 @@ async function actionItems(user) {
   if (user.platform_role === 'admin') led = (await db('topics').whereNot('status', 'archived').select('id')).map((r) => r.id);
   else led = (await db('topic_members').where({ user_id: user.id, role: 'leader' }).select('topic_id')).map((r) => r.topic_id);
   const items = [];
+  if (user.platform_role === 'admin') {
+    const waiting = await db('users').leftJoin('topics', 'topics.id', 'users.pending_topic_id').where('users.status', 'pending').select('users.id', 'users.name', 'users.email', 'users.joined_via', 'users.created_at', 'topics.code');
+    for (const w of waiting) items.push({ type: 'Approval', title: 'Approve ' + w.name + '’s account', detail: w.email + (w.joined_via ? ' · ' + w.joined_via : ''), topic: w.code || 'Workspace', href: '/admin#approvals', urgent: false, at: w.created_at });
+  }
   if (led.length) {
     // Agents whose findings need the researcher, or that stopped
     const parts = await db('parts').join('topics', 'topics.id', 'parts.topic_id')

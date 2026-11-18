@@ -32,8 +32,8 @@ function platformRole(inv) {
 }
 
 // Use the invite for this person: join the project (if any). Returns where to go next.
-async function accept(inv, user) {
-  await db('invites').where({ id: inv.id }).increment('uses', 1);
+async function accept(inv, user, { counted = false } = {}) {
+  if (!counted) await db('invites').where({ id: inv.id }).increment('uses', 1);
   if (!inv.topic_id) return '/';
   const has = await db('topic_members').where({ topic_id: inv.topic_id, user_id: user.id }).first();
   if (!has) {

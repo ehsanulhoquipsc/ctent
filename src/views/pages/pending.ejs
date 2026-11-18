@@ -1,0 +1,16 @@
+<%- include('../partials/head') %>
+<body>
+<main class="auth">
+  <div class="auth-lang"><%- include('../partials/lang-menu') %></div>
+  <div class="auth-card" style="text-align:center;align-items:center">
+    <img class="logo" src="/static/img/logo.png" alt="CTENT — Conducting from Interior">
+    <span class="e-ico" style="width:56px;height:56px"><%- u.icon('clock', 26) %></span>
+    <h1>Thanks, <span data-i18n-skip><%= person.name.split(' ')[0] %></span> — almost there</h1>
+    <p class="text-2" style="line-height:1.55">An admin needs to approve your account before you can start. We’ve let them know.</p>
+    <p class="text-2" style="line-height:1.55">Once you’re approved, sign in again with <b data-i18n-skip><%= person.email %></b><%= person.pending_topic_id ? ' and you’ll go straight to the project you were invited to' : '' %>.</p>
+    <a class="btn btn-s" href="/login">Back to sign in</a>
+  </div>
+</main>
+<script src="/static/js/app.js?v=<%= typeof assetV !== 'undefined' ? assetV : 1 %>"></script>
+</body>
+</html>

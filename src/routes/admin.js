@@ -8,6 +8,7 @@ const { audit, notify } = require('../lib/events');
 const { now, COLOR_NAMES } = require('../lib/util');
 const { wipeContent } = require('../lib/wipe');
 const invites = require('../lib/invites');
+const approvals = require('../lib/approvals');
 
 const r = express.Router();
 r.use('/admin', auth.requireRole('admin'));
@@ -31,7 +32,9 @@ r.get('/admin', async (req, res) => {
   };
   const log = await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').leftJoin('topics', 'topics.id', 'audit_log.topic_id').orderBy('audit_log.id', 'desc').limit(40).select('audit_log.*', 'users.name', 'topics.code');
   const invs = (await db('invites').whereNull('topic_id').whereNull('revoked_at').orderBy('id', 'desc')).filter((i) => !i.expires_at || new Date(i.expires_at).getTime() > Date.now()).map((i) => ({ ...i, link: invites.linkOf(req, i.token) }));
-  res.render('pages/admin', { title: 'Admin console', active: 'admin', users, topicsOf, stats, log, q, created: req.session.newUser || null, colors: COLOR_NAMES, invs, googleOn: require('../lib/google').configured() });
+  const pending = await db('users').leftJoin('topics', 'topics.id', 'users.pending_topic_id').where('users.status', 'pending').orderBy('users.id')
+    .select('users.*', 'topics.code as topic_code', 'topics.title as topic_title');
+  res.render('pages/admin', { title: 'Admin console', active: 'admin', users: users.filter((x) => x.status !== 'pending'), pending, approvalOn: approvals.required(), topicsOf, stats, log, q, created: req.session.newUser || null, colors: COLOR_NAMES, invs, googleOn: require('../lib/google').configured() });
   req.session.newUser = null;
 });
 r.post('/admin/invites', async (req, res) => {
@@ -45,6 +48,40 @@ r.post('/admin/invites', async (req, res) => {
     req.flash('ok', 'Invite link ready — copy it and send it.');
   }
   res.redirect('/admin#invite');
+});
+// New accounts waiting for an admin
+r.post('/admin/approvals/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (req.body.action === 'decline') {
+    const u = await approvals.decline(req.user, id);
+    req.flash(u ? 'ok' : 'error', u ? u.name + '’s request was declined and removed.' : 'That request was already handled.');
+  } else {
+    const u = await approvals.approve(req.user, id, req.body.role);
+    req.flash(u ? 'ok' : 'error', u ? u.name + ' is approved. They can sign in now.' : 'That request was already handled.');
+  }
+  res.redirect('/admin#approvals');
+});
+
+// One person's activity: sign-ins, what they did, where they work
+r.get('/admin/users/:id/activity', async (req, res) => {
+  const p = await db('users').where({ id: parseInt(req.params.id, 10) }).first();
+  if (!p) return auth.notFound(res);
+  const log = await db('audit_log').leftJoin('topics', 'topics.id', 'audit_log.topic_id').where('audit_log.user_id', p.id).orderBy('audit_log.id', 'desc').limit(200)
+    .select('audit_log.*', 'topics.code', 'topics.title as topic_title');
+  const projects = await db('topic_members').join('topics', 'topics.id', 'topic_members.topic_id').where('topic_members.user_id', p.id).orderBy('topics.id', 'desc')
+    .select('topics.id', 'topics.code', 'topics.title', 'topics.status', 'topic_members.role', 'topic_members.joined_at');
+  const count = async (q) => Number((await q.count({ n: '*' }).first()).n);
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const totals = {
+    signins: await count(db('audit_log').where({ user_id: p.id, action: 'user.signin' }).where('created_at', '>=', since)),
+    messages: await count(db('messages').where({ user_id: p.id })),
+    tasks: await count(db('tasks').where({ assignee_id: p.id })),
+    tasksDone: await count(db('tasks').where({ assignee_id: p.id, status: 'done' })),
+    files: await count(db('files').where({ uploaded_by: p.id })),
+    actions: await count(db('audit_log').where({ user_id: p.id }).whereNot('action', 'user.signin'))
+  };
+  const approver = p.approved_by ? await db('users').where({ id: p.approved_by }).first('name') : null;
+  res.render('pages/admin-activity', { title: 'Activity · ' + p.name, active: 'admin', crumb: '<a href="/admin">Admin console</a> / Activity', person: p, log, projects, totals, approver });
 });
 r.post('/admin/users', async (req, res) => {
   const name = clean(req.body.name, 120);

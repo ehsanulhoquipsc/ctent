@@ -30,6 +30,9 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      # New accounts wait for an admin to approve them (set to "false" to let people in straight away)
+      - key: REQUIRE_APPROVAL
+        value: "true"
       # The address people use, e.g. https://ctent.doctren.com (used for the Google callback and invite links)
       - key: APP_URL
         sync: false

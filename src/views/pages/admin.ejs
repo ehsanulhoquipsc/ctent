@@ -9,6 +9,26 @@
 <% if (created) { %>
   <div class="alert ok" role="status" style="flex-wrap:wrap"><%- u.icon('check', 16) %><span style="flex:1 1 300px"><b><%= created.reset ? 'Password reset for ' : 'Account created for ' %><%= created.name %>.</b> Send them these sign-in details privately — the password is shown only once:</span><span class="kbd" style="padding:4px 10px;background:var(--surface);border-radius:6px;color:var(--text)"><%= created.email %> · <%= created.password %></span></div>
 <% } %>
+<section class="card flush<%= pending.length ? ' needs-card' : ' calm' %>" id="approvals">
+  <div class="ib-head"><span class="ib-dot"<%- pending.length ? '' : ' style="background:var(--green)"' %>></span><h2>Waiting for approval</h2><span class="mono"><%= pending.length %></span></div>
+  <% if (!pending.length) { %><p class="text-2" style="padding:0 20px 18px;font-size:14px"><%= approvalOn ? 'No one is waiting. New accounts — from Google sign-in or invite links — appear here until you approve them.' : 'Approval is off (REQUIRE_APPROVAL=false): new accounts can start straight away.' %></p><% } %>
+  <% pending.forEach((p) => { %>
+    <div class="ib-row">
+      <%- u.avatar(p) %>
+      <div class="ib-body">
+        <span class="ib-title" data-i18n-skip><%= p.name %></span>
+        <span class="ib-meta"><span data-i18n-skip><%= p.email %></span><span>· <%= p.joined_via || 'Signed up' %></span><span>· <%= u.ago(p.created_at) %></span><% if (p.topic_code) { %><span class="ptag" data-i18n-skip><%= p.topic_code %> · <%= p.topic_title %></span><% } %></span>
+      </div>
+      <form method="post" action="/admin/approvals/<%= p.id %>" class="split">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="sr" for="ar<%= p.id %>">Role</label>
+        <select class="in" id="ar<%= p.id %>" name="role" style="height:36px;width:auto"><% ['member', 'leader', 'guest', 'admin'].forEach((r) => { %><option value="<%= r %>"<%= p.platform_role === r ? ' selected' : '' %>><%= r[0].toUpperCase() + r.slice(1) %></option><% }) %></select>
+        <button class="btn btn-p btn-sm" name="action" value="approve">Approve</button>
+        <button class="btn btn-s btn-sm" name="action" value="decline" data-confirm-btn="Decline and remove <%= p.name %>’s request?">Decline</button>
+      </form>
+    </div>
+  <% }) %>
+</section>
 <div class="cols" id="users">
   <section class="card flush wide" style="display:block">
     <div class="split" style="padding:16px 20px"><h2 style="flex:1">Users</h2>
@@ -26,6 +46,7 @@
           <td class="hint"><%= x.last_login_at ? u.ago(x.last_login_at) : 'Never' %></td>
           <td><span class="tag dotted" style="background:<%= x.status === 'active' ? 'var(--green-soft)' : 'var(--red-soft)' %>;color:<%= x.status === 'active' ? 'var(--green)' : 'var(--red)' %>"><%= x.status === 'active' ? 'Active' : 'Suspended' %></span></td>
           <td style="text-align:right;white-space:nowrap">
+            <a class="mini" href="/admin/users/<%= x.id %>/activity" title="See what <%= x.name %> has done"><%- u.icon('activity', 14) %>Activity</a>
             <details class="ed" style="text-align:left"><%- u.editSummary() %>
               <form method="post" action="/admin/users/<%= x.id %>" class="ed-pop">
                 <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="edit">

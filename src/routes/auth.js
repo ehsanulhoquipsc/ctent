@@ -7,10 +7,12 @@ const { audit } = require('../lib/events');
 const { now, COLOR_NAMES } = require('../lib/util');
 const google = require('../lib/google');
 const invites = require('../lib/invites');
+const approvals = require('../lib/approvals');
 const crypto = require('crypto');
 
 const r = express.Router();
 const demoLogins = () => process.env.DEMO_LOGINS !== 'false';
+const waiting = (res, user) => res.render('pages/pending', { title: 'Waiting for approval', person: user });
 const safeNext = (n) => (typeof n === 'string' && n.startsWith('/') && !n.startsWith('//') ? n : '/');
 
 async function startSession(req, user) {
@@ -37,8 +39,10 @@ r.post('/login', async (req, res) => {
   if (auth.tooManyAttempts(key)) return fail('Too many attempts. Wait 15 minutes and try again.');
   const user = await db('users').whereRaw('lower(email) = ?', [email]).first();
   if (!user || !bcrypt.compareSync(password, user.password_hash)) { auth.recordFailure(key); return fail('That email and password don’t match.'); }
+  if (user.status === 'pending') return waiting(res, user);
   if (user.status !== 'active') return fail('This account is suspended. Contact your administrator.');
   auth.clearFailures(key);
+  await audit(user.id, null, 'user.signin', 'Signed in with a password');
   await startSession(req, user);
   res.redirect(safeNext(req.body.next));
 });
@@ -101,8 +105,9 @@ r.get('/auth/google/callback', async (req, res) => {
   let user = await db('users').where({ google_sub: g.sub }).first() || await db('users').whereRaw('lower(email) = ?', [g.email]).first();
   let created = false;
   if (user) {
-    if (user.status !== 'active') return loginError(req, res, 'This account is suspended. Contact your administrator.');
     if (!user.google_sub) await db('users').where({ id: user.id }).update({ google_sub: g.sub });
+    if (user.status === 'pending') return waiting(res, user);
+    if (user.status !== 'active') return loginError(req, res, 'This account is suspended. Contact your administrator.');
   } else if (inv || signupOpen()) {
     const role = inv ? invites.platformRole(inv) : 'member';
     const id = await db.insertId('users', { name: g.name.slice(0, 120), email: g.email, google_sub: g.sub, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10),
@@ -110,12 +115,15 @@ r.get('/auth/google/callback', async (req, res) => {
     user = await db('users').where({ id }).first();
     created = true;
     await audit(id, inv ? inv.topic_id : null, 'user.joined', g.name + ' (' + g.email + ') joined with Google' + (inv ? ' from an invite link' : ''));
+    if (inv) await db('invites').where({ id: inv.id }).increment('uses', 1);
+    if ((await approvals.onSignup(user, inv, inv ? 'Google · invite link' : 'Google · open sign-up')).pending) return waiting(res, user);
   } else {
     return loginError(req, res, 'There’s no CTENT account for ' + g.email + ' yet. Ask a project leader for an invite link, then open it to join.');
   }
   await startSession(req, user);
+  await audit(user.id, null, 'user.signin', 'Signed in with Google');
   let to = o.next && o.next !== '/' ? o.next : '/';
-  if (inv) to = await invites.accept(inv, user);
+  if (inv) to = await invites.accept(inv, user, { counted: created });
   if (created) { req.flash('ok', 'Welcome to CTENT, ' + user.name.split(' ')[0] + '! Add your expertise on your profile so leaders can match you to the right parts.'); }
   res.redirect(to);
 });
@@ -146,8 +154,10 @@ r.post('/join/:token', async (req, res) => {
   const id = await db.insertId('users', { ...v, password_hash: bcrypt.hashSync(pw, 12), platform_role: invites.platformRole(inv), color: COLOR_NAMES[Math.floor(Math.random() * COLOR_NAMES.length)], created_at: now() });
   const user = await db('users').where({ id }).first();
   await audit(id, inv.topic_id, 'user.joined', v.name + ' (' + v.email + ') joined from an invite link');
+  await db('invites').where({ id: inv.id }).increment('uses', 1);
+  if ((await approvals.onSignup(user, inv, 'Password · invite link')).pending) return waiting(res, user);
   await startSession(req, user);
-  const to = await invites.accept(inv, user);
+  const to = await invites.accept(inv, user, { counted: true });
   req.flash('ok', 'Welcome to CTENT, ' + v.name.split(' ')[0] + '!');
   res.redirect(to);
 });

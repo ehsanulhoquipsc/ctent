@@ -754,7 +754,7 @@
       f.submit();
     };
     freshToken().then(function (d) {
-      if (!d.signedIn && !/\/(login|forgot|setup)/.test(f.action)) { saveDrafts(); toast(L('You were signed out. Your text is kept — sign in again in another tab, then press Save.'), { grey: true, ms: 0 }); return; }
+      if (!d.signedIn && document.querySelector('nav.side')) { saveDrafts(); toast(L('You were signed out. Your text is kept — sign in again in another tab, then press Save.'), { grey: true, ms: 0 }); return; }
       setToken(d.token); go();
     }).catch(go);
   }, false);

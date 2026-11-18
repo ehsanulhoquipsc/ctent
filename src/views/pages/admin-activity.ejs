@@ -1,0 +1,41 @@
+<%- include('../partials/top') %>
+<%
+  const LABEL = { 'user.signin': 'Signed in', 'user.joined': 'Joined', 'user.approved': 'Approved someone', 'user.created': 'Added a user', 'topic.created': 'Created a project', 'member.added': 'Added a member', 'member.joined': 'Joined a project', 'invite.created': 'Made an invite link', 'paper.fixed': 'Fixed the paper' };
+  const p = person;
+%>
+<a href="/admin" style="font-size:14px;font-weight:500;text-decoration:none">← Admin console</a>
+<section class="card act-head">
+  <%- u.avatar(p, 'lg') %>
+  <div style="flex:1 1 280px;min-width:0">
+    <div class="split" style="flex-wrap:wrap"><h1 data-i18n-skip><%= p.name %></h1><%- u.roleTag(p.platform_role) %><span class="tag dotted" style="background:<%= p.status === 'active' ? 'var(--green-soft)' : p.status === 'pending' ? 'var(--amber-soft)' : 'var(--red-soft)' %>;color:<%= p.status === 'active' ? 'var(--green)' : p.status === 'pending' ? 'var(--amber)' : 'var(--red)' %>"><%= p.status === 'active' ? 'Active' : p.status === 'pending' ? 'Waiting for approval' : 'Suspended' %></span></div>
+    <p class="text-2" style="margin-top:4px"><span data-i18n-skip><%= p.email %></span><%= p.institution ? ' · ' + p.institution : '' %><%= p.google_sub ? ' · signs in with Google' : '' %></p>
+    <p class="hint" style="margin-top:4px">Joined <%= u.fmtDate(p.created_at, { day: 'numeric', month: 'short', year: 'numeric' }) %><%= p.joined_via ? ' · ' + p.joined_via : '' %><%= approver ? ' · approved by ' + approver.name + ' ' + u.ago(p.approved_at) : '' %> · last sign-in <%= p.last_login_at ? u.ago(p.last_login_at) : 'never' %></p>
+  </div>
+</section>
+<div class="tiles" style="max-width:none">
+  <div class="tile"><b><%= totals.signins %></b><span>sign-ins, last 30 days</span></div>
+  <div class="tile"><b><%= totals.actions %></b><span>actions recorded</span></div>
+  <div class="tile"><b><%= totals.tasksDone %>/<%= totals.tasks %></b><span>tasks done</span></div>
+  <div class="tile"><b><%= totals.messages %></b><span>messages · <%= totals.files %> files</span></div>
+</div>
+<div class="cols">
+  <section class="card flush wide" style="display:block">
+    <div class="card-head" style="padding:18px 20px 4px"><h2>Activity</h2><span class="mono">Latest <%= log.length %></span></div>
+    <% if (!log.length) { %><div class="empty2"><span class="e-ico"><%- u.icon('activity', 24) %></span><b>Nothing yet</b><span>Sign-ins, projects they create or join, and changes they make will show here.</span></div><% } %>
+    <div class="act-list">
+    <% log.forEach((a) => { %>
+      <div class="row"><span class="mono" style="width:140px;flex:none;text-transform:none"><%= u.fmtDateTime(a.created_at) %></span>
+        <span style="flex:1;font-size:13.5px"><b style="font-weight:500"><%= LABEL[a.action] || a.action.replace(/[._]/g, ' ') %></b> <span class="text-2" data-i18n-skip><%= a.detail %></span></span>
+        <% if (a.code) { %><a class="mono" href="/topics/<%= a.topic_id %>"><%= a.code %></a><% } else { %><span class="mono">platform</span><% } %></div>
+    <% }) %>
+    </div>
+  </section>
+  <div class="narrow">
+    <section class="card" style="display:flex;flex-direction:column;gap:10px">
+      <h2>Projects</h2>
+      <% if (!projects.length) { %><p class="hint">Not in any project yet.</p><% } %>
+      <% projects.forEach((t) => { %><a href="/topics/<%= t.id %>" class="split" style="text-decoration:none;color:var(--text)"><span class="ptag"><%= t.code %></span><span style="flex:1;min-width:0;font-size:13.5px" data-i18n-skip><%= t.title %></span><%- u.roleTag(t.role) %></a><% }) %>
+    </section>
+  </div>
+</div>
+<%- include('../partials/bottom') %>

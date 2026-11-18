@@ -208,6 +208,8 @@ People join with **Continue with Google** — no passwords to manage. Google cha
 - Anyone with a Google account, without an invite: only if you set `GOOGLE_SIGNUP=open` (they join as members).
 - No Google account? The invite page also lets people create an account with a password.
 
+**Admin approval:** every account people make themselves (Google or invite page) waits until an admin approves it in **Admin console → Waiting for approval** (it's also in the admin's Inbox). Pick their role, then Approve — they join the project they were invited to — or Decline. Set `REQUIRE_APPROVAL=false` to skip this. Each user's **Activity** page (Admin console → Users) shows their sign-ins, projects, tasks, messages and everything they've done.
+
 When real people start using it, set `DEMO_LOGINS=false` so the one-click demo accounts disappear from the sign-in page.
 
 ### Keep it free for good: Neon database, your own domain, no sleeping

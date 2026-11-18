@@ -1049,3 +1049,6 @@ html[data-theme="dark"] .ev2.sel { box-shadow: 0 0 0 3px var(--acc-soft); }
 /* Invite links */
 .inv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line-2); }
 .inv-link { flex: 1 1 220px; min-width: 0; font: 500 12.5px var(--mono); color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 22px; }
+.act-head h1 { font-size: 24px; }
+.act-list .row { display: flex; gap: 12px; align-items: baseline; padding: 10px 20px; border-top: 1px solid var(--line-2); flex-wrap: wrap; }
