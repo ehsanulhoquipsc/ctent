@@ -1159,3 +1159,11 @@ test('admin can clear workspace data; accounts are kept', async () => {
   // Empty workspace still renders
   for (const p of ['/', '/topics', '/messages', '/meetings', '/tasks', '/inbox', '/actions', '/admin']) assert.strictEqual((await admin.get(p)).status === 200 || (await admin.get(p)).status === 302, true, p);
 });
+
+test('privacy policy is public and linked from sign-in', async () => {
+  const r = await request(app).get('/privacy');
+  assert.equal(r.status, 200);
+  assert.match(r.text, /Privacy policy/);
+  const l = await request(app).get('/login');
+  assert.match(l.text, /href="\/privacy"/);
+});

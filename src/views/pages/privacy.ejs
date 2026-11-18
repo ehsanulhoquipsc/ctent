@@ -1,0 +1,22 @@
+<%- include('../partials/head') %>
+<body>
+<main class="auth">
+  <div class="auth-lang"><%- include('../partials/lang-menu') %></div>
+  <div class="auth-card" style="max-width:640px">
+    <img class="logo" src="/static/img/logo.png" alt="CTENT — Conducting from Interior">
+    <h1>Privacy policy</h1>
+    <p class="text-2" style="line-height:1.6">CTENT is a workspace for research groups. This page explains what we keep about you and why.</p>
+    <h3>What we collect</h3>
+    <p class="text-2" style="line-height:1.6">Your name and email address. If you sign in with Google, we also get your Google account ID — nothing else from your Google account. We keep the work you add to the workspace (messages, tasks, files, papers) and a log of actions such as sign-ins, so admins can manage the workspace.</p>
+    <h3>How we use it</h3>
+    <p class="text-2" style="line-height:1.6">Only to run the workspace: to sign you in, show your work to the people in your projects, and send you notifications inside CTENT. We don’t sell or share your data, and we don’t use it for ads.</p>
+    <h3>Where it’s stored</h3>
+    <p class="text-2" style="line-height:1.6">On our hosting provider (Render) and database provider (Neon). When you use an AI research agent, the text of your question and parts is sent to the AI service that runs it.</p>
+    <h3>Your choices</h3>
+    <p class="text-2" style="line-height:1.6">You can ask an admin to correct or delete your account and data at any time<%= contact ? ' — or email ' : '.' %><% if (contact) { %><a href="mailto:<%= contact %>"><%= contact %></a>.<% } %></p>
+    <a class="btn btn-s" href="/login">Back to sign in</a>
+  </div>
+</main>
+<script src="/static/js/app.js?v=<%= typeof assetV !== 'undefined' ? assetV : 1 %>"></script>
+</body>
+</html>

@@ -21,6 +21,8 @@ async function startSession(req, user) {
   await db('users').where({ id: user.id }).update({ last_login_at: now() });
 }
 
+r.get('/privacy', (req, res) => res.render('pages/privacy', { title: 'Privacy policy', contact: process.env.CONTACT_EMAIL || '' }));
+
 r.get('/login', async (req, res) => {
   if (req.user) return res.redirect('/');
   const count = Number((await db('users').count({ n: '*' }).first()).n);
