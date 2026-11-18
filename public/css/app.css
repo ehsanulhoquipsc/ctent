@@ -1041,3 +1041,11 @@ details.fold[open] > summary::before { content: '▾'; }
 .paper-view > div > p + p { margin-top: 14px; }
 html[data-theme="dark"] { --acc-soft: color-mix(in srgb, var(--acc) 24%, #1F1C1A); }
 html[data-theme="dark"] .ev2.sel { box-shadow: 0 0 0 3px var(--acc-soft); }
+
+/* Sign in with Google (Google's button guidelines: white, G mark, "Continue with Google") */
+.g-btn { display: flex; align-items: center; justify-content: center; gap: 12px; height: 46px; border-radius: 10px; border: 1px solid #DADCE0; background: #fff; color: #1F1F1F; font: 500 15px 'DM Sans', system-ui, sans-serif; text-decoration: none; }
+.g-btn:hover { background: #F8F9FA; border-color: #C6C9CE; color: #1F1F1F; filter: none; }
+.g-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Invite links */
+.inv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.inv-link { flex: 1 1 220px; min-width: 0; font: 500 12.5px var(--mono); color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

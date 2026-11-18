@@ -7,6 +7,7 @@ const { now, COLOR_NAMES } = require('../lib/util');
 const { topicProgress } = require('./dashboard');
 const agent = require('../lib/agent');
 const parts = require('../lib/parts');
+const invites = require('../lib/invites');
 
 const r = express.Router();
 const clean = (v, max) => String(v || '').trim().slice(0, max || 240);
@@ -206,7 +207,26 @@ r.get('/topics/:tid/members', auth.loadTopic('member'), async (req, res) => {
   const open = await db('tasks').where({ topic_id: t.id }).whereNot('status', 'done').groupBy('assignee_id').select('assignee_id').count({ n: '*' });
   const load = Object.fromEntries(open.map((x) => [x.assignee_id, Number(x.n)]));
   const others = res.locals.isTopicLeader ? await db('users').where({ status: 'active' }).whereNotIn('id', members.map((m) => m.id)).orderBy('name').select('id', 'name', 'email', 'platform_role') : [];
-  res.render('pages/topic-members', { title: 'Members · ' + t.code, active: 'topics', tab: 'Members', crumb: '<a href="/topics">Projects</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / Members', members, load, others });
+  const invs = res.locals.isTopicLeader ? (await db('invites').where({ topic_id: t.id }).whereNull('revoked_at').orderBy('id', 'desc'))
+    .filter((i) => (!i.expires_at || new Date(i.expires_at).getTime() > Date.now()) && (!i.max_uses || i.uses < i.max_uses)).map((i) => ({ ...i, link: invites.linkOf(req, i.token) })) : [];
+  res.render('pages/topic-members', { title: 'Members · ' + t.code, active: 'topics', tab: 'Members', crumb: '<a href="/topics">Projects</a> / <a href="/topics/' + t.id + '">' + t.code + '</a> / Members', members, load, others, invs, googleOn: require('../lib/google').configured() });
+});
+// Invite links: anyone with the link can join this project (signing in with Google, or with a password).
+r.post('/topics/:tid/invites', auth.loadTopic('leader'), async (req, res) => {
+  const t = req.topic;
+  if (req.body.action === 'revoke') {
+    await db('invites').where({ id: parseInt(req.body.id, 10), topic_id: t.id }).update({ revoked_at: now() });
+    await audit(req.user.id, t.id, 'invite.revoked', 'Turned off an invite link');
+    req.flash('ok', 'That invite link no longer works.');
+  } else {
+    if (t.status === 'archived') { req.flash('error', 'This project is archived.'); return res.redirect('/topics/' + t.id + '/members'); }
+    const role = ['leader', 'member', 'guest'].includes(req.body.role) ? req.body.role : 'member';
+    const days = [1, 7, 14, 30].includes(parseInt(req.body.days, 10)) ? parseInt(req.body.days, 10) : 14;
+    await invites.create(req.user, { topicId: t.id, role, days });
+    await audit(req.user.id, t.id, 'invite.created', 'Made an invite link (' + role + ', ' + days + ' days)');
+    req.flash('ok', 'Invite link ready — copy it and send it to the people you want to join.');
+  }
+  res.redirect('/topics/' + t.id + '/members#invite');
 });
 r.post('/topics/:tid/members', auth.loadTopic('leader'), async (req, res) => {
   const t = req.topic;

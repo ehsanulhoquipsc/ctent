@@ -1,0 +1,36 @@
+<%- include('../partials/head') %>
+<body>
+<main class="auth">
+  <div class="auth-lang"><%- include('../partials/lang-menu') %></div>
+  <div class="auth-card">
+    <img class="logo" src="/static/img/logo.png" alt="CTENT — Conducting from Interior">
+    <% if (!inv) { %>
+      <div style="text-align:center"><h1>This invite link doesn’t work</h1><p class="text-2" style="margin-top:6px">It may have expired or been turned off. Ask the person who sent it for a new link.</p></div>
+      <a class="btn btn-s" href="/login">Go to sign in</a>
+    <% } else { %>
+      <div style="text-align:center">
+        <span class="mono"><%= inv.by_name ? inv.by_name + ' invited you' : 'You’re invited' %></span>
+        <h1 style="margin-top:6px"><% if (inv.topic_id) { %>Join <span data-i18n-skip>“<%= inv.topic_title %>”</span><% } else { %>Join the CTENT workspace<% } %></h1>
+        <p class="text-2" style="margin-top:6px"><%= inv.topic_id ? (inv.role === 'guest' ? 'You’ll be able to read this research project.' : inv.role === 'leader' ? 'You’ll co-lead this research project.' : 'You’ll work on this research project as a co-author.') : 'CTENT is where your research group plans, researches and writes together.' %></p>
+      </div>
+      <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+      <% if (googleOn) { %>
+        <%- include('../partials/google-btn', { gq: 'invite=' + encodeURIComponent(inv.token) }) %>
+        <p class="hint" style="text-align:center">Already have an account? Continue with Google using the same email, or <a href="/login?next=<%= encodeURIComponent('/join/' + inv.token) %>">sign in with your password</a>.</p>
+        <details class="fold"><summary><span class="hint">No Google account? Create one with a password</span></summary>
+      <% } %>
+      <form method="post" action="/join/<%= inv.token %>" style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field"><label for="jn">Your name</label><input id="jn" name="name" required maxlength="120" autocomplete="name" value="<%= v.name || '' %>"></div>
+        <div class="field"><label for="je">Email</label><input id="je" name="email" type="email" required autocomplete="email" value="<%= v.email || '' %>"></div>
+        <div class="field"><label for="jp">Password</label><input id="jp" name="password" type="password" required minlength="10" autocomplete="new-password"><span class="hint">At least 10 characters.</span></div>
+        <button class="btn <%= googleOn ? 'btn-s' : 'btn-p' %>">Create account and join</button>
+        <% if (!googleOn) { %><p class="hint" style="text-align:center">Already have an account? <a href="/login?next=<%= encodeURIComponent('/join/' + inv.token) %>">Sign in</a>, then open this link again.</p><% } %>
+      </form>
+      <% if (googleOn) { %></details><% } %>
+    <% } %>
+  </div>
+</main>
+<script src="/static/js/app.js?v=<%= typeof assetV !== 'undefined' ? assetV : 1 %>"></script>
+</body>
+</html>

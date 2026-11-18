@@ -64,8 +64,23 @@
       <div class="field"><label for="ni">Institution</label><input id="ni" name="institution"></div>
       <div class="field"><label for="nr">Platform role</label><select id="nr" name="role"><option value="member">Member — works on topics they’re added to</option><option value="leader">Leader — can create and run topics</option><option value="guest">Guest — read-only reviewer</option><option value="admin">Admin — full access</option></select></div>
       <button class="btn btn-p">Create account</button>
-      <span class="hint">A temporary password is generated and shown once. Email invites come with the email service.</span>
+      <span class="hint">A temporary password is generated and shown once. <%= googleOn ? 'If their email is a Google account, they can also just “Continue with Google”.' : '' %></span>
     </form>
+    <section class="card" id="invite" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Invite people with a link</h2>
+      <p class="text-2" style="font-size:13.5px">For people who don’t need a project yet. <%= googleOn ? 'They sign in with Google.' : 'They create an account with a password.' %> To invite someone to one project, use that project’s Team → People page.</p>
+      <% invs.forEach((i) => { %>
+        <div class="inv-row"><span class="inv-link" data-i18n-skip><%= i.link %></span><button type="button" class="btn btn-p btn-sm" data-copy="<%= i.link %>"><%- u.icon('copy', 14) %>Copy</button>
+          <span class="hint" style="flex-basis:100%">Joins as <%= i.role %> · <%= i.uses %> joined · until <%= u.fmtDate(i.expires_at) %></span>
+          <form method="post" action="/admin/invites" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="<%= i.id %>"><button class="btn-link">Turn off</button></form></div>
+      <% }) %>
+      <form method="post" action="/admin/invites" class="split" style="flex-wrap:wrap">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="sr" for="wir">Role</label><select class="in" id="wir" name="role" style="width:auto"><option value="member">Member</option><option value="leader">Leader</option><option value="guest">Guest</option></select>
+        <button class="btn btn-s btn-sm"><%- u.icon('plus', 15) %>Make a link (14 days)</button>
+      </form>
+      <span class="hint"><%= process.env.GOOGLE_SIGNUP === 'open' ? 'Open sign-up is on: anyone with a Google account can join as a member.' : 'Only people with an account or an invite link can join.' %></span>
+    </section>
     <section class="card"><h3 style="margin-bottom:8px">Access levels</h3><p class="text-2" style="font-size:13px"><b>Admin</b> sees and manages everything. <b>Leader</b> creates topics and runs the ones they lead. <b>Member</b> sees only topics they’re in. <b>Guest</b> reads only what they’re given.</p></section>
   </div>
 </div>

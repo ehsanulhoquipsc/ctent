@@ -4,7 +4,10 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const auth = require('../lib/auth');
 const { audit } = require('../lib/events');
-const { now } = require('../lib/util');
+const { now, COLOR_NAMES } = require('../lib/util');
+const google = require('../lib/google');
+const invites = require('../lib/invites');
+const crypto = require('crypto');
 
 const r = express.Router();
 const demoLogins = () => process.env.DEMO_LOGINS !== 'false';
@@ -21,7 +24,8 @@ r.get('/login', async (req, res) => {
   const count = Number((await db('users').count({ n: '*' }).first()).n);
   if (count === 0) return res.redirect('/setup');
   const demo = demoLogins() ? await db('users').where('email', 'like', '%@ctent.demo').where({ status: 'active' }).orderBy('id').select('id', 'name', 'email', 'platform_role', 'title') : [];
-  res.render('pages/login', { title: 'Sign in', next: safeNext(req.query.next), error: null, email: '', demo });
+  res.render('pages/login', { title: 'Sign in', next: safeNext(req.query.next), error: req.session.loginError || null, email: '', demo, googleOn: google.configured() });
+  req.session.loginError = null;
 });
 
 r.post('/login', async (req, res) => {
@@ -29,7 +33,7 @@ r.post('/login', async (req, res) => {
   const password = String(req.body.password || '');
   const key = req.ip + '|' + email;
   const demo = demoLogins() ? await db('users').where('email', 'like', '%@ctent.demo').where({ status: 'active' }).orderBy('id').select('id', 'name', 'email', 'platform_role', 'title') : [];
-  const fail = (msg) => res.status(401).render('pages/login', { title: 'Sign in', next: safeNext(req.body.next), error: msg, email, demo });
+  const fail = (msg) => res.status(401).render('pages/login', { title: 'Sign in', next: safeNext(req.body.next), error: msg, email, demo, googleOn: google.configured() });
   if (auth.tooManyAttempts(key)) return fail('Too many attempts. Wait 15 minutes and try again.');
   const user = await db('users').whereRaw('lower(email) = ?', [email]).first();
   if (!user || !bcrypt.compareSync(password, user.password_hash)) { auth.recordFailure(key); return fail('That email and password don’t match.'); }
@@ -72,6 +76,80 @@ r.post('/setup', async (req, res) => {
   await audit(id, null, 'admin.setup', 'Created the first admin account');
   await startSession(req, { id });
   res.redirect('/admin');
+});
+
+// ---------- Sign in with Google ----------
+const signupOpen = () => process.env.GOOGLE_SIGNUP === 'open';
+const loginError = (req, res, msg) => { req.session.loginError = msg; res.redirect('/login'); };
+
+r.get('/auth/google', (req, res) => {
+  if (!google.configured()) return auth.notFound(res);
+  const state = google.newState();
+  req.session.oauth = { state, next: safeNext(req.query.next), invite: String(req.query.invite || '').slice(0, 64) || null, at: Date.now() };
+  req.session.save(() => res.redirect(google.authUrl(req, state)));
+});
+
+r.get('/auth/google/callback', async (req, res) => {
+  const o = req.session.oauth || {};
+  req.session.oauth = null;
+  if (!google.configured()) return auth.notFound(res);
+  if (req.query.error) return loginError(req, res, req.query.error === 'access_denied' ? 'Google sign-in was cancelled.' : 'Google sign-in didn’t work. Try again.');
+  if (!o.state || o.state !== req.query.state || Date.now() - (o.at || 0) > 10 * 60000) return loginError(req, res, 'That sign-in link expired. Try again.');
+  let g;
+  try { g = await google.exchange(req, String(req.query.code || '')); } catch (e) { return loginError(req, res, e.message); }
+  const inv = o.invite ? await invites.find(o.invite) : null;
+  let user = await db('users').where({ google_sub: g.sub }).first() || await db('users').whereRaw('lower(email) = ?', [g.email]).first();
+  let created = false;
+  if (user) {
+    if (user.status !== 'active') return loginError(req, res, 'This account is suspended. Contact your administrator.');
+    if (!user.google_sub) await db('users').where({ id: user.id }).update({ google_sub: g.sub });
+  } else if (inv || signupOpen()) {
+    const role = inv ? invites.platformRole(inv) : 'member';
+    const id = await db.insertId('users', { name: g.name.slice(0, 120), email: g.email, google_sub: g.sub, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10),
+      platform_role: role, color: COLOR_NAMES[Math.floor(Math.random() * COLOR_NAMES.length)], created_at: now() });
+    user = await db('users').where({ id }).first();
+    created = true;
+    await audit(id, inv ? inv.topic_id : null, 'user.joined', g.name + ' (' + g.email + ') joined with Google' + (inv ? ' from an invite link' : ''));
+  } else {
+    return loginError(req, res, 'There’s no CTENT account for ' + g.email + ' yet. Ask a project leader for an invite link, then open it to join.');
+  }
+  await startSession(req, user);
+  let to = o.next && o.next !== '/' ? o.next : '/';
+  if (inv) to = await invites.accept(inv, user);
+  if (created) { req.flash('ok', 'Welcome to CTENT, ' + user.name.split(' ')[0] + '! Add your expertise on your profile so leaders can match you to the right parts.'); }
+  res.redirect(to);
+});
+
+// ---------- Invite links ----------
+r.get('/join/:token', async (req, res) => {
+  const inv = await invites.find(req.params.token);
+  if (!inv) return res.status(404).render('pages/join', { title: 'Invite link', inv: null, googleOn: google.configured(), error: null, v: {} });
+  if (req.user) {
+    const to = await invites.accept(inv, req.user);
+    req.flash('ok', inv.topic_id ? 'You’ve joined ' + inv.topic_code + '.' : 'You’re already in the workspace.');
+    return res.redirect(to);
+  }
+  res.render('pages/join', { title: inv.topic_id ? 'Join ' + inv.topic_code : 'Join CTENT', inv, googleOn: google.configured(), error: null, v: {} });
+});
+
+// Without Google: make an account with a password from the invite page.
+r.post('/join/:token', async (req, res) => {
+  const inv = await invites.find(req.params.token);
+  if (!inv) return res.redirect('/join/' + encodeURIComponent(req.params.token));
+  const v = { name: String(req.body.name || '').trim().slice(0, 120), email: String(req.body.email || '').trim().toLowerCase().slice(0, 190) };
+  const pw = String(req.body.password || '');
+  let error = null;
+  if (v.name.length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) error = 'Enter your name and a valid email.';
+  else if (pw.length < 10) error = 'Use a password of at least 10 characters.';
+  else if (await db('users').whereRaw('lower(email) = ?', [v.email]).first()) error = 'There’s already an account with that email. Sign in first, then open the invite link again.';
+  if (error) return res.status(400).render('pages/join', { title: 'Join', inv, googleOn: google.configured(), error, v });
+  const id = await db.insertId('users', { ...v, password_hash: bcrypt.hashSync(pw, 12), platform_role: invites.platformRole(inv), color: COLOR_NAMES[Math.floor(Math.random() * COLOR_NAMES.length)], created_at: now() });
+  const user = await db('users').where({ id }).first();
+  await audit(id, inv.topic_id, 'user.joined', v.name + ' (' + v.email + ') joined from an invite link');
+  await startSession(req, user);
+  const to = await invites.accept(inv, user);
+  req.flash('ok', 'Welcome to CTENT, ' + v.name.split(' ')[0] + '!');
+  res.redirect(to);
 });
 
 module.exports = r;

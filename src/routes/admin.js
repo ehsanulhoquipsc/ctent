@@ -7,6 +7,7 @@ const auth = require('../lib/auth');
 const { audit, notify } = require('../lib/events');
 const { now, COLOR_NAMES } = require('../lib/util');
 const { wipeContent } = require('../lib/wipe');
+const invites = require('../lib/invites');
 
 const r = express.Router();
 r.use('/admin', auth.requireRole('admin'));
@@ -29,8 +30,21 @@ r.get('/admin', async (req, res) => {
     messages: Number((await db('messages').count({ n: '*' }).first()).n)
   };
   const log = await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').leftJoin('topics', 'topics.id', 'audit_log.topic_id').orderBy('audit_log.id', 'desc').limit(40).select('audit_log.*', 'users.name', 'topics.code');
-  res.render('pages/admin', { title: 'Admin console', active: 'admin', users, topicsOf, stats, log, q, created: req.session.newUser || null, colors: COLOR_NAMES });
+  const invs = (await db('invites').whereNull('topic_id').whereNull('revoked_at').orderBy('id', 'desc')).filter((i) => !i.expires_at || new Date(i.expires_at).getTime() > Date.now()).map((i) => ({ ...i, link: invites.linkOf(req, i.token) }));
+  res.render('pages/admin', { title: 'Admin console', active: 'admin', users, topicsOf, stats, log, q, created: req.session.newUser || null, colors: COLOR_NAMES, invs, googleOn: require('../lib/google').configured() });
   req.session.newUser = null;
+});
+r.post('/admin/invites', async (req, res) => {
+  if (req.body.action === 'revoke') {
+    await db('invites').where({ id: parseInt(req.body.id, 10) }).whereNull('topic_id').update({ revoked_at: now() });
+    req.flash('ok', 'That invite link no longer works.');
+  } else {
+    const role = ['leader', 'member', 'guest'].includes(req.body.role) ? req.body.role : 'member';
+    await invites.create(req.user, { role, days: 14 });
+    await audit(req.user.id, null, 'invite.created', 'Made a workspace invite link (' + role + ')');
+    req.flash('ok', 'Invite link ready — copy it and send it.');
+  }
+  res.redirect('/admin#invite');
 });
 r.post('/admin/users', async (req, res) => {
   const name = clean(req.body.name, 120);

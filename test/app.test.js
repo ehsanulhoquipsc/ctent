@@ -1008,6 +1008,96 @@ test('no form is nested inside another (browsers would send the token twice)', a
   assert.strictEqual(r.status, 302);
 });
 
+test('sign in with Google, invite links, and joining a project', async () => {
+  const anon = request.agent(app);
+  assert.doesNotMatch((await anon.get('/login')).text, /Continue with Google/);
+  assert.strictEqual((await anon.get('/auth/google')).status, 404);
+  Object.assign(process.env, { GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'secret', APP_URL: 'https://ctent.doctren.com' });
+  const real = global.fetch;
+  let who = null, aud = 'cid.apps.googleusercontent.com';
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  global.fetch = async (url, opts = {}) => {
+    if (String(url) === 'https://oauth2.googleapis.com/token') {
+      const body = new URLSearchParams(opts.body);
+      assert.strictEqual(body.get('redirect_uri'), 'https://ctent.doctren.com/auth/google/callback');
+      if (body.get('code') !== 'good') return { ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) };
+      return { ok: true, status: 200, json: async () => ({ id_token: b64({ alg: 'RS256' }) + '.' + b64({ iss: 'https://accounts.google.com', aud, exp: Math.floor(Date.now() / 1000) + 600, email_verified: true, ...who }) + '.sig' }) };
+    }
+    return real(url, opts);
+  };
+  // Go through Google and come back; returns where the app sent the person.
+  const viaGoogle = async (agent, query = '', code = 'good') => {
+    const go = await agent.get('/auth/google' + query);
+    assert.strictEqual(go.status, 302);
+    const u = new URL(go.headers.location);
+    assert.strictEqual(u.origin + u.pathname, 'https://accounts.google.com/o/oauth2/v2/auth');
+    assert.strictEqual(u.searchParams.get('scope'), 'openid email profile');
+    return (await agent.get('/auth/google/callback?code=' + code + '&state=' + u.searchParams.get('state'))).headers.location;
+  };
+  try {
+    assert.match((await anon.get('/login')).text, /Continue with Google/);
+    // Someone without an account or invite can't get in
+    who = { sub: 'g-stranger', email: 'stranger@gmail.com', name: 'Stranger' };
+    assert.strictEqual(await viaGoogle(request.agent(app)), '/login');
+    assert.ok(!(await db('users').where({ email: 'stranger@gmail.com' }).first()));
+    // A forged state is refused
+    const forge = request.agent(app);
+    await forge.get('/auth/google');
+    assert.strictEqual((await forge.get('/auth/google/callback?code=good&state=nope')).headers.location, '/login');
+    // An existing account signs in with Google (matched by email) and gets linked
+    who = { sub: 'g-ehsan', email: 'ehsan@ctent.demo', name: 'Ehsan' };
+    const ehsan = request.agent(app);
+    assert.strictEqual(await viaGoogle(ehsan), '/');
+    assert.strictEqual((await db('users').where({ email: 'ehsan@ctent.demo' }).first()).google_sub, 'g-ehsan');
+    assert.match((await ehsan.get('/')).text, /Good (morning|afternoon|evening)/);
+    // A token meant for another app is refused
+    aud = 'someone-else'; who = { sub: 'g-ehsan', email: 'ehsan@ctent.demo' };
+    assert.strictEqual(await viaGoogle(request.agent(app)), '/login');
+    aud = 'cid.apps.googleusercontent.com';
+    // The leader makes an invite link for a project
+    const leader = await agentFor('ehsan@ctent.demo');
+    const tid = await topicId('CT-0150');
+    await leader.post('/topics/' + tid + '/invites').type('form').send({ _csrf: leader.csrf, role: 'member', days: '14' });
+    const page = await leader.get('/topics/' + tid + '/members');
+    const link = page.text.match(/https:\/\/ctent\.doctren\.com\/join\/([A-Za-z0-9_-]+)/);
+    assert.ok(link, 'the invite link is shown');
+    const token = link[1];
+    // A new person opens it and continues with Google: account made, project joined, leader told
+    const join = await request.agent(app).get('/join/' + token);
+    assert.match(join.text, /Downstream|Medog|Join/);
+    who = { sub: 'g-rina', email: 'rina@gmail.com', name: 'Rina Akter' };
+    const rina = request.agent(app);
+    await rina.get('/join/' + token);
+    assert.strictEqual(await viaGoogle(rina, '?invite=' + token), '/topics/' + tid);
+    const ru = await db('users').where({ email: 'rina@gmail.com' }).first();
+    assert.strictEqual(ru.platform_role, 'member');
+    assert.strictEqual((await db('topic_members').where({ topic_id: tid, user_id: ru.id }).first()).role, 'member');
+    assert.ok(await db('notifications').where('title', 'like', 'Rina Akter joined CT-0150%').first());
+    assert.strictEqual((await rina.get('/topics/' + tid)).status, 200);
+    // Without Google: create an account with a password from the same link
+    const pw = request.agent(app);
+    const jp = await pw.get('/join/' + token);
+    const csrf = jp.text.match(/name="_csrf" value="([^"]+)"/)[1];
+    assert.strictEqual((await pw.post('/join/' + token).type('form').send({ _csrf: csrf, name: 'Karim Uddin', email: 'karim@example.org', password: 'long-enough-pw' })).headers.location, '/topics/' + tid);
+    assert.ok(await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where({ topic_id: tid, email: 'karim@example.org' }).first());
+    // Turned off: the link stops working
+    const inv = await db('invites').where({ token }).first();
+    await leader.post('/topics/' + tid + '/invites').type('form').send({ _csrf: leader.csrf, action: 'revoke', id: String(inv.id) });
+    assert.strictEqual((await request(app).get('/join/' + token)).status, 404);
+    // Workspace invite from the admin console, and open sign-up
+    const admin = await agentFor('nadia@ctent.demo');
+    await admin.post('/admin/invites').type('form').send({ _csrf: admin.csrf, role: 'leader' });
+    assert.match((await admin.get('/admin')).text, /\/join\/[A-Za-z0-9_-]+/);
+    process.env.GOOGLE_SIGNUP = 'open';
+    who = { sub: 'g-open', email: 'open@gmail.com', name: 'Open User' };
+    assert.strictEqual(await viaGoogle(request.agent(app)), '/');
+    assert.strictEqual((await db('users').where({ email: 'open@gmail.com' }).first()).platform_role, 'member');
+  } finally {
+    global.fetch = real;
+    for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'APP_URL', 'GOOGLE_SIGNUP']) delete process.env[k];
+  }
+});
+
 test('admin can clear workspace data; accounts are kept', async () => {
   const admin = await agentFor('nadia@ctent.demo');
   const users = Number((await db('users').count({ n: '*' }).first()).n);

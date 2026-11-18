@@ -191,6 +191,25 @@ Free-plan limits to know before sharing the link:
 - Render's free database expires 30 days after it's created. Upgrade it, or create a new one, to keep the demo running.
 - Uploaded files are stored in the database. That's fine for a demo, but large files should move to object storage for real use.
 
+### Sign in with Google and invite people (free)
+
+People join with **Continue with Google** — no passwords to manage. Google charges nothing for sign-in.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → create a project (e.g. "CTENT").
+2. **APIs & Services → OAuth consent screen** (Google Auth Platform): app name *CTENT*, your support email, **Audience: External**. Add your domain `doctren.com` under authorised domains. Then **Publish app** (Audience → *In production*): with only email/profile access Google doesn't need to review it, and anyone can sign in. (While it's *Testing*, only test users you list can.)
+3. **Clients → Create client → Web application**:
+   - Authorised JavaScript origins: `https://ctent.doctren.com` and `https://ctent.onrender.com`
+   - Authorised redirect URIs: `https://ctent.doctren.com/auth/google/callback` and `https://ctent.onrender.com/auth/google/callback`
+4. Copy the **Client ID** and **Client secret** into Render → ctent → **Environment** as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and set `APP_URL` = `https://ctent.doctren.com`. Save.
+
+**Who can get in:**
+- People who already have an account: Continue with Google with the same email (it links automatically).
+- New people: a project leader opens **Team → People → Invite with a link**, picks the role (co-author, guest or co-lead) and how long the link works, and sends it. Opening it and continuing with Google creates their account and adds them to the project. Admins can also make workspace invite links in the Admin console.
+- Anyone with a Google account, without an invite: only if you set `GOOGLE_SIGNUP=open` (they join as members).
+- No Google account? The invite page also lets people create an account with a password.
+
+When real people start using it, set `DEMO_LOGINS=false` so the one-click demo accounts disappear from the sign-in page.
+
 ### Keep it free for good: Neon database, your own domain, no sleeping
 
 Render's free database is deleted 30 days after it was made. Move to a free Neon database (it doesn't expire) without losing anything:

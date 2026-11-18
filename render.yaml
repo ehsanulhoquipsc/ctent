@@ -25,6 +25,14 @@ services:
         value: "true"
       - key: MAX_UPLOAD_MB
         value: "10"
+      # Sign in with Google (free) — see README "Sign in with Google"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # The address people use, e.g. https://ctent.doctren.com (used for the Google callback and invite links)
+      - key: APP_URL
+        sync: false
       # Free AI for the research agents — paste your key from https://aistudio.google.com/apikey
       - key: GEMINI_API_KEY
         sync: false
