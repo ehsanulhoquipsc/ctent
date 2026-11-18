@@ -1167,3 +1167,23 @@ test('privacy policy is public and linked from sign-in', async () => {
   const l = await request(app).get('/login');
   assert.match(l.text, /href="\/privacy"/);
 });
+
+test('with DEMO_LOGINS=false, demo accounts cannot sign in and open demo sessions end', async () => {
+  const agent = request.agent(app);
+  const page = await agent.get('/login');
+  const csrf = (page.text.match(/name="_csrf" value="([^"]+)"/) || [])[1];
+  await agent.post('/login').type('form').send({ _csrf: csrf, email: 'nadia@ctent.demo', password: 'demo1234' }).expect(302);
+  assert.equal((await agent.get('/admin')).status, 200);
+  process.env.DEMO_LOGINS = 'false';
+  try {
+    const r = await agent.get('/admin');
+    assert.notEqual(r.status, 200);
+    const p2 = await agent.get('/login');
+    assert.doesNotMatch(p2.text, /Or try a demo account/);
+    const c2 = (p2.text.match(/name="_csrf" value="([^"]+)"/) || [])[1];
+    const f = await agent.post('/login').type('form').send({ _csrf: c2, email: 'nadia@ctent.demo', password: 'demo1234' });
+    assert.equal(f.status, 401);
+    assert.match(f.text, /Demo accounts are turned off/);
+    assert.equal((await agent.post('/login/demo').type('form').send({ _csrf: c2, id: 1 })).status, 404);
+  } finally { delete process.env.DEMO_LOGINS; }
+});

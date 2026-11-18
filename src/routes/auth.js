@@ -41,6 +41,7 @@ r.post('/login', async (req, res) => {
   if (auth.tooManyAttempts(key)) return fail('Too many attempts. Wait 15 minutes and try again.');
   const user = await db('users').whereRaw('lower(email) = ?', [email]).first();
   if (!user || !bcrypt.compareSync(password, user.password_hash)) { auth.recordFailure(key); return fail('That email and password don’t match.'); }
+  if (auth.demoBlocked(user)) return fail('Demo accounts are turned off. Sign in with your own account, or ask an admin for an invite link.');
   if (user.status === 'pending') return waiting(res, user);
   if (user.status !== 'active') return fail('This account is suspended. Contact your administrator.');
   auth.clearFailures(key);
@@ -106,6 +107,7 @@ r.get('/auth/google/callback', async (req, res) => {
   const inv = o.invite ? await invites.find(o.invite) : null;
   let user = await db('users').where({ google_sub: g.sub }).first() || await db('users').whereRaw('lower(email) = ?', [g.email]).first();
   let created = false;
+  if (user && auth.demoBlocked(user)) return loginError(req, res, 'Demo accounts are turned off. Sign in with your own account.');
   if (user) {
     if (!user.google_sub) await db('users').where({ id: user.id }).update({ google_sub: g.sub });
     if (user.status === 'pending') return waiting(res, user);

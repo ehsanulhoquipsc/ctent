@@ -44,11 +44,13 @@ function recordFailure(key) {
 function clearFailures(key) { attempts.delete(key); }
 
 // ---------- Users ----------
+// With DEMO_LOGINS=false the seeded @ctent.demo accounts can't be used at all: no sign-in, and open sessions end.
+const demoBlocked = (u) => process.env.DEMO_LOGINS === 'false' && /@ctent\.demo$/i.test(String(u && u.email || ''));
 async function loadUser(req, res, next) {
   res.locals.me = null;
   if (req.session && req.session.uid) {
     const u = await db('users').where({ id: req.session.uid }).first();
-    if (u && u.status === 'active') {
+    if (u && u.status === 'active' && !demoBlocked(u)) {
       req.user = u;
       res.locals.me = u;
     } else {
@@ -121,4 +123,4 @@ async function workTopicIds(user) {
   return (await db('topic_members').where({ user_id: user.id }).whereNot('role', 'guest').select('topic_id')).map((r) => r.topic_id);
 }
 
-module.exports = { workTopicIds, killSessions, RANK, csrfToken, csrf, csrfAfterUpload, csrfOk, tooManyAttempts, recordFailure, clearFailures, loadUser, requireUser, requireRole, atLeast, forbidden, notFound, topicAccess, loadTopic, myTopicIds };
+module.exports = { demoBlocked, workTopicIds, killSessions, RANK, csrfToken, csrf, csrfAfterUpload, csrfOk, tooManyAttempts, recordFailure, clearFailures, loadUser, requireUser, requireRole, atLeast, forbidden, notFound, topicAccess, loadTopic, myTopicIds };
