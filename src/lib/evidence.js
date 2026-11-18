@@ -20,18 +20,24 @@ const methodLabel = (lang, m) => msg(lang, 'mt_' + String(m).replace(' / ', '_')
 const TYPE_LABELS = { paper: 'Journal / paper', book: 'Book', report: 'Report', reference: 'Reference', religious: 'Primary religious text', web: 'Web page', news: 'News' };
 const typeLabel = (lang, t) => (lang === 'bn' && I18N.types.bn[t]) || TYPE_LABELS[t] || t;
 
-// ---------------------------------------------------------------- Harvard citations
+// ---------------------------------------------------------------- Harvard citations (Cite Them Right)
+// Names that belong to an organisation, not a person: never turn these into "Surname, I.".
+const CORPORATE = /\b(bank|bureau|ministry|department|organi[sz]ation|association|institute|institution|university|council|commission|committee|agency|authority|foundation|society|group|office|centre|center|corporation|company|ltd|inc|government|nations|union|forum|network|consortium|contributors|team|board|world|statistics|unesco|unicef|oecd|who)\b/i;
+const PARTICLES = new Set(['van', 'von', 'der', 'den', 'de', 'da', 'del', 'di', 'du', 'la', 'le', 'al', 'el', 'bin', 'binti', 'ibn']);
 function parseName(name) {
-  name = String(name || '').trim();
+  name = String(name || '').replace(/\s+/g, ' ').trim();
   if (!name) return ['', ''];
+  if (CORPORATE.test(name) || name.split(' ').length > 5) return [name, ''];
   let last; let first;
   if (name.includes(',')) [last, first] = name.split(/,(.*)/s).map((p) => (p || '').trim());
   else {
-    const parts = name.split(/\s+/);
-    if (parts.length === 1 || /^(world bank|wikipedia)/i.test(name)) return [name, ''];
-    last = parts.pop(); first = parts.join(' ');
+    const parts = name.split(' ');
+    if (parts.length === 1) return [name, ''];
+    let i = parts.length - 1; // keep particles with the surname: "van der Berg"
+    while (i > 1 && PARTICLES.has(parts[i - 1].toLowerCase())) i--;
+    last = parts.slice(i).join(' '); first = parts.slice(0, i).join(' ');
   }
-  const initials = String(first || '').split(/[\s\-.]+/).filter(Boolean).map((p) => p[0].toUpperCase() + '.').join('');
+  const initials = String(first || '').split(/[\s\-.]+/).filter((p) => p && /\p{L}/u.test(p[0])).map((p) => p[0].toUpperCase() + '.').join('');
   return [last, initials];
 }
 function authorsStr(authors) {
@@ -41,29 +47,60 @@ function authorsStr(authors) {
   if (names.length === 1) return names[0];
   return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
 }
+const yearOf = (it) => it.year_label || it.year || 'n.d.';
 function inText(it) {
   const sur = (it.authors || []).map((a) => parseName(a)[0]).filter(Boolean);
-  const year = it.year || 'n.d.';
+  const year = yearOf(it);
   if (!sur.length) {
     const title = it.title || 'Untitled';
     if (it.source === 'quran') return "(Qur'an " + (title.split(/\s+/)[1] || '') + ')';
     const short = title.length <= 40 ? title : title.slice(0, 37).trim() + '...';
     return '(' + short + ', ' + year + ')';
   }
-  const who = sur.length === 1 ? sur[0] : sur.length === 2 ? sur[0] + ' and ' + sur[1] : sur[0] + ' et al.';
+  // Name up to three authors; "et al." from four.
+  const who = sur.length === 1 ? sur[0] : sur.length <= 3 ? sur.slice(0, -1).join(', ') + ' and ' + sur[sur.length - 1] : sur[0] + ' et al.';
   return '(' + who + ', ' + year + ')';
 }
 function harvard(it, accessed) {
   accessed = accessed || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const au = authorsStr(it.authors);
-  const year = it.year || 'n.d.';
-  const title = it.title || 'Untitled';
+  const year = yearOf(it);
+  const title = String(it.title || 'Untitled').replace(/\.+$/, '');
   const venue = it.venue || '';
   const link = it.doi ? 'doi: ' + it.doi + '.' : it.url ? 'Available at: ' + it.url + ' (Accessed: ' + accessed + ').' : '';
-  if (it.source === 'quran') return "The Qur'an (n.d.) " + title.split(' ').slice(1).join(' ') + '. Translated by Sahih International. Available at: ' + it.url + ' (Accessed: ' + accessed + ').';
-  if (it.type === 'book') return ((au || title) + ' (' + year + ') ' + title + '.' + (venue ? ' ' + venue + '.' : '') + ' ' + (it.url && !au ? link : '')).trim();
-  if (it.type === 'paper') return ((au || 'Anonymous') + ' (' + year + ") '" + title + "'," + (venue ? ' ' + venue + '.' : '') + ' ' + link).replace(',.', '.').trim();
-  return ((au || venue || title) + ' (' + year + ') ' + title + '. ' + link).trim();
+  if (it.source === 'quran') {
+    const tr = /Bangla/.test(venue) ? 'Muhiuddin Khan and Sahih International' : 'Sahih International';
+    return "The Qur'an (n.d.) " + title.split(' ').slice(1).join(' ') + '. Translated by ' + tr + '. Available at: ' + it.url + ' (Accessed: ' + accessed + ').';
+  }
+  if (it.type === 'book') {
+    const pub = venue ? ' ' + venue + '.' : '';
+    return au ? (au + ' (' + year + ') ' + title + '.' + pub).trim() : (title + ' (' + year + ').' + pub + ' ' + (it.url ? link : '')).trim();
+  }
+  if (it.type === 'paper') {
+    const lead = au || venue || 'Anonymous';
+    return (lead + ' (' + year + ") '" + title + "'" + (venue && venue !== lead ? ', ' + venue : '') + '. ' + link).trim();
+  }
+  const lead = au || venue;
+  return ((lead ? lead + ' (' + year + ') ' + title : title + ' (' + year + ')') + '. ' + link).trim();
+}
+// Sets citation and in_text on every item. When two different works share the same author(s) and year,
+// Harvard adds a letter to the year (2021a, 2021b) so each in-text citation points to one reference.
+function applyCitations(items) {
+  for (const it of items) delete it.year_label;
+  const groups = new Map();
+  for (const it of items) {
+    if (it.source === 'quran') continue;
+    const k = inText(it);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(it);
+  }
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => String(a.title || '').toLowerCase().localeCompare(String(b.title || '').toLowerCase()));
+    g.forEach((it, i) => { const y = it.year || 'n.d.'; it.year_label = y === 'n.d.' ? 'n.d.-' + 'abcdefghijklmnopqrstuvwxyz'[i % 26] : y + 'abcdefghijklmnopqrstuvwxyz'[i % 26]; });
+  }
+  for (const it of items) { it.citation = harvard(it); it.in_text = inText(it); }
+  return items;
 }
 
 // ---------------------------------------------------------------- Quality flags
@@ -163,7 +200,8 @@ const BN_COUNTRIES = { 'বাংলাদেশ': 'Bangladesh', 'ভারত':
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const COUNTRY_RE = new RegExp('\\b(' + COUNTRIES.map((c) => esc(c.toLowerCase())).concat(Object.keys(MULTI).map(esc)).sort((a, b) => b.length - a.length).join('|') + ')\\b', 'g');
 const CASE = Object.fromEntries(COUNTRIES.map((c) => [c.toLowerCase(), c]));
-const NOT_COUNTRY = new Set(['', 'n/a', 'na', 'none', 'not stated', 'unknown', 'not specified', 'unspecified', '-', 'various']);
+const NOT_COUNTRY = new Set(['', 'n/a', 'na', 'none', 'not stated', 'unknown', 'not specified', 'unspecified', '-', 'various',
+  'global', 'worldwide', 'international', 'multiple', 'multiple countries', 'multi-country', 'cross-country', 'cross-national', 'several countries', 'many countries', 'world', 'not applicable', 'empty', 'null']);
 function countriesIn(text) {
   const found = [];
   const low = String(text || '').toLowerCase();
@@ -334,8 +372,9 @@ async function findGaps({ topic, depth, items, plan, synthesis, lang, llm, log, 
       const { text, refs } = analysisText(st, items);
       const ids = new Set(items.map((it) => it.id));
       const res = await llm.json('Reply with JSON only.', fill(GAPS_PROMPT, { topic, n: st.n_relevant, k, analysis: text, lang_rule: GAP_LANG[lang] || GAP_LANG.en }));
-      gaps = (res.gaps || []).filter((g) => g && String(g.title || '').trim()).map((g) => {
-        const ev = [...new Set((g.evidence || []).map((i) => refs[parseInt(i, 10)]).filter((id) => id && ids.has(id)))];
+      gaps = (Array.isArray(res.gaps) ? res.gaps : []).filter((g) => g && String(g.title || '').trim()).map((g) => {
+        const evList = Array.isArray(g.evidence) ? g.evidence : (g.evidence === undefined || g.evidence === null || g.evidence === '' ? [] : [g.evidence]);
+        const ev = [...new Set(evList.map((i) => parseInt(i, 10)).filter((i) => i >= 0).map((i) => refs[i]).filter((id) => id && ids.has(id)))];
         const type = String(g.type || '').toLowerCase().trim(); const pr = String(g.priority || '').toLowerCase().trim();
         return { type: GAP_TYPES.includes(type) ? type : 'empirical', priority: PRIORITY[pr] !== undefined ? pr : 'medium', title: String(g.title).trim().slice(0, 300), description: String(g.description || '').trim().slice(0, 1500), signal: String(g.signal || '').trim().slice(0, 600), evidence: ev, research_question: String(g.research_question || '').trim().slice(0, 600), method: String(g.method || '').trim().slice(0, 600) };
       });
@@ -349,6 +388,6 @@ async function findGaps({ topic, depth, items, plan, synthesis, lang, llm, log, 
 
 module.exports = {
   BANGLA, msg, flagLabel, consensusLabel, priorityLabel, tierLabel, gapTypeLabel, methodLabel, typeLabel, TYPE_LABELS,
-  inText, harvard, authorsStr, flagsFor, qualityCheck, pdfCandidates, keySections, fetchFullText,
+  inText, harvard, authorsStr, applyCitations, parseName, flagsFor, qualityCheck, pdfCandidates, keySections, fetchFullText,
   METHOD_TYPES, GAP_TYPES, classifyMethod, itemCountries, countriesIn, analyse, ruleGaps, findGaps, count
 };

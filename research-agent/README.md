@@ -87,7 +87,7 @@ Always open and check a source before citing it; abstracts and AI summaries are 
 `app.py` web app · `agent.py` pipeline and prompts · `sources.py` all source connectors · `fulltext.py` PDF reading ·
 `quality.py` quality checks · `gaps.py` research gaps finder · `matrix.py` Excel matrix · `translations.py` English/Bangla text · `llm.py` Gemini/Ollama ·
 `citations.py` Harvard formatting · `db.py` SQLite storage · `exporter.py` Word/Markdown export ·
-`tests/test_offline.py` full offline test (`python tests/test_offline.py`).
+`tests/test_offline.py` full offline test (`python tests/test_offline.py`) · `tests/test_bugfixes.py` regression tests for fixed bugs (`python tests/test_bugfixes.py`).
 
 ## Look and feel
 
@@ -102,3 +102,15 @@ where "Back to CTENT" points (default https://ctent.onrender.com).
 `agent.py`, `sources.py`, `llm.py`, `citations.py` and `exporter.py` have no Flask dependency, so they drop straight
 into the ctent repo. The research task page calls `agent.run_research(run_id)` in a background thread and links each
 run to a task ID; the evidence cards table becomes shared by the team, so members can select cards together.
+
+## Troubleshooting
+
+- **A run says "interrupted"**: the app was closed while it was running. Open it and click **Run again**; cards it had
+  already saved are still shown.
+- **"Gemini daily free quota is used up"**: the free tier resets daily. Searching still works; AI reading, the
+  agreement map and drafts resume later. Ollama has no limit.
+- **"Gemini model ... was not found"**: set `GEMINI_MODEL=gemini-2.5-flash` in `.env` and restart.
+- **OpenAlex without a key** searches only your main topic once per run, so its small free quota lasts. Add the free
+  `OPENALEX_API_KEY` to search every sub-question.
+- **DuckDuckGo errors** (web, news, hadith, Bangladesh sites): it limits fast repeated searches. The agent now
+  spaces them out and retries once; if errors continue, untick a few of those sources.

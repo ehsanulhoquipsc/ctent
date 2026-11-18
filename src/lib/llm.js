@@ -13,6 +13,9 @@ const GAP_MS = parseInt(process.env.LLM_MIN_INTERVAL_MS || (process.env.NODE_ENV
 let nextCall = 0;
 async function pace() { const t = Date.now(); const at = Math.max(t, nextCall); nextCall = at + GAP_MS; if (at > t) await new Promise((r) => setTimeout(r, at - t)); }
 let geminiModel = null; // resolved once, then reused
+// When a provider's DAILY free quota is used up, skip it for 30 minutes instead of waiting on it for every call.
+const restingUntil = {};
+const isDailyQuota = (m) => /PerDay|per day|daily/i.test(String(m || ''));
 
 const OPENAI_LIKE = {
   groq: () => ({ base: 'https://api.groq.com/openai/v1', key: process.env.GROQ_API_KEY, model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', name: 'Groq' }),
@@ -41,7 +44,14 @@ async function call(url, opts) {
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(url, { ...opts, signal: ctl.signal });
-      if (res.status === 429 || res.status === 503) { if (attempt === 0) await new Promise((r) => setTimeout(r, 5000)); continue; }
+      if (res.status === 429 || res.status === 503) {
+        const busy = await res.text().catch(() => '');
+        if (res.status === 429 && isDailyQuota(busy)) { // waiting won't help today: fail fast so the backup is used
+          const err = new Error('daily free quota used up: ' + busy.slice(0, 200)); err.status = 429; throw err;
+        }
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 5000));
+        continue;
+      }
       const text = await res.text();
       let body = null;
       try { body = JSON.parse(text); } catch (e) { /* not JSON */ }
@@ -93,11 +103,26 @@ async function openaiCompatible(p, system, prompt) {
   return ((((out.choices || [])[0] || {}).message || {}).content) || '';
 }
 
+// Models sometimes answer with a bare list (or a list holding one object) instead of the object we asked for.
+// Always return a plain object so callers can read fields safely.
+function shape(data) {
+  if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+  if (Array.isArray(data)) {
+    const first = data.length === 1 && data[0] && typeof data[0] === 'object' && !Array.isArray(data[0]) ? data[0] : {};
+    return { ...first, items: data, claims: data, gaps: data, questions: data, parts: data };
+  }
+  return {};
+}
 function parseJson(text) {
-  const s = String(text || '').replace(/^```(?:json)?/i, '').replace(/```\s*$/, '');
-  const a = s.indexOf('{'), b = s.lastIndexOf('}');
-  if (a < 0 || b < a) throw new Error('The AI reply was not in the expected format.');
-  return JSON.parse(s.slice(a, b + 1));
+  const s = String(text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+  try { return shape(JSON.parse(s)); } catch (e) { /* look for the JSON inside other text */ }
+  const o1 = s.indexOf('{'), o2 = s.lastIndexOf('}'), a1 = s.indexOf('['), a2 = s.lastIndexOf(']');
+  const tries = [];
+  if (o1 >= 0 && o2 > o1) tries.push(s.slice(o1, o2 + 1));
+  if (a1 >= 0 && a2 > a1) tries.push(s.slice(a1, a2 + 1));
+  if (a1 >= 0 && a1 < o1) tries.reverse(); // the reply is a list of objects
+  for (const t of tries) { try { return shape(JSON.parse(t)); } catch (e) { /* next */ } }
+  throw new Error('The AI reply was not in the expected format.');
 }
 
 // Ask for a JSON object. Tries each connected service in turn; throws if all of them fail.
@@ -106,6 +131,7 @@ async function json(system, prompt, onTry) {
   if (!list.length) throw new Error('No AI service is connected.');
   const errors = [];
   for (const p of list) {
+    if ((restingUntil[p] || 0) > Date.now()) { errors.push(nameOf(p) + ': daily free quota used up (resting)'); continue; }
     try {
       if (onTry) await onTry(nameOf(p));
       await pace();
@@ -115,6 +141,7 @@ async function json(system, prompt, onTry) {
       return out;
     } catch (e) {
       const msg = e.name === 'AbortError' ? 'timed out' : e.message;
+      if (e.status === 429 && isDailyQuota(msg)) restingUntil[p] = Date.now() + 30 * 60 * 1000;
       errors.push(nameOf(p) + ': ' + msg);
     }
   }

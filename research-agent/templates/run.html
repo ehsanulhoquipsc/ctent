@@ -34,6 +34,10 @@
 <section class="card run-progress" id="progress">
   <ol class="stepper" id="stepper"></ol>
   <p class="hint" id="runHint" style="text-align:center">{{ t("running_hint") }}</p>
+  <div class="alert warn" id="failBox" style="display:none">{{ icon('alert') }}
+    <span style="flex:1">{{ t("run_failed") }}</span>
+    <form method="post" action="/run/{{ run.id }}/retry" style="margin:0"><button class="btn btn-p btn-sm" type="submit">{{ t("retry") }}</button></form>
+  </div>
   <div>
     <button class="btn-link log-toggle" type="button" onclick="toggleLog()">{{ icon('terminal', 15) }}<span id="logLabel">{{ t("hide_log") }}</span></button>
     <pre class="log" id="log" style="margin-top:10px">{{ run.log }}</pre>
@@ -138,18 +142,23 @@ const TYPES = {paper:T.t_paper, book:T.t_book, report:T.t_report, reference:T.t_
 const FLAGS = {retracted:T.f_retracted, preprint:T.f_preprint, check_journal:T.f_check_journal};
 const STEPS = [["planning", "step_plan"], ["searching", "step_search"], ["trail", "step_trail"], ["quality", "step_quality"],
   ["fulltext", "step_fulltext"], ["extracting", "step_read"], ["synthesis", "step_agree"], ["gaps", "step_gaps"], ["done", "step_done"]];
-let items = [], byId = {}, synthesis = [], gapData = {}, charts = {}, lastStep = 0;
+let items = [], byId = {}, synthesis = [], gapData = {}, charts = {}, lastStep = 0, seenRunning = false;
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const isFlagged = i => (i.flags || []).some(f => f === "retracted" || f === "check_journal");
 const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const $ = id => document.getElementById(id);
+const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
 
 function stepper(status) {
   let cur = STEPS.findIndex(s => s[0] === status);
   const failed = ["error", "interrupted"].includes(status), done = status === "done";
   if (status === "queued") cur = 0;
-  if (failed) cur = lastStep;
+  if (failed) {
+    // We only know where it stopped if this page watched it running; otherwise don't show a misleading step.
+    $("stepper").style.display = seenRunning ? "" : "none";
+    cur = lastStep;
+  } else if (!done) seenRunning = true;
   $("stepper").innerHTML = STEPS.map(([k, label], i) => {
     const past = done || i < cur, now = !done && i === cur;
     return `<li class="${past ? "past" : now ? "cur" + (failed ? " red" : "") : ""}"><span class="dot">${past ? "✓" : i + 1}</span><b>${esc(T[label])}</b></li>`;
@@ -164,12 +173,21 @@ function setStatus(status) {
 }
 
 async function poll() {
-  const r = await fetch(`/api/run/${RUN}`).then(r => r.json());
+  let r;
+  try {
+    r = await fetch(`/api/run/${RUN}`).then(res => { if (!res.ok) throw new Error(res.status); return res.json(); });
+  } catch (e) {  // server restarting or briefly busy: keep trying instead of freezing the page
+    setTimeout(poll, 5000); return;
+  }
   setStatus(r.status); stepper(r.status);
   const log = $("log"); log.textContent = r.log; log.scrollTop = log.scrollHeight;
   if (["done", "error", "interrupted"].includes(r.status)) {
     $("runHint").style.display = "none";
     if (r.status === "done") { $("progress").style.display = "none"; await loadItems(); }
+    else {
+      $("failBox").style.display = "";
+      if (r.n_items > 0) await loadItems();  // it failed late: the cards it saved are still usable
+    }
     if (r.has_draft) showDraft((await fetch(`/api/run/${RUN}/draft`).then(r => r.json())).draft);
   } else setTimeout(poll, 2000);
 }
@@ -328,7 +346,7 @@ function card(i) {
   return `<article class="ev ${i.selected ? "sel" : ""} ${(i.flags || []).includes("retracted") ? "retracted" : ""}" id="c${i.id}">
     <input type="checkbox" ${i.selected ? "checked" : ""} onchange="toggle(${i.id}, this.checked)" aria-label="Select">
     <div class="ev-body">
-      <h3>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>` : esc(i.title)}</h3>
+      <h3>${safeUrl(i.url) ? `<a href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.title)}</a>` : esc(i.title)}</h3>
       <div class="ev-tags">${flags}<span class="tag t-${i.tier}">${esc(T[i.tier])}</span><span class="tag neutral">${esc(TYPES[i.type] || i.type)}</span>
         ${i.fulltext ? `<span class="tag ft">${T.fulltext_badge}</span>` : ""}${i.via ? `<span class="tag tr">${T.trail_badge}</span>` : ""}
         ${i.relevance !== null ? `<span class="tag rel">${T.ai_relevance} ${i.relevance}/5</span>` : ""}</div>
@@ -358,7 +376,10 @@ function render() {
 }
 
 async function save(ids, selected) {
-  await fetch("/api/select", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ids, selected})});
+  try {
+    const r = await fetch("/api/select", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ids, selected})});
+    if (!r.ok) throw new Error(r.status);
+  } catch (e) { ctentToast(T.save_failed); }
 }
 async function toggle(id, on) { byId[id].selected = on ? 1 : 0; await save([id], on); render(); }
 async function selectVisible(on) {

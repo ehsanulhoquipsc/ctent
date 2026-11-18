@@ -95,11 +95,11 @@ def evidence_markdown(run, items, plan_questions, gaps_result=None):
             out += [f"### {it['title']}", "", meta, ""]
             if it.get("flags"):
                 out += ["**⚠ " + " · ".join(FLAGS.get(lang, FLAGS["en"]).get(f, f) for f in it["flags"]) + "**", ""]
-            if it.get("future"):
-                out += [f"**{L('m_future')}:** {it['future']}", ""]
             for key in ("method", "sample", "limitations"):
                 if it.get(key):
                     out += [f"**{L('m_' + {'method': 'method', 'sample': 'sample', 'limitations': 'limits'}[key])}:** {it[key]}", ""]
+            if it.get("future"):
+                out += [f"**{L('m_future')}:** {it['future']}", ""]
             if it["findings"]:
                 out += [f"**{L('findings')}:**", ""] + [f"- {f}" for f in it["findings"]] + [""]
             if it["data_points"]:
@@ -109,7 +109,8 @@ def evidence_markdown(run, items, plan_questions, gaps_result=None):
             out += [f"**{L('cite_as')}:** {it['in_text']}", "", f"**{L('reference')}:** {it['citation']}", ""]
             if it.get("url"):
                 out += [f"**{L('link')}:** {it['url']}", ""]
-    out += [f"## {L('references')}", ""] + sorted({it["citation"] for it in items}, key=str.lower)
+    usable = {it["citation"] for it in items if "retracted" not in (it.get("flags") or [])}
+    out += [f"## {L('references')}", ""] + sorted(usable, key=str.lower)
     return "\n".join(out) + "\n"
 
 
@@ -138,11 +139,22 @@ def _set_fonts(style, latin="Calibri"):
         sz_cs.set(qn("w:val"), str(int(style.font.size.pt * 2)))
 
 
+# Characters that are illegal in Word XML (PDF text often contains them): python-docx refuses them and the export fails.
+_ILLEGAL_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
+
+
+def clean_text(text):
+    return _ILLEGAL_XML.sub("", str(text or ""))
+
+
 def _add_runs(p, text):
-    for part in re.split(r"(\*\*[^*]+\*\*|\*[^*]+\*)", text):
+    for part in re.split(r"(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)", clean_text(text)):
         if not part:
             continue
-        if part.startswith("**") and part.endswith("**"):
+        if part.startswith("***") and part.endswith("***") and len(part) > 6:
+            run = p.add_run(part[3:-3])
+            run.bold = run.italic = True
+        elif part.startswith("**") and part.endswith("**") and len(part) > 4:
             run = p.add_run(part[2:-2])
             run.bold = True
         elif part.startswith("*") and part.endswith("*") and len(part) > 2:
@@ -156,29 +168,58 @@ def _add_runs(p, text):
             run.font.complex_script = True
 
 
+def _table(doc, rows):
+    """Markdown table lines ("| a | b |") -> a Word table. The "|---|---|" separator row is dropped."""
+    cells = [[c.strip() for c in r.strip().strip("|").split("|")] for r in rows
+             if not re.fullmatch(r"\|?[\s:|-]+\|?", r.strip())]
+    if not cells:
+        return
+    width = max(len(r) for r in cells)
+    table = doc.add_table(rows=len(cells), cols=width)
+    table.style = "Table Grid"
+    for i, row in enumerate(cells):
+        for j in range(width):
+            para = table.cell(i, j).paragraphs[0]
+            _add_runs(para, row[j] if j < len(row) else "")
+            if i == 0:
+                for run in para.runs:
+                    run.bold = True
+
+
 def md_to_docx(md):
     doc = Document()
     doc.styles["Normal"].font.size = Pt(11)
-    for name in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3", "List Bullet", "List Number", "Quote"):
+    for name in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5",
+                 "List Bullet", "List Number", "Quote"):
         try:
             _set_fonts(doc.styles[name])
         except KeyError:
             pass
     in_refs = False
-    for line in md.splitlines():
-        s = line.rstrip()
-        if not s.strip():
+    lines = clean_text(md).splitlines()
+    i = 0
+    while i < len(lines):
+        s = lines[i].rstrip()
+        i += 1
+        if not s.strip() or re.fullmatch(r"\s*([-*_])(\s*\1){2,}\s*", s):  # blank line or horizontal rule
             continue
-        m = re.match(r"^(#{1,4})\s+(.*)", s)
+        if s.lstrip().startswith("|"):
+            block = [s]
+            while i < len(lines) and lines[i].lstrip().startswith("|"):
+                block.append(lines[i])
+                i += 1
+            _table(doc, block)
+            continue
+        m = re.match(r"^(#{1,6})\s+(.*)", s)
         if m:
-            heading = m.group(2).replace("*", "")
-            doc.add_heading(heading, level=0 if len(m.group(1)) == 1 else len(m.group(1)) - 1)
+            heading = m.group(2).replace("*", "").strip()
+            doc.add_heading(heading, level=0 if len(m.group(1)) == 1 else min(len(m.group(1)) - 1, 5))
             in_refs = heading.lower().startswith(("references", "reference list", "তথ্যসূত্র"))
             continue
-        if re.match(r"^\s*[-*]\s+", s):
-            _add_runs(doc.add_paragraph(style="List Bullet"), re.sub(r"^\s*[-*]\s+", "", s))
-        elif re.match(r"^\s*\d+\.\s+", s):
-            _add_runs(doc.add_paragraph(style="List Number"), re.sub(r"^\s*\d+\.\s+", "", s))
+        if re.match(r"^\s*[-*+•]\s+", s):
+            _add_runs(doc.add_paragraph(style="List Bullet"), re.sub(r"^\s*[-*+•]\s+", "", s))
+        elif re.match(r"^\s*\d+[.)]\s+", s):
+            _add_runs(doc.add_paragraph(style="List Number"), re.sub(r"^\s*\d+[.)]\s+", "", s))
         elif s.startswith(">"):
             _add_runs(doc.add_paragraph(style="Quote"), s.lstrip("> "))
         else:

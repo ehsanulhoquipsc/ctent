@@ -7,6 +7,8 @@ news, Wikipedia and hadith sources are searched in Bangla, and findings and draf
 import json
 import math
 import re
+import sys
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import citations
@@ -149,7 +151,20 @@ def _s(v):
 
 
 def _list(v):
-    return [x for x in v or [] if isinstance(x, str) and x.strip()]
+    """A list of non-empty strings. A model sometimes returns one string instead of a list: keep it whole
+    (iterating over a string would split it into single characters)."""
+    if isinstance(v, str):
+        v = [v]
+    if not isinstance(v, (list, tuple)):
+        return []
+    return [x.strip() for x in v if isinstance(x, str) and x.strip()]
+
+
+def _ids(v):
+    """Source ids from a model answer: a list, or a single id."""
+    if isinstance(v, (list, tuple)):
+        return list(v)
+    return [] if v is None or v == "" else [v]
 
 
 # ---------------------------------------------------------------- 1. Plan
@@ -196,6 +211,11 @@ def _build_jobs(plan, enabled, per_source, lang):
         if not src or not sources.is_available(key):
             continue
         mode = src["mode"]
+        if src.get("keyless_topic_only") and not config.OPENALEX_API_KEY:
+            # Without a key OpenAlex allows only a few searches a day: search the main topic once.
+            if not BANGLA.search(plan["topic_query"]):
+                jobs.append((key, topic_q, plan["topic_query"], per_source, "en"))
+            continue
         if mode == "islamic":
             for kw in plan.get("islamic_keywords", []):
                 jobs.append((key, islamic, kw, per_source, lang if key == "quran" else "en"))
@@ -271,7 +291,8 @@ def dedupe(items):
         if len(it.get("abstract") or "") > len(cur.get("abstract") or ""):
             cur["abstract"] = it["abstract"]
         cur["citations"] = max(cur.get("citations") or 0, it.get("citations") or 0) or None
-        for k in ("year", "venue", "doi", "url", "pdf_url", "publisher", "via"):
+        # ("via" is not copied: a paper the search found itself must not be relabelled "found via citation trail")
+        for k in ("year", "venue", "doi", "url", "pdf_url", "publisher"):
             cur[k] = cur.get(k) or it.get(k)
         cur["retracted"] = cur.get("retracted") or it.get("retracted")
         cur["preprint"] = cur.get("preprint") and it.get("preprint")  # a published copy wins
@@ -330,8 +351,11 @@ def follow_trail(items, cfg, lang, log):
 # ---------------------------------------------------------------- 5-6. Read full text and extract evidence
 
 def _apply(it, r):
-    try:
-        it["relevance"] = max(0, min(5, int(r.get("relevance") or 0)))
+    if not isinstance(r, dict):
+        return
+    try:  # a missing relevance means "unknown", not "irrelevant"
+        rel = r.get("relevance")
+        it["relevance"] = None if rel in (None, "") else max(0, min(5, int(round(float(rel)))))
     except (TypeError, ValueError):
         it["relevance"] = None
     it["findings"] = _list(r.get("findings"))
@@ -342,9 +366,9 @@ def _apply(it, r):
     mt = _s(r.get("method_type")).lower()
     it["method_type"] = mt if mt in gapfinder.METHOD_TYPES else ""
     it["country"] = _s(r.get("country"))
-    q = _s(r.get("quote"))
-    source_text = (it.get("_fulltext") or "") + " " + (it.get("abstract") or "")
-    it["quote"] = q if q and q[:40].lower() in re.sub(r"\s+", " ", source_text).lower() else ""
+    q = re.sub(r"\s+", " ", _s(r.get("quote"))).strip(" \"'“”")
+    source_text = re.sub(r"\s+", " ", (it.get("_fulltext") or "") + " " + (it.get("abstract") or "")).lower()
+    it["quote"] = q if q and q[:40].lower() in source_text else ""  # only keep quotes that really are in the text
     it["score"] += 0.4 * (it["relevance"] or 0)
 
 
@@ -377,6 +401,9 @@ def read_full_texts(items, cfg, topic, lang, log):
                                                      year=it.get("year") or "n.d.", text=it["_fulltext"],
                                                      method_types=METHOD_LIST,
                                                      lang_rule=LANG_RULES["extract"][lang]))
+        except llm.QuotaExhausted as e:
+            log(f"  ! {e}")
+            return
         except Exception as e:
             log(msg(lang, "skipped", i=i, e=str(e)[:120]))
             continue
@@ -396,10 +423,14 @@ def extract(items, topic, lang, log, batch_size=8):
         try:
             res = llm.json_call(EXTRACT_PROMPT.format(topic=topic, sources=text, lang_rule=LANG_RULES["extract"][lang],
                                                       method_types=METHOD_LIST))
+        except llm.QuotaExhausted as e:
+            log(f"  ! {e}")
+            return
         except Exception as e:
             log(msg(lang, "skipped", i=bi, e=str(e)[:120]))
             continue
-        by_id = {str(r.get("id")): r for r in res.get("items", []) if isinstance(r, dict)}
+        rows = res.get("items") if isinstance(res.get("items"), list) else []
+        by_id = {str(r.get("id")).strip("[]= id"): r for r in rows if isinstance(r, dict)}
         for i, it in enumerate(batch):
             if str(i) in by_id:
                 _apply(it, by_id[str(i)])
@@ -436,15 +467,21 @@ def synthesize(items, plan, lang, log):
                           for i, it in enumerate(group))
         try:
             res = llm.json_call(SYNTH_PROMPT.format(question=q, cards=cards, lang_rule=LANG_RULES["synth"][lang]))
+        except llm.QuotaExhausted as e:
+            log(f"  ! {e}")
+            break
         except Exception as e:
             log(msg(lang, "skipped", i=q[:40], e=str(e)[:100]))
             continue
 
         def pick(ids):
             picked = []
-            for i in ids or []:
+            for i in _ids(ids):
                 try:
-                    it = group[int(i)]
+                    n = int(i)
+                    if n < 0:
+                        continue  # group[-1] would silently pick the wrong source
+                    it = group[n]
                 except (ValueError, TypeError, IndexError):
                     continue
                 if it not in picked:
@@ -452,7 +489,7 @@ def synthesize(items, plan, lang, log):
             return picked
 
         claims = []
-        for c in res.get("claims", []):
+        for c in res.get("claims") if isinstance(res.get("claims"), list) else []:
             if not isinstance(c, dict) or not _s(c.get("claim")):
                 continue
             sup, con = pick(c.get("support")), pick(c.get("contradict"))
@@ -483,7 +520,7 @@ def run_research(run_id):
     cfg = config.DEPTHS[depth]
 
     def log(m):
-        db.append_log(run_id, m)
+        db.append_log(run_id, sources.scrub(m))
 
     try:
         db.update_run(run_id, status="planning")
@@ -533,8 +570,7 @@ def run_research(run_id):
         for it in items:
             if not it.get("findings"):
                 it["findings"] = _first_sentences(it.get("abstract"))
-            it["citation"] = citations.harvard(it)
-            it["in_text"] = citations.in_text(it)
+        citations.apply(items)  # Harvard citations, with 2021a / 2021b when author and year repeat
 
         synth = []
         if opts.get("synthesis", True) and llm.enabled():
@@ -559,6 +595,7 @@ def run_research(run_id):
         log(msg(lang, "done", n=len(items)) + "".join(f" · {e}" for e in extra))
     except Exception as e:
         log(f"{msg(lang, 'error')}: {e}")
+        print(sources.scrub(traceback.format_exc()), file=sys.stderr)
         db.update_run(run_id, status="error")
 
 

@@ -59,7 +59,10 @@ BN_COUNTRIES = {"বাংলাদেশ": "Bangladesh", "ভারত": "India
 _COUNTRY_RE = re.compile(r"\b(" + "|".join(sorted([re.escape(c.lower()) for c in COUNTRIES] +
                                                   [re.escape(k) for k in MULTI_WORD], key=len, reverse=True)) + r")\b")
 _CASE = {c.lower(): c for c in COUNTRIES}
-NOT_COUNTRY = {"", "n/a", "na", "none", "not stated", "unknown", "not specified", "unspecified", "-", "various"}
+NOT_COUNTRY = {"", "n/a", "na", "none", "not stated", "unknown", "not specified", "unspecified", "-", "various",
+               "global", "worldwide", "international", "multiple", "multiple countries", "multi-country",
+               "cross-country", "cross-national", "several countries", "many countries", "world", "not applicable",
+               "empty", "null"}
 
 
 def countries_in(text):
@@ -273,7 +276,6 @@ LANG_RULE = {"en": "Write in English.",
 
 
 def _analysis_text(stats, items, lang):
-    L = lambda k, **kw: msg(lang, k, **kw)  # noqa: E731
     refs, local = [], {}
 
     def ref(iid):
@@ -331,13 +333,17 @@ def ai_gaps(stats, items, topic, depth_k, lang):
     res = llm.json_call(GAPS_PROMPT.format(topic=topic, n=stats["n_relevant"], k=depth_k, analysis=text,
                                            lang_rule=LANG_RULE[lang]))
     out = []
-    for g in res.get("gaps", []):
+    for g in res.get("gaps") if isinstance(res.get("gaps"), list) else []:
         if not isinstance(g, dict) or not str(g.get("title") or "").strip():
             continue
         ev = []
-        for i in g.get("evidence") or []:
+        evidence = g.get("evidence")
+        for i in evidence if isinstance(evidence, list) else ([evidence] if evidence not in (None, "") else []):
             try:
-                iid = refs[int(i)]
+                n = int(i)
+                if n < 0:
+                    continue
+                iid = refs[n]
             except (ValueError, TypeError, IndexError):
                 continue
             if iid in by_id and iid not in ev:

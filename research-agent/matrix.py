@@ -5,6 +5,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.utils import get_column_letter
 
 import citations
@@ -20,6 +21,11 @@ CONS_FILL = {"strong": "DDF1E4", "moderate": "EAF4D9", "mixed": "FDF1D6", "conte
 THIN = Border(bottom=Side(style="thin", color="DDDDDD"))
 
 
+def _v(val):
+    """Excel refuses control characters (common in text taken from PDFs); remove them."""
+    return ILLEGAL_CHARACTERS_RE.sub("", val) if isinstance(val, str) else val
+
+
 def _sheet(ws, headers, widths, rows, font_name, flag_col=None):
     for c, (h, w) in enumerate(zip(headers, widths), 1):
         cell = ws.cell(row=1, column=c, value=h)
@@ -30,7 +36,9 @@ def _sheet(ws, headers, widths, rows, font_name, flag_col=None):
     ws.row_dimensions[1].height = 30
     for r, row in enumerate(rows, 2):
         for c, val in enumerate(row, 1):
-            cell = ws.cell(row=r, column=c, value=val)
+            cell = ws.cell(row=r, column=c, value=_v(val))
+            if isinstance(cell.value, str) and cell.value.startswith("="):
+                cell.data_type = "s"  # text such as "=..." must stay text, not become a formula
             cell.font = Font(name=font_name, size=10)
             cell.alignment = Alignment(vertical="top", wrap_text=True)
             cell.border = THIN
@@ -135,7 +143,7 @@ def build(run, items, synthesis, gaps_result=None):
         ws4.cell(row=1, column=col, value=title).font = Font(name=font_name, bold=True)
         ws4.cell(row=1, column=col + 1, value="n").font = Font(name=font_name, bold=True)
         for r, (k, v) in enumerate(data, 2):
-            ws4.cell(row=r, column=col, value=k).font = Font(name=font_name)
+            ws4.cell(row=r, column=col, value=_v(k)).font = Font(name=font_name)
             ws4.cell(row=r, column=col + 1, value=v)
         if data:
             chart = PieChart() if kind == "pie" else BarChart()

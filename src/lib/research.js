@@ -69,13 +69,15 @@ function textOf(x) { // text content of a parsed XML node
 }
 const yearOf = (v) => { const m = String(v || '').match(/(1[5-9]\d\d|20\d\d)/); return m ? m[1] : ''; };
 
+// Only http(s) links are kept: a 'javascript:' link from a search result must never become clickable.
+const safeLink = (u) => (/^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '');
 function item(source, type, tier, title, o = {}) {
-  const doi = String(o.doi || '').toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, '').trim();
+  const doi = String(o.doi || '').trim().toLowerCase().replace(/^(https?:\/\/(dx\.)?doi\.org\/|doi:\s*)/, '').trim();
   return {
     source, type, tier, title: clean(title) || '(untitled)',
     authors: (o.authors || []).map(clean).filter(Boolean), year: yearOf(o.year), venue: clean(o.venue), abstract: clean(o.abstract),
-    url: o.url || (doi ? 'https://doi.org/' + doi : ''), doi, citations: Number.isFinite(+o.citations) && o.citations !== null && o.citations !== '' ? Math.round(+o.citations) : null,
-    pdf_url: o.pdf_url || '', retracted: !!o.retracted, preprint: !!o.preprint, publisher: clean(o.publisher)
+    url: safeLink(o.url) || (doi ? 'https://doi.org/' + doi : ''), doi, citations: Number.isFinite(+o.citations) && o.citations !== null && o.citations !== '' ? Math.round(+o.citations) : null,
+    pdf_url: safeLink(o.pdf_url), retracted: !!o.retracted, preprint: !!o.preprint, publisher: clean(o.publisher)
   };
 }
 
@@ -187,7 +189,9 @@ async function searchEuropePmc(q, limit, opts = {}) {
 }
 
 async function searchDoaj(q, limit) {
-  const data = await request('doaj', 'https://doaj.org/api/search/articles/' + encodeURIComponent(q), { params: { pageSize: Math.min(limit, 100) } });
+  // DOAJ uses Elasticsearch query syntax: characters such as : ( ) / " would make the request fail.
+  const clean = String(q).replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim() || 'research';
+  const data = await request('doaj', 'https://doaj.org/api/search/articles/' + encodeURIComponent(clean), { params: { pageSize: Math.min(limit, 100) } });
   return (data.results || []).map((r) => {
     const b = r.bibjson || {};
     const doi = ((b.identifier || []).find((i) => String(i.type || '').toLowerCase() === 'doi') || {}).id;
@@ -350,7 +354,7 @@ async function citationTrail(doi, limit) {
 //       "bd" = main topic + first two sub-questions (English), "bd_bn" = same, in Bangla when Bangla mode is on.
 const GROUPS = ['Academic papers', 'Books', 'Data & reports', 'Reference', 'Islamic sources', 'Web & news', 'Bangladesh sources'];
 const SOURCE_TYPES = {
-  openalex: { label: 'OpenAlex', group: 'Academic papers', search: searchOpenAlex, mode: 'questions', default: true, note: '250M+ journal articles, books and reports' },
+  openalex: { label: 'OpenAlex', group: 'Academic papers', search: searchOpenAlex, mode: 'questions', default: true, keylessTopicOnly: true, note: '250M+ journal articles, books and reports' },
   semantic_scholar: { label: 'Semantic Scholar', group: 'Academic papers', search: searchSemanticScholar, mode: 'questions', default: true, note: '200M+ papers across all fields' },
   crossref: { label: 'CrossRef', group: 'Academic papers', search: searchCrossref, mode: 'questions', default: true, note: 'Publisher records for 150M+ works' },
   doaj: { label: 'DOAJ (open-access journals)', group: 'Academic papers', search: searchDoaj, mode: 'questions', default: true, note: 'Peer-reviewed open-access journals' },

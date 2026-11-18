@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import sys
 import threading
 
 from flask import Flask, Response, abort, jsonify, redirect, render_template, request, url_for
@@ -17,8 +18,17 @@ import sources
 from icons import icon
 from translations import STRINGS, method_label
 
+for stream in (sys.stdout, sys.stderr):  # Bangla text in error messages must not crash a Windows console
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 app = Flask(__name__)
 db.init()
+
+EXPORTS = {("evidence", "docx"), ("evidence", "md"), ("matrix", "xlsx"), ("gaps", "docx"), ("gaps", "md"),
+           ("draft", "docx"), ("draft", "md")}
 
 
 def ui_lang():
@@ -30,9 +40,8 @@ def ui_lang():
 def inject_strings():
     lang = ui_lang()
     strings = STRINGS[lang]
-    runs = db.list_runs(200)
     return {"t": lambda key: strings.get(key, STRINGS["en"].get(key, key)), "ui": lang, "T": strings,
-            "icon": icon, "recent_runs": runs[:6], "total_runs": len(runs), "ai_on": llm.enabled(),
+            "icon": icon, "recent_runs": db.list_runs(6), "total_runs": db.count_runs(), "ai_on": llm.enabled(),
             "ai_label": llm.label(), "ctent_url": config.CTENT_URL}
 
 
@@ -78,6 +87,16 @@ def new_run():
     return redirect(url_for("run_page", run_id=run_id))
 
 
+@app.post("/run/<int:run_id>/retry")
+def retry_run(run_id):
+    """Start the same research again (for runs that failed or were stopped when the app was closed)."""
+    old = db.get_run(run_id) or abort(404)
+    options = json.loads(old.get("options") or "{}") or None
+    new_id = db.create_run(old["topic"], old["depth"], json.loads(old["sources"] or "[]"), old.get("lang") or "en", options)
+    threading.Thread(target=agent.run_research, args=(new_id,), daemon=True).start()
+    return redirect(url_for("run_page", run_id=new_id))
+
+
 @app.get("/run/<int:run_id>")
 def run_page(run_id):
     run = db.get_run(run_id) or abort(404)
@@ -91,7 +110,8 @@ def run_page(run_id):
 @app.get("/api/run/<int:run_id>")
 def run_status(run_id):
     run = db.get_run(run_id) or abort(404)
-    return jsonify(status=run["status"], log=run["log"] or "", has_draft=bool(run["draft"]))
+    return jsonify(status=run["status"], log=run["log"] or "", has_draft=bool(run["draft"]),
+                   n_items=db.count_items(run_id))
 
 
 @app.get("/api/run/<int:run_id>/synthesis")
@@ -124,8 +144,12 @@ def run_items(run_id):
 
 @app.post("/api/select")
 def select_items():
-    data = request.get_json(force=True)
-    db.set_selected([int(i) for i in data.get("ids", [])], bool(data.get("selected")))
+    data = request.get_json(silent=True) or {}
+    try:
+        ids = [int(i) for i in data.get("ids", [])]
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error="bad ids"), 400
+    db.set_selected(ids, bool(data.get("selected")))
     return jsonify(ok=True)
 
 
@@ -148,6 +172,8 @@ def get_draft(run_id):
 @app.get("/run/<int:run_id>/export/<kind>.<fmt>")
 def export(run_id, kind, fmt):
     run = db.get_run(run_id) or abort(404)
+    if (kind, fmt) not in EXPORTS:
+        abort(404)
     name = (re.sub(r"[^A-Za-z0-9]+", "_", run["topic"])[:50].strip("_") or f"research_{run_id}") + f"_{kind}"
     if kind == "matrix" and fmt == "xlsx":
         items = db.get_items(run_id, selected_only=True) or db.get_items(run_id)
@@ -155,7 +181,9 @@ def export(run_id, kind, fmt):
         return Response(data, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition": f'attachment; filename="{name}.xlsx"'})
     if kind == "draft":
-        md = run["draft"] or abort(404)
+        if not run["draft"]:
+            abort(404)
+        md = run["draft"]
     elif kind == "gaps":
         result = json.loads(run.get("gaps") or "{}")
         if not result.get("gaps"):

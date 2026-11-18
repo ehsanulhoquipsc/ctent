@@ -17,8 +17,8 @@ _session.headers.update({"User-Agent": config.USER_AGENT})
 MIN_INTERVAL = {
     "openalex": 0.15, "semantic_scholar": 1.1, "crossref": 0.2, "arxiv": 3.1, "pubmed": 0.4,
     "doaj": 0.3, "core": 1.0, "openlibrary": 0.4, "googlebooks": 0.4, "wikipedia": 0.2,
-    "worldbank": 0.5, "quran": 0.5, "hadith": 2.0, "web": 2.0, "news": 2.0,
-    "unpaywall": 0.2, "fulltext": 0.3, "bdsites": 2.0,
+    "worldbank": 0.5, "quran": 0.5, "unpaywall": 0.2, "fulltext": 0.3,
+    "ddg": 2.5,  # every DuckDuckGo search (web, news, hadith, Bangladesh sites) shares one limit
 }
 _locks = {k: threading.Lock() for k in MIN_INTERVAL}
 _last = {}
@@ -32,6 +32,14 @@ def _throttle(name):
         _last[name] = time.monotonic()
 
 
+_SECRET_RE = re.compile(r"((?:api_key|apikey|key|email|mailto|token)=)[^&\s'\"]+", re.I)
+
+
+def scrub(text):
+    """Removes API keys and email addresses from error messages before they reach the log."""
+    return _SECRET_RE.sub(r"\1***", str(text))
+
+
 def _get(name, url, params=None, headers=None, as_json=True, retries=3, empty_on_404=False):
     err = None
     for attempt in range(retries):
@@ -39,7 +47,7 @@ def _get(name, url, params=None, headers=None, as_json=True, retries=3, empty_on
         try:
             r = _session.get(url, params=params, headers=headers, timeout=25)
         except requests.RequestException as e:
-            err = e
+            err = RuntimeError(f"connection failed ({type(e).__name__})")
             time.sleep(2 * (attempt + 1))
             continue
         if r.status_code == 404 and empty_on_404:
@@ -50,9 +58,13 @@ def _get(name, url, params=None, headers=None, as_json=True, retries=3, empty_on
             continue
         if r.status_code in (401, 403, 409):
             raise RuntimeError(f"HTTP {r.status_code} - needs an API key or daily quota used up")
-        r.raise_for_status()
-        return r.json() if as_json else r.text
-    raise err
+        if r.status_code >= 400:  # never raise_for_status(): its message contains the URL and any API key
+            raise RuntimeError(f"HTTP {r.status_code} (request rejected)")
+        try:
+            return r.json() if as_json else r.text
+        except ValueError:
+            raise RuntimeError("unexpected response (not JSON)")
+    raise err or RuntimeError("no response")
 
 
 def _clean(s):
@@ -69,18 +81,29 @@ def _year(v):
     return m.group(1) if m else ""
 
 
+def _safe_url(u):
+    """Only http(s) links: a 'javascript:' link from a search result must never become clickable."""
+    u = (u or "").strip()
+    return u if re.match(r"https?://", u, re.I) else ""
+
+
+def _norm_doi(doi):
+    return re.sub(r"^(https?://)?(dx\.)?doi\.org/|^doi:\s*", "", (doi or "").strip(), flags=re.I).lower()
+
+
 def _item(source, type_, tier, title, authors=None, year=None, venue=None, abstract=None,
           url=None, doi=None, citations=None, pdf_url="", retracted=False, preprint=False, publisher=""):
+    doi = _norm_doi(doi)
     return {
-        "pdf_url": pdf_url or "", "retracted": bool(retracted), "preprint": bool(preprint),
+        "pdf_url": _safe_url(pdf_url), "retracted": bool(retracted), "preprint": bool(preprint),
         "publisher": _clean(publisher),
         "source": source, "type": type_, "tier": tier,
         "title": _clean(title) or "(untitled)",
         "authors": [_clean(a) for a in (authors or []) if a and _clean(a)],
         "year": _year(year), "venue": _clean(venue), "abstract": _clean(abstract),
-        "url": url or (f"https://doi.org/{doi}" if doi else ""),
-        "doi": (doi or "").lower().replace("https://doi.org/", ""),
-        "citations": int(citations) if isinstance(citations, (int, float)) else None,
+        "url": _safe_url(url) or (f"https://doi.org/{doi}" if doi else ""),
+        "doi": doi,
+        "citations": int(citations) if isinstance(citations, (int, float)) and not isinstance(citations, bool) else None,
     }
 
 
@@ -211,7 +234,9 @@ def search_pubmed(query, limit, lang="en"):
 
 
 def search_doaj(query, limit, lang="en"):
-    data = _get("doaj", f"https://doaj.org/api/search/articles/{quote(query)}", {"pageSize": min(limit, 100)})
+    # DOAJ uses Elasticsearch query syntax: characters such as : ( ) / " would make the request fail.
+    clean = re.sub(r"[^\w\s-]", " ", query).strip() or "research"
+    data = _get("doaj", f"https://doaj.org/api/search/articles/{quote(clean)}", {"pageSize": min(limit, 100)})
     out = []
     for r in data.get("results", []):
         b = r.get("bibjson", {})
@@ -326,17 +351,34 @@ def _ddgs():
     return DDGS()
 
 
+def _ddg(kind, query, max_results):
+    """DuckDuckGo search with one shared rate limit and one retry, because it blocks fast repeated searches."""
+    for attempt in range(2):
+        _throttle("ddg")
+        try:
+            client = _ddgs()
+            fn = client.news if kind == "news" else client.text
+            return fn(query, max_results=max_results) or []
+        except Exception as e:
+            if "no results" in str(e).lower():
+                return []
+            if attempt == 1:
+                raise RuntimeError(f"DuckDuckGo: {scrub(str(e))[:120]}")
+            time.sleep(6)
+    return []
+
+
 def search_hadith(query, limit, lang="en"):
-    _throttle("hadith")
     site, venue = ("hadithbd.com", "HadithBD (Bangla)") if lang == "bn" else ("sunnah.com", "Sunnah.com")
-    res = _ddgs().text(f"site:{site} {query}", max_results=min(limit, 15)) or []
+    res = _ddg("text", f"site:{site} {query}", min(limit, 15))
     return [_item("hadith", "religious", "medium", r.get("title"), [], None, venue,
                   r.get("body"), r.get("href")) for r in res]
 
 
 # ---------------------------------------------------------------- Web and news
 
-_TRUSTED = (".gov", ".gov.au", ".gov.uk", ".edu", ".edu.au", ".ac.uk", ".int", ".un.org", "who.int", "oecd.org")
+_TRUSTED = (".gov", ".gov.au", ".gov.uk", ".gov.bd", ".edu", ".edu.au", ".edu.bd", ".ac.uk", ".ac.bd", ".int",
+            ".un.org", "who.int", "oecd.org", "worldbank.org", "imf.org", "adb.org")
 
 
 def _web_tier(url):
@@ -345,15 +387,13 @@ def _web_tier(url):
 
 
 def search_web(query, limit, lang="en"):
-    _throttle("web")
-    res = _ddgs().text(query, max_results=min(limit, 20)) or []
+    res = _ddg("text", query, min(limit, 20))
     return [_item("web", "web", _web_tier(r.get("href")), r.get("title"), [], None,
                   urlparse(r.get("href", "")).netloc, r.get("body"), r.get("href")) for r in res]
 
 
 def search_news(query, limit, lang="en"):
-    _throttle("news")
-    res = _ddgs().news(query, max_results=min(limit, 20)) or []
+    res = _ddg("news", query, min(limit, 20))
     return [_item("news", "news", "medium", r.get("title"), [], r.get("date"), r.get("source"),
                   r.get("body"), r.get("url") or r.get("href")) for r in res]
 
@@ -362,8 +402,7 @@ def search_news(query, limit, lang="en"):
 
 def _site_source(key, site, type_, tier, venue):
     def search(query, limit, lang="en"):
-        _throttle("bdsites")
-        res = _ddgs().text(f"site:{site} {query}", max_results=min(limit, 10)) or []
+        res = _ddg("text", f"site:{site} {query}", min(limit, 10))
         return [_item(key, type_, tier, r.get("title"), [], None, venue, r.get("body"), r.get("href")) for r in res]
     search.__name__ = f"search_{key}"
     return search
@@ -451,7 +490,7 @@ def citation_trail(doi, limit):
 
 SOURCES = {
     "openalex":         {"label": "OpenAlex", "group": "Academic papers", "fn": search_openalex, "mode": "questions",
-                         "default": True, "needs": "OPENALEX_API_KEY (free, required since Feb 2026)"},
+                         "default": True, "keyless_topic_only": True, "needs": "OPENALEX_API_KEY (free, required since Feb 2026)"},
     "semantic_scholar": {"label": "Semantic Scholar", "group": "Academic papers", "fn": search_semantic_scholar, "mode": "questions", "default": True},
     "crossref":         {"label": "CrossRef", "group": "Academic papers", "fn": search_crossref, "mode": "questions", "default": True},
     "doaj":             {"label": "DOAJ (open-access journals)", "group": "Academic papers", "fn": search_doaj, "mode": "questions", "default": True},

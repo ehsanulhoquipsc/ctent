@@ -32,15 +32,19 @@ def conn():
     return c
 
 
-def init():
+def init(mark_interrupted=True):
+    """mark_interrupted: only the web app should do this at startup. A run still "running" then belongs to a
+    server that was stopped. The command-line tool must not, or it would break a run the web app is doing."""
     with conn() as c:
+        c.execute("PRAGMA journal_mode=WAL")  # lets the page read while a research run is writing
         c.executescript(SCHEMA)
         for table, cols in EXTRA_COLS.items():
             have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
             for col, typ in cols.items():
                 if col not in have:
                     c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
-        c.execute("UPDATE runs SET status='interrupted' WHERE status NOT IN ('done','error','interrupted')")
+        if mark_interrupted:
+            c.execute("UPDATE runs SET status='interrupted' WHERE status NOT IN ('done','error','interrupted')")
 
 
 def create_run(topic, depth, sources, lang="en", options=None):
@@ -67,6 +71,16 @@ def get_run(run_id):
     with conn() as c:
         r = c.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
         return dict(r) if r else None
+
+
+def count_runs():
+    with conn() as c:
+        return c.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+
+
+def count_items(run_id):
+    with conn() as c:
+        return c.execute("SELECT COUNT(*) FROM items WHERE run_id=?", (run_id,)).fetchone()[0]
 
 
 def list_runs(limit=30):

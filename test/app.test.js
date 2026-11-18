@@ -664,7 +664,7 @@ test('AI agents: plan, search, evidence cards, agreement, gaps, select, accept, 
     assert.ok(cards.some((c) => c.flags.includes('retracted')), 'retraction found via Crossref');
     assert.ok(cards.some((c) => c.flags.includes('check_journal')), 'questionable journal flagged');
     const a = cards.find((c) => c.findings.includes('Finding A about flow.') && c.doi && c.type === 'paper' && !c.flags.length);
-    assert.ok(a && a.data_points.length && a.method === 'case study' && a.quote && /\(Author1, 20\d\d\)/.test(a.in_text) && a.citation.includes('doi: 10.1000'), 'extracted card with verified quote and Harvard citation');
+    assert.ok(a && a.data_points.length && a.method === 'case study' && a.quote && /\(Author1, 20\d\d[a-z]?\)/.test(a.in_text) && a.citation.includes('doi: 10.1000'), 'extracted card with verified quote and Harvard citation');
     assert.ok(cards.every((c) => c.quote !== 'invented quote not in the text'), 'invented quotes are dropped');
     assert.ok(JSON.parse(run.synthesis).length >= 1, 'agreement map saved');
     assert.match(run.gap_data, /Few dry-season studies/);

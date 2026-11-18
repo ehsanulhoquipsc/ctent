@@ -43,7 +43,9 @@ function firstSentences(text, n) {
   return s.slice(0, n || 1).join(' ').trim();
 }
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
-const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()) : []);
+// A model sometimes answers one string instead of a list: keep it rather than dropping it.
+const list = (v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? v : []).filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim());
+const idList = (v) => (Array.isArray(v) ? v : v === undefined || v === null || v === '' ? [] : [v]);
 const fill = (tpl, kw) => tpl.replace(/\{(\w+)\}/g, (m, k) => (kw[k] !== undefined ? kw[k] : m));
 // The researcher can stop a run, and the watchdog ends runs that hang; either way the job must not overwrite it.
 async function alive(runId) { const r = await db('agent_runs').where({ id: runId }).select('status').first(); return !!r && r.status === 'running'; }
@@ -159,6 +161,11 @@ function buildJobs(plan, enabled, perSource, lang) {
   for (const key of enabled) {
     const src = research.SOURCE_TYPES[key];
     if (!src || !research.available(key)) continue;
+    if (src.keylessTopicOnly && !process.env.OPENALEX_API_KEY) {
+      // Without a key OpenAlex allows only a few searches a day: search the main topic once.
+      if (!BANGLA.test(plan.topic_query)) jobs.push([key, topicQ, plan.topic_query, perSource, 'en']);
+      continue;
+    }
     if (src.mode === 'islamic') {
       for (const kw of plan.islamic_keywords || []) jobs.push([key, islamic, kw, perSource, key === 'quran' ? lang : 'en']);
       if (lang === 'bn' && key === 'hadith') for (const kw of plan.islamic_keywords_bn || []) jobs.push([key, islamic, kw, perSource, 'bn']);
@@ -217,7 +224,8 @@ function dedupe(items) {
     for (const s of it.found_in || [it.source]) if (!cur.found_in.includes(s)) cur.found_in.push(s);
     if ((it.abstract || '').length > (cur.abstract || '').length) cur.abstract = it.abstract;
     cur.citations = Math.max(cur.citations || 0, it.citations || 0) || null;
-    for (const k of ['year', 'venue', 'doi', 'url', 'pdf_url', 'publisher', 'via']) cur[k] = cur[k] || it[k];
+    // ("via" is not copied: a paper the search found itself must not be relabelled "found via citation trail")
+    for (const k of ['year', 'venue', 'doi', 'url', 'pdf_url', 'publisher']) cur[k] = cur[k] || it[k];
     cur.retracted = cur.retracted || it.retracted;
     cur.preprint = cur.preprint && it.preprint; // a published copy wins
     if (!cur.authors.length && it.authors.length) cur.authors = it.authors;
@@ -262,7 +270,8 @@ async function followTrail(items, depth, lang, runId) {
 
 // ---------------------------------------------------------------- 5-6. Read full text and extract evidence
 function apply(it, r) {
-  const rel = parseInt(r.relevance, 10);
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return;
+  const rel = Math.round(parseFloat(r.relevance));
   it.relevance = Number.isFinite(rel) ? Math.max(0, Math.min(5, rel)) : null;
   it.findings = list(r.findings).slice(0, 6);
   it.data_points = list(r.data_points).slice(0, 10);
@@ -271,7 +280,7 @@ function apply(it, r) {
   const mt = str(r.method_type).toLowerCase();
   it.method_type = evidence.METHOD_TYPES.includes(mt) ? mt : '';
   it.country = str(r.country).slice(0, 200);
-  const q = str(r.quote);
+  const q = str(r.quote).replace(/\s+/g, ' ').replace(/^["'“”\s]+|["'“”\s]+$/g, '');
   const sourceText = ((it._fulltext || '') + ' ' + (it.abstract || '')).replace(/\s+/g, ' ').toLowerCase();
   it.quote = q && sourceText.includes(q.slice(0, 40).toLowerCase()) ? q.slice(0, 400) : ''; // only quotes that really are in the text
   it.score = (it.score || 0) + 0.4 * (it.relevance || 0);
@@ -312,7 +321,7 @@ async function extract(items, topicText, lang, part, runId, batchSize = 8) {
     const text = batch.map((it, i) => '[id=' + i + '] Sub-question: ' + it.question + '\nTitle: ' + it.title + '\nYear: ' + (it.year || 'n.d.') + '\nText: ' + it.abstract.slice(0, 1800)).join('\n\n');
     try {
       const res = await llm.json('Reply with JSON only.', fill(EXTRACT_PROMPT, { topic: topicText, sources: text, lang_rule: LANG_RULES.extract[lang], method_types: METHOD_LIST }));
-      const byId = new Map((res.items || []).filter((r) => r && typeof r === 'object').map((r) => [String(r.id), r]));
+      const byId = new Map((Array.isArray(res.items) ? res.items : []).filter((r) => r && typeof r === 'object').map((r) => [String(r.id).replace(/[^\d]/g, ''), r]));
       batch.forEach((it, i) => { if (byId.has(String(i))) apply(it, byId.get(String(i))); });
     } catch (e) { await log(runId, msg(lang, 'skipped', { i: bi, e: String(e.message).slice(0, 120) })); }
     if (!(await alive(runId))) throw new Stopped();
@@ -342,10 +351,10 @@ async function synthesize(items, plan, lang, runId) {
     const cards = group.map((it, i) => '[' + i + '] ' + it.in_text + ': ' + it.findings.slice(0, 4).concat((it.data_points || []).slice(0, 2)).join(' | ')).join('\n');
     let res;
     try { res = await llm.json('Reply with JSON only.', fill(SYNTH_PROMPT, { question: q, cards, lang_rule: LANG_RULES.synth[lang] })); } catch (e) { await log(runId, msg(lang, 'skipped', { i: q.slice(0, 40), e: String(e.message).slice(0, 100) })); continue; }
-    const pick = (ids) => [...new Set((ids || []).map((i) => group[parseInt(i, 10)]).filter(Boolean))];
+    const pick = (ids) => [...new Set(idList(ids).map((i) => parseInt(i, 10)).filter((i) => i >= 0).map((i) => group[i]).filter(Boolean))];
     const claims = [];
-    for (const c of res.claims || []) {
-      if (!c || !str(c.claim)) continue;
+    for (const c of Array.isArray(res.claims) ? res.claims : []) {
+      if (!c || typeof c !== 'object' || !str(c.claim)) continue;
       const sup = pick(c.support); const con = pick(c.contradict).filter((x) => !sup.includes(x));
       if (!sup.length && !con.length) continue;
       claims.push({ claim: str(c.claim).slice(0, 600), support: sup, contradict: con, note: str(c.note).slice(0, 600), consensus: consensusOf(sup.length, con.length) });
@@ -434,9 +443,8 @@ async function execute(runId) {
     for (const it of items) {
       if (!(it.findings || []).length) it.findings = it.abstract ? [firstSentences(it.abstract, 2).slice(0, 500)] : [];
       it.data_points = it.data_points || [];
-      it.citation = evidence.harvard(it);
-      it.in_text = evidence.inText(it);
     }
+    evidence.applyCitations(items); // Harvard citations, with 2021a / 2021b when author and year repeat
 
     let synth = [];
     if (opts.has('synthesis') && llm.available()) { await step(part, 86, 'Mapping agreement and contradiction'); synth = await synthesize(items, plan, lang, runId); }
@@ -602,4 +610,5 @@ async function draftSection(topic, section, items, lang) {
 
 function queueInfo() { return { queue: queue.slice(), active, concurrency: CONCURRENCY }; }
 
-module.exports = { rescueSaved, queueInfo, launch, recover, watchdog, stop, suggestParts, draftSection, rerunGaps, parseCard, DEPTH, OPTIONS, DEFAULT_OPTIONS, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; } };
+module.exports = { rescueSaved, queueInfo, launch, recover, watchdog, stop, suggestParts, draftSection, rerunGaps, parseCard, DEPTH, OPTIONS, DEFAULT_OPTIONS, keywords, firstSentences, _onFinish: (fn) => { testHook = fn; },
+  _internal: { dedupe, buildJobs, applyAnswer: apply, list } }; // _internal: for unit tests only

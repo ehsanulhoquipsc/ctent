@@ -11,6 +11,11 @@ import config
 _lock = threading.Lock()
 _last = [0.0]
 _client = [None]
+_blocked_until = [0.0]   # set when the daily free quota is used up, so later calls fail fast instead of waiting
+
+
+class QuotaExhausted(RuntimeError):
+    pass
 
 
 def enabled():
@@ -42,6 +47,8 @@ def _gemini(prompt, json_mode):
         _client[0] = genai.Client(api_key=config.GEMINI_API_KEY)
     cfg = types.GenerateContentConfig(
         temperature=0.2, response_mime_type="application/json" if json_mode else "text/plain")
+    if time.monotonic() < _blocked_until[0]:
+        raise QuotaExhausted("Gemini daily free quota is used up. Try again later (it resets daily), or use Ollama.")
     for attempt in range(4):
         _throttle()
         try:
@@ -49,11 +56,19 @@ def _gemini(prompt, json_mode):
             return resp.text or ""
         except Exception as e:
             msg = str(e)
-            if any(code in msg for code in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE")):
-                time.sleep(20 * (attempt + 1))
+            if "PerDay" in msg or "per day" in msg.lower():
+                # Daily quota: waiting a minute will not help, so stop all AI calls for the next 30 minutes.
+                _blocked_until[0] = time.monotonic() + 1800
+                raise QuotaExhausted("Gemini daily free quota is used up. Try again later (it resets daily), or use Ollama.")
+            if any(code in msg for code in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "overloaded")):
+                time.sleep(15 * (attempt + 1))
                 continue
-            raise
-    raise RuntimeError("Gemini free-tier limit reached. Wait a few minutes, or use Quick depth.")
+            if "API_KEY_INVALID" in msg or "API key not valid" in msg:
+                raise RuntimeError("Gemini rejected the API key. Check GEMINI_API_KEY in .env.")
+            if "NOT_FOUND" in msg or "is not found" in msg:
+                raise RuntimeError(f"Gemini model '{config.GEMINI_MODEL}' was not found. Set GEMINI_MODEL=gemini-2.5-flash in .env.")
+            raise RuntimeError(f"Gemini error: {msg[:200]}")
+    raise RuntimeError("Gemini is busy or the per-minute limit was reached. Wait a few minutes, or use Quick depth.")
 
 
 def _ollama(prompt, json_mode):
@@ -75,13 +90,24 @@ def text_call(prompt):
     return _call(prompt, False)
 
 
+def _shape(data):
+    """Models sometimes answer with a bare list, or a list holding one object, instead of the object we asked for.
+    Always return a dict so callers can use .get() safely."""
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, list):
+        first = data[0] if len(data) == 1 and isinstance(data[0], dict) else {}
+        return {**first, "items": data, "claims": data, "gaps": data, "questions": data}
+    return {}
+
+
 def json_call(prompt):
     text = _call(prompt, True).strip()
-    text = re.sub(r"^```(?:json)?|```$", "", text).strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text).strip()
     try:
-        return json.loads(text)
+        return _shape(json.loads(text))
     except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.S)
+        m = re.search(r"\{.*\}|\[.*\]", text, re.S)
         if m:
-            return json.loads(m.group(0))
-        raise
+            return _shape(json.loads(m.group(0)))
+        raise ValueError("the AI did not return valid JSON")

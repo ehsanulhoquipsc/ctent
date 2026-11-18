@@ -46,18 +46,24 @@ def pdf_candidates(it):
 
 def download_pdf(url):
     sources._throttle("fulltext")
+    if not url.lower().startswith(("http://", "https://")):
+        return None
     try:
-        r = sources._session.get(url, timeout=40, stream=True, headers={"Accept": "application/pdf,*/*"})
+        # "with" closes the connection even when we stop early (wrong type, too big, error)
+        with sources._session.get(url, timeout=40, stream=True, headers={"Accept": "application/pdf,*/*"}) as r:
+            if r.status_code != 200:
+                return None
+            data = bytearray()
+            for chunk in r.iter_content(65536):
+                data += chunk
+                if len(data) > MAX_BYTES:
+                    return None
+                if len(data) >= 1024 and b"%PDF-" not in bytes(data[:1024]):
+                    return None  # an HTML landing page, not a PDF: stop downloading
     except Exception:
         return None
-    if r.status_code != 200:
-        return None
-    data = bytearray()
-    for chunk in r.iter_content(65536):
-        data += chunk
-        if len(data) > MAX_BYTES:
-            return None
-    return bytes(data) if data[:5] == b"%PDF-" else None
+    start = bytes(data[:1024]).find(b"%PDF-")
+    return bytes(data[start:]) if start >= 0 else None
 
 
 def pdf_text(data):

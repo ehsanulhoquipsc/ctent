@@ -2,6 +2,7 @@
 Saves the run to the same database, so you can open it later in the web app."""
 import argparse
 import json
+import sys
 
 import agent
 import config
@@ -9,13 +10,19 @@ import db
 import exporter
 import sources
 
+for stream in (sys.stdout, sys.stderr):  # Bangla output on a Windows console
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 p = argparse.ArgumentParser()
 p.add_argument("topic")
 p.add_argument("--depth", choices=list(config.DEPTHS), default="quick")
 p.add_argument("--sources", help="comma-separated keys, default = all default sources")
 a = p.parse_args()
 
-db.init()
+db.init(mark_interrupted=False)
 chosen = a.sources.split(",") if a.sources else [k for k, s in sources.SOURCES.items() if s["default"]]
 run_id = db.create_run(a.topic, a.depth, chosen)
 agent.run_research(run_id)

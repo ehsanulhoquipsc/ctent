@@ -68,33 +68,52 @@ function evidenceMarkdown(title, lang, items, questions, gapResult) {
       if (it.url) out.push('**' + L('link') + ':** ' + it.url, '');
     }
   }
-  out.push('## ' + L('references'), '', ...[...new Set(items.map((it) => it.citation).filter(Boolean))].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
+  // Retracted papers stay visible as cards (with their warning) but never go into the reference list.
+  const usable = items.filter((it) => !(it.flags || []).includes('retracted'));
+  out.push('## ' + L('references'), '', ...[...new Set(usable.map((it) => it.citation).filter(Boolean))].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
   return out.join('\n') + '\n';
 }
 
 // Simple Markdown (headings, bullets, numbered lists, quotes, **bold**, *italic*) to a Word document.
+// Characters that are illegal in Word/Excel XML (PDF text often contains them): they make the file unreadable.
+const ILLEGAL_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+const cleanXml = (v) => (typeof v === 'string' ? v.replace(ILLEGAL_XML, '') : v);
+
 async function mdToDocx(md) {
   const D = require('docx');
-  const runs = (text) => text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/).filter(Boolean).map((p) => {
+  md = cleanXml(String(md || ''));
+  const runs = (text) => text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/).filter(Boolean).map((p) => {
+    if (/^\*\*\*.*\*\*\*$/.test(p) && p.length > 6) return new D.TextRun({ text: p.slice(3, -3), bold: true, italics: true });
     if (/^\*\*.*\*\*$/.test(p)) return new D.TextRun({ text: p.slice(2, -2), bold: true });
     if (/^\*.*\*$/.test(p) && p.length > 2) return new D.TextRun({ text: p.slice(1, -1), italics: true });
     return new D.TextRun(p);
   });
   const children = [];
   let inRefs = false;
-  for (const line of md.split('\n')) {
-    const s = line.trimEnd();
-    if (!s.trim()) continue;
-    const h = s.match(/^(#{1,4})\s+(.*)/);
+  const lines = md.split('\n');
+  for (let li = 0; li < lines.length; li++) {
+    const s = lines[li].trimEnd();
+    if (!s.trim() || /^\s*([-*_])(\s*\1){2,}\s*$/.test(s)) continue; // blank line or horizontal rule
+    if (s.trimStart().startsWith('|')) { // a Markdown table becomes a Word table (the |---| row is dropped)
+      const block = [s];
+      while (li + 1 < lines.length && lines[li + 1].trimStart().startsWith('|')) block.push(lines[++li]);
+      const rows = block.filter((r) => !/^\|?[\s:|-]+\|?$/.test(r.trim())).map((r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim()));
+      if (rows.length) {
+        const width = Math.max(...rows.map((r) => r.length));
+        children.push(new D.Table({ rows: rows.map((r, ri) => new D.TableRow({ children: Array.from({ length: width }, (_, ci) => new D.TableCell({ children: [new D.Paragraph({ children: ri === 0 ? [new D.TextRun({ text: r[ci] || '', bold: true })] : runs(r[ci] || ' ') })] })) })) }));
+      }
+      continue;
+    }
+    const h = s.match(/^(#{1,6})\s+(.*)/);
     if (h) {
       const text = h[2].replace(/\*/g, '');
-      const level = [D.HeadingLevel.TITLE, D.HeadingLevel.HEADING_1, D.HeadingLevel.HEADING_2, D.HeadingLevel.HEADING_3][h[1].length - 1];
+      const level = [D.HeadingLevel.TITLE, D.HeadingLevel.HEADING_1, D.HeadingLevel.HEADING_2, D.HeadingLevel.HEADING_3, D.HeadingLevel.HEADING_4, D.HeadingLevel.HEADING_5][h[1].length - 1];
       children.push(new D.Paragraph({ text, heading: level }));
       inRefs = /^(references|reference list|তথ্যসূত্র)/i.test(text);
       continue;
     }
-    if (/^\s*[-*]\s+/.test(s)) children.push(new D.Paragraph({ children: runs(s.replace(/^\s*[-*]\s+/, '')), bullet: { level: 0 } }));
-    else if (/^\s*\d+\.\s+/.test(s)) children.push(new D.Paragraph({ children: runs(s), indent: { left: 360 } }));
+    if (/^\s*[-*+•]\s+/.test(s)) children.push(new D.Paragraph({ children: runs(s.replace(/^\s*[-*+•]\s+/, '')), bullet: { level: 0 } }));
+    else if (/^\s*\d+[.)]\s+/.test(s)) children.push(new D.Paragraph({ children: runs(s), indent: { left: 360 } }));
     else if (s.startsWith('>')) children.push(new D.Paragraph({ children: [new D.TextRun({ text: s.replace(/^>\s*/, ''), italics: true })], indent: { left: 540 } }));
     else children.push(new D.Paragraph({ children: runs(s), spacing: { after: 120 }, ...(inRefs ? { indent: { left: 720, hanging: 720 } } : {}) }));
   }
@@ -116,7 +135,7 @@ async function matrixXlsx(title, lang, items, synthesis, gapResult) {
     head.height = 30;
     head.eachCell((c) => { c.font = { name: font, bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8E2433' } }; c.alignment = { vertical: 'middle', wrapText: true }; });
     rows.forEach((row, i) => {
-      const r = ws.addRow(row);
+      const r = ws.addRow(row.map(cleanXml));
       r.eachCell({ includeEmpty: true }, (c) => { c.font = { name: font, size: 10 }; c.alignment = { vertical: 'top', wrapText: true }; if (i % 2 === 0) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6F4F1' } }; });
       if (opts.fill) opts.fill(r, i);
     });
