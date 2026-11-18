@@ -22,7 +22,10 @@ function makeConfig() {
     return {
       client: 'pg',
       connection: { connectionString: process.env.DATABASE_URL, ssl: useSsl ? { rejectUnauthorized: false } : false },
-      pool: { min: 0, max: 8 },
+      // Keep connections open for 5 minutes between requests: opening a new encrypted one to a hosted database
+      // costs several round trips, and the default closes them after 30 seconds idle.
+      pool: { min: 0, max: 10, idleTimeoutMillis: 5 * 60 * 1000, reapIntervalMillis: 30 * 1000 },
+      acquireConnectionTimeout: 30000,
       migrations
     };
   }

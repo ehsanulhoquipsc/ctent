@@ -115,17 +115,22 @@ r.get('/topics/:tid/paper', auth.loadTopic('member'), async (req, res) => {
   const t = req.topic;
   const sections = await ensureSections(t);
   const cur = sections.find((s) => s.id === parseInt(req.query.s, 10)) || sections.find((s) => s.part_id) || sections[0];
-  const { num, refs } = await numbering(sections);
-  const parts = await db('parts').where({ topic_id: t.id }).select('id', 'title', 'agent_status', 'agent_name', 'handler');
+  const bodyIds = [...new Set([...String(cur.body || '').matchAll(MARK)].map((m) => parseInt(m[1], 10)))];
+  // These don't depend on each other, so they're fetched together.
+  const [{ num, refs }, parts, findings, comments, srcAll, allF] = await Promise.all([
+    numbering(sections),
+    db('parts').where({ topic_id: t.id }).select('id', 'title', 'agent_status', 'agent_name', 'handler'),
+    acceptedFindings(t.id, cur.part_id ? [cur.part_id] : null),
+    db('paper_comments').leftJoin('users', 'users.id', 'paper_comments.user_id').where('paper_comments.section_id', cur.id).orderBy('paper_comments.id').select('paper_comments.*', 'users.name', 'users.color', 'users.id as uid'),
+    bodyIds.length ? db('agent_sources').whereIn('id', bodyIds) : [],
+    acceptedFindings(t.id, null)
+  ]);
   const partOf = Object.fromEntries(parts.map((p) => [p.id, p]));
-  const findings = await acceptedFindings(t.id, cur.part_id ? [cur.part_id] : null);
   const used = new Set();
   sections.forEach((s) => { String(s.body || '').split(/\n\s*\n/).forEach((p) => used.add(p.replace(MARK, '').trim())); });
-  const comments = await db('paper_comments').leftJoin('users', 'users.id', 'paper_comments.user_id').where('paper_comments.section_id', cur.id).orderBy('paper_comments.id').select('paper_comments.*', 'users.name', 'users.color', 'users.id as uid');
   // Citation popovers: what each cited source is and the finding it supports.
-  const curIds = [...new Set([...String(cur.body || '').matchAll(MARK)].map((m) => parseInt(m[1], 10)))].filter((id) => num[id]);
-  const srcRows = curIds.length ? (await db('agent_sources').whereIn('id', curIds)).map(agent.parseCard) : [];
-  const allF = await acceptedFindings(t.id, null);
+  const curIds = bodyIds.filter((id) => num[id]);
+  const srcRows = srcAll.filter((r) => num[r.id]).map(agent.parseCard);
   const cites = Object.fromEntries(srcRows.map((c) => [c.id, { n: num[c.id], title: c.title, authors: c.authorsList.slice(0, 3).join(', ') + (c.authorsList.length > 3 ? ' et al.' : ''), year: c.year || 'n.d.', tier: c.tier, flags: c.flags, url: u.safeUrl(c.url) || '',
     finding: ((allF.find((f) => f.srcIds.includes(c.id)) || {}).text || (c.findings || [])[0] || '').slice(0, 240) }]));
   const usedIds = new Set(curIds);

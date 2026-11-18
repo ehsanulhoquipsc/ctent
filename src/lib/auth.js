@@ -80,10 +80,13 @@ function notFound(res, message) {
 // ---------- Topic access ----------
 // Admins see every topic. Everyone else sees only topics they belong to.
 async function topicAccess(user, topicId) {
-  const topic = await db('topics').where({ id: topicId }).first();
+  const admin = user.platform_role === 'admin';
+  const [topic, m] = await Promise.all([
+    db('topics').where({ id: topicId }).first(),
+    admin ? null : db('topic_members').where({ topic_id: topicId, user_id: user.id }).first()
+  ]);
   if (!topic) return { topic: null, role: null };
-  if (user.platform_role === 'admin') return { topic, role: 'leader', isAdmin: true };
-  const m = await db('topic_members').where({ topic_id: topicId, user_id: user.id }).first();
+  if (admin) return { topic, role: 'leader', isAdmin: true };
   return { topic, role: m ? m.role : null };
 }
 function loadTopic(minRole) {
@@ -100,8 +103,7 @@ function loadTopic(minRole) {
     res.locals.topic = topic; res.locals.topicRole = role;
     res.locals.isTopicLeader = role === 'leader';
     res.locals.isGuest = role === 'guest';
-    res.locals.journey = await require('./journey').journeyOf(topic, role);
-    res.locals.topicMembersPreview = await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where('topic_members.topic_id', topic.id).orderByRaw("case topic_members.role when 'leader' then 0 when 'member' then 1 else 2 end").limit(5).select('users.id', 'users.name', 'users.color');
+    [res.locals.journey, res.locals.topicMembersPreview] = await Promise.all([require('./journey').journeyOf(topic, role), db('topic_members').join('users', 'users.id', 'topic_members.user_id').where('topic_members.topic_id', topic.id).orderByRaw("case topic_members.role when 'leader' then 0 when 'member' then 1 else 2 end").limit(5).select('users.id', 'users.name', 'users.color')]);
     next();
   };
 }

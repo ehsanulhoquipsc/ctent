@@ -19,21 +19,24 @@ r.get('/admin', async (req, res) => {
   const q = clean(req.query.q, 100).toLowerCase();
   let uq = db('users').orderBy('id');
   if (q) uq = uq.where((w) => w.whereRaw('lower(name) like ?', ['%' + q + '%']).orWhereRaw('lower(email) like ?', ['%' + q + '%']));
-  const users = await uq;
-  const tc = await db('topic_members').groupBy('user_id').select('user_id').count({ n: '*' });
+  // Everything on this page is independent: fetch it all at once.
+  const n = (row, k = 'n') => Number((row || {})[k]) || 0;
+  const [users, tc, cUsers, cActive, cTopics, cArchived, cFiles, cMessages, log, invRows, pending] = await Promise.all([
+    uq,
+    db('topic_members').groupBy('user_id').select('user_id').count({ n: '*' }),
+    db('users').count({ n: '*' }).first(),
+    db('users').where({ status: 'active' }).count({ n: '*' }).first(),
+    db('topics').count({ n: '*' }).first(),
+    db('topics').where({ status: 'archived' }).count({ n: '*' }).first(),
+    db('files').sum({ s: 'size' }).first(),
+    db('messages').count({ n: '*' }).first(),
+    db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').leftJoin('topics', 'topics.id', 'audit_log.topic_id').orderBy('audit_log.id', 'desc').limit(40).select('audit_log.*', 'users.name', 'topics.code'),
+    db('invites').whereNull('topic_id').whereNull('revoked_at').orderBy('id', 'desc'),
+    db('users').leftJoin('topics', 'topics.id', 'users.pending_topic_id').where('users.status', 'pending').orderBy('users.id').select('users.*', 'topics.code as topic_code', 'topics.title as topic_title')
+  ]);
   const topicsOf = Object.fromEntries(tc.map((x) => [x.user_id, Number(x.n)]));
-  const stats = {
-    users: Number((await db('users').count({ n: '*' }).first()).n),
-    active: Number((await db('users').where({ status: 'active' }).count({ n: '*' }).first()).n),
-    topics: Number((await db('topics').count({ n: '*' }).first()).n),
-    archived: Number((await db('topics').where({ status: 'archived' }).count({ n: '*' }).first()).n),
-    files: Number((await db('files').sum({ s: 'size' }).first()).s) || 0,
-    messages: Number((await db('messages').count({ n: '*' }).first()).n)
-  };
-  const log = await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').leftJoin('topics', 'topics.id', 'audit_log.topic_id').orderBy('audit_log.id', 'desc').limit(40).select('audit_log.*', 'users.name', 'topics.code');
-  const invs = (await db('invites').whereNull('topic_id').whereNull('revoked_at').orderBy('id', 'desc')).filter((i) => !i.expires_at || new Date(i.expires_at).getTime() > Date.now()).map((i) => ({ ...i, link: invites.linkOf(req, i.token) }));
-  const pending = await db('users').leftJoin('topics', 'topics.id', 'users.pending_topic_id').where('users.status', 'pending').orderBy('users.id')
-    .select('users.*', 'topics.code as topic_code', 'topics.title as topic_title');
+  const stats = { users: n(cUsers), active: n(cActive), topics: n(cTopics), archived: n(cArchived), files: n(cFiles, 's'), messages: n(cMessages) };
+  const invs = invRows.filter((i) => !i.expires_at || new Date(i.expires_at).getTime() > Date.now()).map((i) => ({ ...i, link: invites.linkOf(req, i.token) }));
   res.render('pages/admin', { title: 'Admin console', active: 'admin', users: users.filter((x) => x.status !== 'pending'), pending, approvalOn: approvals.required(), topicsOf, stats, log, q, created: req.session.newUser || null, colors: COLOR_NAMES, invs, googleOn: require('../lib/google').configured() });
   req.session.newUser = null;
 });

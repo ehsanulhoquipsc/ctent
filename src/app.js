@@ -14,6 +14,40 @@ const auth = require('./lib/auth');
 const util = require('./lib/util');
 const { actionItems } = require('./lib/actions');
 
+// The numbers every page's menu shows (Inbox count, pinned projects). They're asked for in parallel and
+// kept for a few seconds per person, so clicking around doesn't repeat ~15 database trips on every page.
+// Any change anyone makes (a POST) clears them, so counts are never behind your own actions.
+const MENU_TTL = process.env.NODE_ENV === 'test' && !process.env.MENU_CACHE ? 0 : 20 * 1000;
+const menuCache = new Map();
+function clearMenus() { menuCache.clear(); }
+async function menuData(user) {
+  const hit = menuCache.get(user.id);
+  if (hit && Date.now() - hit.at < MENU_TTL && hit.role === user.platform_role) return hit.data;
+  const memberOnly = auth.RANK[user.platform_role] < auth.RANK.leader;
+  const [unreadRow, leads, ids, roleRows] = await Promise.all([
+    db('notifications').where({ user_id: user.id }).whereNull('read_at').count({ n: '*' }).first(),
+    memberOnly ? db('topic_members').where({ user_id: user.id, role: 'leader' }).first() : true,
+    auth.myTopicIds(user),
+    db('topic_members').where({ user_id: user.id }).select('topic_id', 'role')
+  ]);
+  const showActions = !!leads;
+  const [actions, pinnedRows] = await Promise.all([
+    showActions ? actionItems(user) : [],
+    ids.length ? db('topics').whereIn('id', ids).whereNotIn('status', ['archived', 'completed']).orderBy('id', 'desc').limit(4).select('*') : []
+  ]);
+  let pinned = [];
+  if (pinnedRows.length) {
+    const roles = Object.fromEntries(roleRows.map((x) => [x.topic_id, x.role]));
+    const js = await require('./lib/journey').journeyMany(pinnedRows, roles);
+    pinned = pinnedRows.map((t) => ({ id: t.id, code: t.code, title: t.title, color: t.color, j: js[t.id] }));
+  }
+  const unread = Number(unreadRow.n);
+  const data = { unread, actionCount: actions.length, showActions, inboxCount: actions.length + unread, pinned };
+  if (menuCache.size > 500) menuCache.clear();
+  menuCache.set(user.id, { at: Date.now(), role: user.platform_role, data });
+  return data;
+}
+
 function createApp() {
   const app = express();
   const prod = process.env.NODE_ENV === 'production';
@@ -77,6 +111,7 @@ function createApp() {
     cookie: { httpOnly: true, sameSite: 'lax', secure: prod, maxAge: 1000 * 60 * 60 * 12 }
   }));
   app.use(auth.loadUser);
+  app.use((req, res, next) => { if (req.method !== 'GET' && req.method !== 'HEAD') { clearMenus(); res.on('finish', clearMenus); } next(); });
   app.use(auth.csrf);
   // A fresh form token for pages left open while the session changed (signing in again in another tab, for example).
   app.get('/csrf.json', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ token: auth.csrfToken(req), signedIn: !!req.user }); });
@@ -88,28 +123,15 @@ function createApp() {
     res.locals.csrf = auth.csrfToken(req);
     res.locals.path = req.path;
     res.locals.flash = req.session.flash || null;
-    req.session.flash = null;
+    if (req.session.flash) req.session.flash = null; // only touch the session when there was a message to clear
     res.locals.unread = 0;
     res.locals.actionCount = 0;
     res.locals.pinned = [];
     res.locals.inboxCount = 0;
     if (req.user) {
-      const r = await db('notifications').where({ user_id: req.user.id }).whereNull('read_at').count({ n: '*' }).first();
-      res.locals.unread = Number(r.n);
       res.locals.isAdmin = req.user.platform_role === 'admin';
       res.locals.isMemberOnly = auth.RANK[req.user.platform_role] < auth.RANK.leader;
-      if (!res.locals.isMemberOnly || (await db('topic_members').where({ user_id: req.user.id, role: 'leader' }).first())) {
-        res.locals.actionCount = (await actionItems(req.user)).length;
-        res.locals.showActions = true;
-      }
-      res.locals.inboxCount = res.locals.actionCount + res.locals.unread;
-      const ids = await auth.myTopicIds(req.user);
-      res.locals.pinned = ids.length ? await db('topics').whereIn('id', ids).whereNotIn('status', ['archived', 'completed']).orderBy('id', 'desc').limit(4).select('*') : [];
-      if (res.locals.pinned.length) {
-        const roles = Object.fromEntries((await db('topic_members').where({ user_id: req.user.id }).select('topic_id', 'role')).map((x) => [x.topic_id, x.role]));
-        const js = await require('./lib/journey').journeyMany(res.locals.pinned, roles);
-        res.locals.pinned = res.locals.pinned.map((t) => ({ id: t.id, code: t.code, title: t.title, color: t.color, j: js[t.id] }));
-      }
+      Object.assign(res.locals, await menuData(req.user));
     }
     next();
   });
@@ -170,4 +192,4 @@ function createApp() {
   return app;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, clearMenus };

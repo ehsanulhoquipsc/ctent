@@ -10,9 +10,11 @@ const r = express.Router();
 
 async function topicProgress(ids) {
   if (!ids.length) return [];
-  const topics = await db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc');
-  const counts = await db('tasks').whereIn('topic_id', ids).groupBy('topic_id', 'status').select('topic_id', 'status').count({ n: '*' });
-  const pc = await db('parts').whereIn('topic_id', ids).groupBy('topic_id', 'agent_status').select('topic_id', 'agent_status').count({ n: '*' });
+  const [topics, counts, pc] = await Promise.all([
+    db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc'),
+    db('tasks').whereIn('topic_id', ids).groupBy('topic_id', 'status').select('topic_id', 'status').count({ n: '*' }),
+    db('parts').whereIn('topic_id', ids).groupBy('topic_id', 'agent_status').select('topic_id', 'agent_status').count({ n: '*' })
+  ]);
   return topics.map((t) => {
     // Progress = parts whose agent findings are accepted; topics without parts fall back to board tasks.
     const parts = pc.filter((c) => c.topic_id === t.id);
@@ -30,14 +32,13 @@ async function topicProgress(ids) {
 
 r.get('/', async (req, res) => {
   const me = req.user;
-  const ids = await auth.myTopicIds(me);
   const show = req.query.show === 'finished' ? 'finished' : 'active';
+  const [ids, roleRows, actions] = await Promise.all([auth.myTopicIds(me), db('topic_members').where({ user_id: me.id }).select('topic_id', 'role'), actionItems(me)]);
   const topics = ids.length ? await db('topics').whereIn('id', ids).whereNot('status', 'archived').orderBy('id', 'desc') : [];
-  const roles = Object.fromEntries((await db('topic_members').where({ user_id: me.id }).select('topic_id', 'role')).map((x) => [x.topic_id, x.role]));
+  const roles = Object.fromEntries(roleRows.map((x) => [x.topic_id, x.role]));
   if (me.platform_role === 'admin') for (const t of topics) roles[t.id] = roles[t.id] || 'leader';
-  const js = await journeyMany(topics, roles);
-  const team = topics.length ? await db('topic_members').join('users', 'users.id', 'topic_members.user_id').whereIn('topic_members.topic_id', topics.map((t) => t.id)).whereNot('topic_members.role', 'guest')
-    .orderByRaw("case topic_members.role when 'leader' then 0 else 1 end").select('topic_members.topic_id', 'users.id', 'users.name', 'users.color') : [];
+  const [js, team] = await Promise.all([journeyMany(topics, roles), topics.length ? db('topic_members').join('users', 'users.id', 'topic_members.user_id').whereIn('topic_members.topic_id', topics.map((t) => t.id)).whereNot('topic_members.role', 'guest')
+    .orderByRaw("case topic_members.role when 'leader' then 0 else 1 end").select('topic_members.topic_id', 'users.id', 'users.name', 'users.color') : []]);
   const list = topics.map((t) => ({ ...t, j: js[t.id], role: roles[t.id], team: team.filter((m) => m.topic_id === t.id) }));
   const active = list.filter((t) => t.status !== 'completed');
   const finished = list.filter((t) => t.status === 'completed');
@@ -46,7 +47,6 @@ r.get('/', async (req, res) => {
   const upNext = active.filter((t) => t.j.next && (t.j.next.href || t.j.next.action) && t.role !== 'guest')
     .map((t) => ({ topic: t, next: t.j.next, step: t.j.current ? t.j.current.n : null, r: rank(t.j.next) + (t.role === 'leader' ? 0 : 4) }))
     .sort((a, b) => a.r - b.r).slice(0, 3);
-  const actions = await actionItems(me);
   res.render('pages/dashboard', {
     title: 'Home', active: 'dashboard', show, projects: show === 'finished' ? finished : active, nActive: active.length, nFinished: finished.length, upNext, needCount: actions.length,
     hour: Number(new Date().toLocaleString('en-AU', { hour: 'numeric', hour12: false, timeZone: 'Australia/Sydney' })),
@@ -72,12 +72,11 @@ const INBOX_KIND = { message: 'message', mention: 'mention', meeting: 'meeting',
 const inboxKind = (k) => INBOX_KIND[k] || 'update';
 r.get('/inbox', async (req, res) => {
   const f = ['all', 'needs', 'message', 'mention', 'meeting', 'update'].includes(req.query.f) ? req.query.f : 'all';
-  const needs = await actionItems(req.user);
-  const notes = (await db('notifications').where({ user_id: req.user.id }).orderBy('id', 'desc').limit(80)).map((n) => ({ ...n, k: inboxKind(n.kind) }));
+  const [needs, noteRows, wids] = await Promise.all([actionItems(req.user), db('notifications').where({ user_id: req.user.id }).orderBy('id', 'desc').limit(80), auth.workTopicIds(req.user)]);
+  const notes = noteRows.map((n) => ({ ...n, k: inboxKind(n.kind) }));
   const counts = { all: needs.length + notes.length, needs: needs.length };
   for (const k of ['message', 'mention', 'meeting', 'update']) counts[k] = notes.filter((n) => n.k === k).length;
   const rows = f === 'all' || f === 'needs' ? notes : notes.filter((n) => n.k === f);
-  const wids = await auth.workTopicIds(req.user);
   const meetings = wids.length ? await db('meetings').join('topics', 'topics.id', 'meetings.topic_id').whereIn('meetings.topic_id', wids)
     .where('meetings.starts_at', '>=', new Date(Date.now() - 3600000).toISOString()).where('meetings.starts_at', '<=', new Date(Date.now() + 7 * 86400000).toISOString())
     .orderBy('meetings.starts_at').limit(4).select('meetings.*', 'topics.title as topic_title', 'topics.color as topic_color') : [];

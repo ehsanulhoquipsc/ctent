@@ -105,10 +105,12 @@ function compute(topic, role, parts, sections, tasks) {
 }
 
 async function load(ids) {
-  const parts = await db('parts').whereIn('topic_id', ids).orderBy('position').orderBy('id')
-    .select('id', 'topic_id', 'title', 'agent_status', 'agent_progress', 'agent_step', 'agent_name', 'handler', 'proposed_user_id', 'due_date');
-  const sections = await db('paper_sections').whereIn('topic_id', ids).select('id', 'topic_id', 'body', 'part_id');
-  const tasks = await db('tasks').whereIn('topic_id', ids).whereNotNull('part_id').select('id', 'topic_id', 'part_id', 'status', 'assignee_id', 'due_date');
+  const [parts, sections, tasks] = await Promise.all([
+    db('parts').whereIn('topic_id', ids).orderBy('position').orderBy('id')
+      .select('id', 'topic_id', 'title', 'agent_status', 'agent_progress', 'agent_step', 'agent_name', 'handler', 'proposed_user_id', 'due_date'),
+    db('paper_sections').whereIn('topic_id', ids).select('id', 'topic_id', 'body', 'part_id'),
+    db('tasks').whereIn('topic_id', ids).whereNotNull('part_id').select('id', 'topic_id', 'part_id', 'status', 'assignee_id', 'due_date')
+  ]);
   return { parts, sections, tasks };
 }
 

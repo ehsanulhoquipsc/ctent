@@ -33,18 +33,23 @@ const base = (t) => '/topics/' + t.id + '/agents';
 async function partsOf(topicId) {
   const parts = await db('parts').where({ topic_id: topicId }).orderBy('position').orderBy('id');
   if (!parts.length) return [];
-  const runs = await db('agent_runs').whereIn('part_id', parts.map((p) => p.id)).orderBy('id', 'desc').select('id', 'part_id', 'status', 'confidence', 'finished_at');
+  const [runs, owners, ctx] = await Promise.all([
+    db('agent_runs').whereIn('part_id', parts.map((p) => p.id)).orderBy('id', 'desc').select('id', 'part_id', 'status', 'confidence', 'finished_at'),
+    db('users').whereIn('id', parts.map((p) => p.proposed_user_id).filter(Boolean)).select('id', 'name', 'color'),
+    plain.queueContext(parts)
+  ]);
   const latest = {};
   runs.forEach((x) => { if (!latest[x.part_id]) latest[x.part_id] = x; });
   const ids = Object.values(latest).map((x) => x.id);
-  const fc = ids.length ? await db('agent_findings').whereIn('run_id', ids).groupBy('run_id').select('run_id').count({ n: '*' }) : [];
-  const sc = ids.length ? await db('agent_sources').whereIn('run_id', ids).groupBy('run_id').select('run_id').count({ n: '*' }) : [];
-  const kc = ids.length ? await db('agent_findings').whereIn('run_id', ids).where({ kept: true }).groupBy('run_id').select('run_id').count({ n: '*' }) : [];
+  const none = Promise.resolve([]);
+  const [fc, sc, kc, tasks] = await Promise.all([
+    ids.length ? db('agent_findings').whereIn('run_id', ids).groupBy('run_id').select('run_id').count({ n: '*' }) : none,
+    ids.length ? db('agent_sources').whereIn('run_id', ids).groupBy('run_id').select('run_id').count({ n: '*' }) : none,
+    ids.length ? db('agent_findings').whereIn('run_id', ids).where({ kept: true }).groupBy('run_id').select('run_id').count({ n: '*' }) : none,
+    db('tasks').leftJoin('users', 'users.id', 'tasks.assignee_id').whereIn('tasks.part_id', parts.map((p) => p.id)).orderBy('tasks.id', 'desc')
+    .select('tasks.id', 'tasks.part_id', 'tasks.status', 'tasks.due_date', 'tasks.assignee_id', 'users.name as who', 'users.color as who_color')
+  ]);
   const num = (list, id) => Number((list.find((x) => x.run_id === id) || { n: 0 }).n);
-  const tasks = await db('tasks').leftJoin('users', 'users.id', 'tasks.assignee_id').whereIn('tasks.part_id', parts.map((p) => p.id)).orderBy('tasks.id', 'desc')
-    .select('tasks.id', 'tasks.part_id', 'tasks.status', 'tasks.due_date', 'tasks.assignee_id', 'users.name as who', 'users.color as who_color');
-  const owners = await db('users').whereIn('id', parts.map((p) => p.proposed_user_id).filter(Boolean)).select('id', 'name', 'color');
-  const ctx = await plain.queueContext(parts);
   return parts.map((p) => {
     const run = latest[p.id] || null;
     const task = tasks.find((x) => x.part_id === p.id) || null;
@@ -65,21 +70,24 @@ async function teamOf(topicId) {
   const m = await db('topic_members').join('users', 'users.id', 'topic_members.user_id').where('topic_members.topic_id', topicId).whereNot('topic_members.role', 'guest').where('users.status', 'active')
     .orderBy('users.name').select('users.id', 'users.name', 'users.color', 'users.title');
   const ids = m.map((x) => x.id);
-  const exp = ids.length ? await db('expertise').whereIn('user_id', ids).orderBy('level', 'desc') : [];
-  const load = ids.length ? await db('tasks').whereIn('assignee_id', ids).whereNot('status', 'done').groupBy('assignee_id').select('assignee_id').count({ n: '*' }) : [];
+  const [exp, load] = ids.length ? await Promise.all([
+    db('expertise').whereIn('user_id', ids).orderBy('level', 'desc'),
+    db('tasks').whereIn('assignee_id', ids).whereNot('status', 'done').groupBy('assignee_id').select('assignee_id').count({ n: '*' })
+  ]) : [[], []];
   return m.map((x) => ({ ...x, skills: exp.filter((e) => e.user_id === x.id).map((e) => e.name), load: Number((load.find((l) => l.assignee_id === x.id) || { n: 0 }).n) }));
 }
 
 // ---------- Plan parts & agents ----------
 async function researchPage(req, res) {
   const t = req.topic;
-  const parts = await partsOf(t.id);
+  const [parts, members] = await Promise.all([partsOf(t.id), teamOf(t.id)]);
   res.render('pages/agents', { title: 'Research · ' + t.code, active: 'topics', tab: 'Plan & agents', crumb: crumb(t, 'Research'),
     parts, SOURCE_TYPES, GROUPS, DEPTHS, DEPTH: agent.DEPTH, OPTIONS: agent.OPTIONS, DEFAULT_SOURCES: research.DEFAULT_SOURCES, available: research.available, normalizeKeys: research.normalizeKeys, label: research.label,
     templates: require('./topics').TEMPLATES, aiOn: llm.available(), aiLabel: llm.label(), busy: parts.filter((p) => p.handler !== 'person' && ['queued', 'running'].includes(p.agent_status)).length,
-    members: await teamOf(t.id), tipsKey: parts.length ? 'research' : '' });
+    members, tipsKey: parts.length ? 'research' : '' });
 }
-r.get('/topics/:tid/agents', auth.loadTopic('member'), async (req, res, next) => { try { await agent.rescueSaved(); } catch (e) { /* ignore */ } next(); }, researchPage);
+// (The one-time repair of earlier runs, agent.rescueSaved, runs once at start-up.)
+r.get('/topics/:tid/agents', auth.loadTopic('member'), researchPage);
 // Add a template's parts (when starting from scratch on the Research page).
 r.post('/topics/:tid/agents/template', auth.loadTopic('leader'), writable, async (req, res) => {
   const t = req.topic;

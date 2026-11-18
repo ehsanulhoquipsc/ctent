@@ -23,16 +23,20 @@ async function nextCode() {
 r.get('/topics', async (req, res) => {
   const ids = await auth.myTopicIds(req.user);
   const show = ['archived', 'completed'].includes(req.query.show) ? req.query.show : 'current';
-  const all = await topicProgress(ids);
-  let topics = all.filter((t) => (show === 'completed' ? t.status === 'completed' : t.status !== 'completed'));
-  if (show === 'archived') topics = ids.length ? (await db('topics').whereIn('id', ids).where('status', 'archived').orderBy('id', 'desc')).map((t) => ({ ...t, total: 0, done: 0, pct: 100 })) : [];
-  const roles = await db('topic_members').where({ user_id: req.user.id }).select('topic_id', 'role');
-  const roleOf = Object.fromEntries(roles.map((x) => [x.topic_id, x.role]));
-  const memberCounts = ids.length ? await db('topic_members').whereIn('topic_id', ids).groupBy('topic_id').select('topic_id').count({ n: '*' }) : [];
-  const countOf = Object.fromEntries(memberCounts.map((x) => [x.topic_id, Number(x.n)]));
   // Topics open to join requests (institution / open visibility) that the user isn't in yet
-  const pending = (await db('join_requests').where({ user_id: req.user.id, status: 'pending' }).select('topic_id')).map((x) => x.topic_id);
-  const joinable = req.user.platform_role === 'guest' ? [] : await db('topics').whereNotIn('id', ids.length ? ids : [0]).whereIn('visibility', ['institution', 'open']).whereNot('status', 'archived').orderBy('id', 'desc');
+  const [all, archived, roles, memberCounts, pendingRows, joinable] = await Promise.all([
+    topicProgress(ids),
+    show === 'archived' && ids.length ? db('topics').whereIn('id', ids).where('status', 'archived').orderBy('id', 'desc') : [],
+    db('topic_members').where({ user_id: req.user.id }).select('topic_id', 'role'),
+    ids.length ? db('topic_members').whereIn('topic_id', ids).groupBy('topic_id').select('topic_id').count({ n: '*' }) : [],
+    db('join_requests').where({ user_id: req.user.id, status: 'pending' }).select('topic_id'),
+    req.user.platform_role === 'guest' ? [] : db('topics').whereNotIn('id', ids.length ? ids : [0]).whereIn('visibility', ['institution', 'open']).whereNot('status', 'archived').orderBy('id', 'desc')
+  ]);
+  let topics = all.filter((t) => (show === 'completed' ? t.status === 'completed' : t.status !== 'completed'));
+  if (show === 'archived') topics = archived.map((t) => ({ ...t, total: 0, done: 0, pct: 100 }));
+  const roleOf = Object.fromEntries(roles.map((x) => [x.topic_id, x.role]));
+  const countOf = Object.fromEntries(memberCounts.map((x) => [x.topic_id, Number(x.n)]));
+  const pending = pendingRows.map((x) => x.topic_id);
   res.render('pages/topics', { title: 'Research topics', active: 'topics', topics, roleOf, countOf, show, joinable, pending,
     canCreate: auth.atLeast(req.user, 'leader'), cta: auth.atLeast(req.user, 'leader') ? { href: '/topics/new', label: 'New topic' } : null });
 });
@@ -189,12 +193,12 @@ r.post('/requests/:rid', async (req, res) => {
 // ----- Overview -----
 r.get('/topics/:tid', auth.loadTopic(), async (req, res) => {
   const t = req.topic;
-  const [prog] = await topicProgress([t.id]);
-  const parts = await db('parts').leftJoin('users', 'users.id', 'parts.proposed_user_id').where('parts.topic_id', t.id).orderBy('parts.position').orderBy('parts.id').select('parts.*', 'users.name as owner', 'users.color as owner_color', 'users.id as owner_id');
-  const meetings = await db('meetings').where({ topic_id: t.id }).where('starts_at', '>=', new Date(Date.now() - 3600000).toISOString()).orderBy('starts_at').limit(3);
-  const activity = await db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').where('audit_log.topic_id', t.id).orderBy('audit_log.id', 'desc').limit(6).select('audit_log.*', 'users.name', 'users.color', 'users.id as uid');
-  const subs = await db('submissions').where({ topic_id: t.id }).groupBy('status').select('status').count({ n: '*' });
-  const members = await db('topic_members').where({ topic_id: t.id }).count({ n: '*' }).first();
+  const [[prog], parts, meetings, activity, subs, members] = await Promise.all([topicProgress([t.id]), db('parts').leftJoin('users', 'users.id', 'parts.proposed_user_id').where('parts.topic_id', t.id).orderBy('parts.position').orderBy('parts.id').select('parts.*', 'users.name as owner', 'users.color as owner_color', 'users.id as owner_id'),
+    db('meetings').where({ topic_id: t.id }).where('starts_at', '>=', new Date(Date.now() - 3600000).toISOString()).orderBy('starts_at').limit(3),
+    db('audit_log').leftJoin('users', 'users.id', 'audit_log.user_id').where('audit_log.topic_id', t.id).orderBy('audit_log.id', 'desc').limit(6).select('audit_log.*', 'users.name', 'users.color', 'users.id as uid'),
+    db('submissions').where({ topic_id: t.id }).groupBy('status').select('status').count({ n: '*' }),
+    db('topic_members').where({ topic_id: t.id }).count({ n: '*' }).first()
+  ]);
   res.render('pages/topic-overview', { title: t.title, active: 'topics', tab: 'Overview', crumb: '<a href="/topics">Projects</a> / ' + t.code, prog: prog || { total: 0, done: 0, pct: 0 }, parts, meetings, activity, subs, memberCount: Number(members.n) });
 });
 
