@@ -1,7 +1,7 @@
 'use strict';
 // CTENT service worker: makes the app installable and shows a friendly page when offline.
 // Pages always come from the network (never stale); only the offline page is kept in the cache.
-const CACHE = 'ctent-offline-v1';
+const CACHE = 'ctent-offline-v2';
 const OFFLINE = ['/static/pwa/offline.html', '/static/pwa/offline.css', '/static/img/icon-192.png'];
 
 self.addEventListener('install', (e) => {
