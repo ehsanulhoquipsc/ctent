@@ -30,7 +30,14 @@
     var later = function () { try { return Number(localStorage.getItem('ctent-install-later') || 0) > Date.now(); } catch (e) { return false; } };
     var deferred = null;
     var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
-    if (standalone) { installBtns.forEach(function (b) { b.hidden = true; }); return; }
+    // Get-the-app page: put the reader's own device first and highlight it.
+    var steps = document.querySelector('.getapp-steps');
+    if (steps) {
+      var os = ios ? 'ios' : /android/i.test(navigator.userAgent) ? 'android' : 'desktop';
+      var mine = steps.querySelector('[data-os="' + os + '"]');
+      if (mine) { mine.classList.add('mine'); steps.insertBefore(mine, steps.firstChild); }
+    }
+    if (standalone) { installBtns.forEach(function (b) { b.hidden = true; }); var dn = document.querySelector('[data-installed-note]'); if (dn) dn.hidden = false; return; }
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault(); deferred = e;
       installBtns.forEach(function (b) { if (!b.closest('[data-install-card]')) b.hidden = false; });

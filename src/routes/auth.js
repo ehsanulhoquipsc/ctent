@@ -21,6 +21,9 @@ async function startSession(req, user) {
   await db('users').where({ id: user.id }).update({ last_login_at: now() });
 }
 
+// A page to share: how to install the CTENT app on any device, then sign in.
+r.get('/app', (req, res) => res.render('pages/get-app', { title: 'Get the CTENT app', signedIn: !!req.user }));
+
 r.get('/privacy', (req, res) => res.render('pages/privacy', { title: 'Privacy policy', contact: process.env.CONTACT_EMAIL || '' }));
 
 r.get('/login', async (req, res) => {

@@ -1101,3 +1101,19 @@ html[data-theme="dark"] .ev2.sel { box-shadow: 0 0 0 3px var(--acc-soft); }
 .nav-btn { border: 0; background: transparent; font-family: var(--font); cursor: pointer; width: 100%; text-align: left; }
 .nav-btn[hidden] { display: none; }
 .nav-btn:hover { background: var(--surface-2); color: var(--text); }
+
+/* Get the app (shareable page) */
+.getapp { width: 480px; align-items: stretch; }
+.getapp-icon { align-self: center; border-radius: 20px; box-shadow: 0 8px 24px rgba(14,14,14,.12); }
+.getapp-btn { height: 50px; justify-content: center; font-size: 16px; }
+.getapp-btn[hidden], .getapp-done[hidden] { display: none; }
+.getapp-done { text-align: center; color: var(--green); font-weight: 600; }
+.getapp-steps { display: flex; flex-direction: column; gap: 10px; }
+.getapp-steps section { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.getapp-steps section.mine { border: 1.5px solid var(--pri); background: var(--pri-soft); }
+.getapp-steps h2 { font-size: 15px; }
+.getapp-steps ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--text-2); }
+.getapp-steps svg { vertical-align: -2px; }
+.getapp-next { display: flex; flex-direction: column; gap: 8px; align-items: stretch; text-align: center; padding-top: 4px; border-top: 1px solid var(--line-2); }
+.getapp-next b { padding-top: 12px; }
+.getapp-next .btn { justify-content: center; height: 46px; }

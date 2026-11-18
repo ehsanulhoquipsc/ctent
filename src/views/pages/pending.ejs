@@ -10,6 +10,7 @@
     <p class="text-2" style="line-height:1.55">Once you’re approved, sign in again with <b data-i18n-skip><%= person.email %></b><%= person.pending_topic_id ? ' and you’ll go straight to the project you were invited to' : '' %>.</p>
     <a class="btn btn-s" href="/login">Back to sign in</a>
   </div>
+<%- include('../partials/install-card') %>
 </main>
 <script src="/static/js/app.js?v=<%= typeof assetV !== 'undefined' ? assetV : 1 %>"></script>
 </body>

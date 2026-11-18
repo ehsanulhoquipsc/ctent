@@ -1227,3 +1227,17 @@ test('phone tab bar: Home, Projects, Inbox, More; More lists account, admin and 
   assert.equal(mm.status, 200);
   assert.doesNotMatch(mm.text, /Admin console/);
 });
+
+test('shareable Get-the-app page is public; invite pages offer installing', async () => {
+  const r = await request(app).get('/app');
+  assert.equal(r.status, 200);
+  assert.match(r.text, /Get the CTENT app/);
+  assert.match(r.text, /Add to Home Screen/);
+  assert.match(r.text, /href="\/login"/);
+  const a = await agentFor('nadia@ctent.demo');
+  await a.post('/admin/invites').type('form').send({ _csrf: a.csrf, role: 'member', days: '7' });
+  const inv = await db('invites').whereNull('topic_id').orderBy('id', 'desc').first();
+  const j = await request(app).get('/join/' + inv.token);
+  assert.equal(j.status, 200);
+  assert.match(j.text, /data-install-card/);
+});
