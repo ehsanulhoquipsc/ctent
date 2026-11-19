@@ -7,7 +7,7 @@
       <tbody>
       <% members.forEach((m) => { %>
         <tr>
-          <td><div class="split"><%- u.avatar(m, '', true) %><span><a href="/people/<%= m.id %>" style="color:var(--text);text-decoration:none;font-weight:500"><%= m.name %></a><br><span class="hint"><%= m.title || m.email %></span></span></div></td>
+          <td><div class="split"><%- u.avatar(m, '', true) %><span><a href="/people/<%= m.id %>" style="color:var(--text);text-decoration:none;font-weight:500"><%= m.name %></a><br><span class="hint"><%= m.title || u.shownEmail(m) %></span></span></div></td>
           <td>
             <% if (isTopicLeader && m.id !== me.id) { %>
               <form method="post" action="/topics/<%= topic.id %>/members/<%= m.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="r<%= m.id %>">Role</label>
@@ -29,7 +29,7 @@
     <form method="post" action="/topics/<%= topic.id %>/members" class="card" style="display:flex;flex-direction:column;gap:12px">
       <h2>Add someone</h2>
       <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <div class="field"><label for="user_id">Person</label><select id="user_id" name="user_id" required><option value="">Choose…</option><% others.forEach((o) => { %><option value="<%= o.id %>"><%= o.name %> — <%= o.email %><%= o.platform_role === 'guest' ? ' (guest)' : '' %></option><% }) %></select></div>
+      <div class="field"><label for="user_id">Person</label><select id="user_id" name="user_id" required><option value="">Choose…</option><% others.forEach((o) => { %><option value="<%= o.id %>"><%= o.name %><%= u.shownEmail(o) ? ' — ' + u.shownEmail(o) : '' %><%= o.platform_role === 'guest' ? ' (guest)' : '' %></option><% }) %></select></div>
       <div class="field"><label for="role">Role</label><select id="role" name="role"><option value="member">Co-author</option><option value="leader">Leader (co-lead)</option><option value="guest">Guest (read only)</option></select></div>
       <button class="btn btn-p">Add to topic</button>
       <span class="hint">Not on CTENT yet? Send them an invite link below.</span>

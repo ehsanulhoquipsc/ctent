@@ -163,6 +163,8 @@ const ICONS = {
   board: 'M4.5 3h4A1.5 1.5 0 0 1 10 4.5v15A1.5 1.5 0 0 1 8.5 21h-4A1.5 1.5 0 0 1 3 19.5v-15A1.5 1.5 0 0 1 4.5 3zM15.5 3h4A1.5 1.5 0 0 1 21 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-4A1.5 1.5 0 0 1 14 12.5v-8A1.5 1.5 0 0 1 15.5 3z',
   video: 'm22 8-6 4 6 4V8ZM4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
   upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  mail: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6',
+  lock: 'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM7 11V7a5 5 0 0 1 10 0v4',
   download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z',
@@ -203,4 +205,7 @@ function delForm(action, csrf, confirmText, label, hidden) {
 }
 function editSummary(label) { return '<summary class="mini">' + icon('edit') + esc(label || 'Edit') + '</summary>'; }
 
-module.exports = { agentStatus, confTag, topSkills, skillChips, delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };
+// An account's email as people should see it: blank for Telegram-only accounts (they have a placeholder).
+const shownEmail = (x) => (x && x.email && !/@telegram\.invalid$/i.test(x.email) ? x.email : '');
+
+module.exports = { shownEmail, agentStatus, confTag, topSkills, skillChips, delForm, editSummary, icon, esc, avatar, tag, roleTag, now, toDate, fmtDate, fmtDateTime, fmtTime, ago, todayStr, isOverdue, initials, color, COLOR_NAMES, detectPlatform, safeUrl, matchScore, status, humanSize, TZ };

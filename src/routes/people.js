@@ -23,7 +23,7 @@ r.get('/people/:id', async (req, res) => {
 
 r.get('/profile', async (req, res) => {
   const expertise = await db('expertise').where({ user_id: req.user.id }).orderBy('kind').orderBy('level', 'desc');
-  res.render('pages/profile', { title: 'Profile & expertise', active: 'profile', expertise, colors: COLOR_NAMES });
+  res.render('pages/profile', { title: 'Profile & expertise', active: 'profile', expertise, colors: COLOR_NAMES, googleOn: require('../lib/google').configured(), tgOn: require('../lib/telegram').configured() });
 });
 r.post('/profile', async (req, res) => {
   const name = clean(req.body.name, 120);
@@ -59,15 +59,41 @@ r.post('/profile/expertise/:id/delete', async (req, res) => {
 });
 r.post('/profile/password', async (req, res) => {
   const u = await db('users').where({ id: req.user.id }).first();
-  if (!bcrypt.compareSync(String(req.body.current || ''), u.password_hash)) { req.flash('error', 'Your current password is wrong.'); return res.redirect('/profile#password'); }
+  // Accounts made with Google or Telegram have no password yet: they can set one without the old one.
+  if (u.has_password && !bcrypt.compareSync(String(req.body.current || ''), u.password_hash)) { req.flash('error', 'Your current password is wrong.'); return res.redirect('/profile#password'); }
+  if (!u.has_password && require('../lib/telegram').isPlaceholder(u.email)) { req.flash('error', 'Add your email first — you’ll sign in with your email and password.'); return res.redirect('/profile#signin'); }
   const pw = String(req.body.password || '');
   if (pw.length < 10) { req.flash('error', 'Use at least 10 characters for the new password.'); return res.redirect('/profile#password'); }
   if (pw !== req.body.password2) { req.flash('error', 'The new passwords don’t match.'); return res.redirect('/profile#password'); }
-  await db('users').where({ id: u.id }).update({ password_hash: bcrypt.hashSync(pw, 12) });
+  await db('users').where({ id: u.id }).update({ password_hash: bcrypt.hashSync(pw, 12), has_password: true });
   await auth.killSessions(u.id, req.sessionID);
-  await audit(u.id, null, 'user.password', 'Changed their password');
-  req.flash('ok', 'Password changed. Other devices were signed out.');
+  await audit(u.id, null, 'user.password', u.has_password ? 'Changed their password' : 'Set a password');
+  req.flash('ok', u.has_password ? 'Password changed. Other devices were signed out.' : 'Password set. You can now sign in with your email and password too.');
   res.redirect('/profile');
+});
+
+// Ways to sign in: remove Google or Telegram (only while another way remains), add an email.
+const methodsOf = (u) => (u.google_sub ? 1 : 0) + (u.telegram_id ? 1 : 0) + (u.has_password ? 1 : 0);
+r.post('/profile/:m/remove', async (req, res, next) => {
+  const m = req.params.m;
+  if (m !== 'google' && m !== 'telegram') return next();
+  const u = await db('users').where({ id: req.user.id }).first();
+  if (methodsOf(u) < 2) { req.flash('error', 'Keep at least one way to sign in.'); return res.redirect('/profile#signin'); }
+  await db('users').where({ id: u.id }).update(m === 'google' ? { google_sub: null } : { telegram_id: null, telegram_username: null });
+  await audit(u.id, null, 'user.signin_method', 'Removed ' + (m === 'google' ? 'Google' : 'Telegram') + ' sign-in');
+  req.flash('ok', (m === 'google' ? 'Google' : 'Telegram') + ' sign-in removed.');
+  res.redirect('/profile#signin');
+});
+r.post('/profile/email', async (req, res) => {
+  const u = await db('users').where({ id: req.user.id }).first();
+  if (!require('../lib/telegram').isPlaceholder(u.email)) return res.redirect('/profile#signin');
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 190);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { req.flash('error', 'That email doesn’t look right.'); return res.redirect('/profile#signin'); }
+  if (await db('users').whereRaw('lower(email) = ?', [email]).first()) { req.flash('error', 'Another account already uses that email.'); return res.redirect('/profile#signin'); }
+  await db('users').where({ id: u.id }).update({ email, email_verified: false });
+  await audit(u.id, null, 'user.email', 'Added an email address');
+  req.flash('ok', 'Email saved.');
+  res.redirect('/profile#signin');
 });
 
 module.exports = r;

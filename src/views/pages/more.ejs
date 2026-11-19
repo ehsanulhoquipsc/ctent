@@ -2,7 +2,7 @@
 <div class="morepage">
   <a class="card more-me" href="/profile">
     <%- u.avatar(me) %>
-    <span class="more-who"><b data-i18n-skip><%= me.name %></b><span class="muted" data-i18n-skip><%= me.email %></span></span>
+    <span class="more-who"><b data-i18n-skip><%= me.name %></b><span class="muted" data-i18n-skip><%= u.shownEmail(me) || (me.telegram_username ? '@' + me.telegram_username : 'Telegram account') %></span></span>
     <span class="tag"><%= me.platform_role %></span>
   </a>
 

@@ -105,7 +105,8 @@ r.post('/admin/users/:id', async (req, res) => {
   const action = req.body.action;
   if (action === 'edit') {
     const name = clean(req.body.name, 120);
-    const email = clean(req.body.email, 190).toLowerCase();
+    let email = clean(req.body.email, 190).toLowerCase();
+    if (!email && require('../lib/telegram').isPlaceholder(u.email)) email = u.email;
     if (name.length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { req.flash('error', 'Enter a name and a valid email.'); return res.redirect('/admin#users'); }
     if (await db('users').whereRaw('lower(email) = ?', [email]).whereNot('id', u.id).first()) { req.flash('error', 'Someone else already uses that email.'); return res.redirect('/admin#users'); }
     await db('users').where({ id: u.id }).update({ name, email, institution: clean(req.body.institution), title: clean(req.body.title) });
@@ -123,7 +124,8 @@ r.post('/admin/users/:id', async (req, res) => {
       if (!Number(others.n)) orphans.push(t.code);
     }
     if (orphans.length) { req.flash('error', u.name + ' is the only leader of ' + orphans.join(', ') + '. Make someone else a leader there first, or suspend the account instead.'); return res.redirect('/admin#users'); }
-    if (String(req.body.confirm || '').trim().toLowerCase() !== u.email.toLowerCase()) { req.flash('error', 'Type the person’s email to confirm deleting their account.'); return res.redirect('/admin#users'); }
+    const expect = (require('../lib/util').shownEmail(u) || u.name).toLowerCase();
+    if (String(req.body.confirm || '').trim().toLowerCase() !== expect) { req.flash('error', 'Type the person’s email (or name, if they have none) to confirm deleting their account.'); return res.redirect('/admin#users'); }
     await auth.killSessions(u.id);
     await db('users').where({ id: u.id }).del();
     await audit(req.user.id, null, 'user.deleted', 'Deleted the account of ' + u.name + ' (' + u.email + ')');

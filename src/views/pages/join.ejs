@@ -14,20 +14,24 @@
         <p class="text-2" style="margin-top:6px"><%= inv.topic_id ? (inv.role === 'guest' ? 'You’ll be able to read this research project.' : inv.role === 'leader' ? 'You’ll co-lead this research project.' : 'You’ll work on this research project as a co-author.') : 'CTENT is where your research group plans, researches and writes together.' %></p>
       </div>
       <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
-      <% if (googleOn) { %>
-        <%- include('../partials/google-btn', { gq: 'invite=' + encodeURIComponent(inv.token) }) %>
-        <p class="hint" style="text-align:center">Already have an account? Continue with Google using the same email, or <a href="/login?next=<%= encodeURIComponent('/join/' + inv.token) %>">sign in with your password</a>.</p>
-        <details class="fold"><summary><span class="hint">No Google account? Create one with a password</span></summary>
+      <% const iq = 'invite=' + encodeURIComponent(inv.token); const others = googleOn || tgOn; %>
+      <% if (others) { %>
+        <span style="text-align:center;font-weight:600;font-size:14px">Create your account with</span>
+        <div class="provider-col">
+          <% if (googleOn) { %><%- include('../partials/google-btn', { gq: iq, glabel: 'Google' }) %><% } %>
+          <% if (tgOn) { %><%- include('../partials/tg-btn', { tq: iq, tlabel: 'Telegram' }) %><% } %>
+        </div>
+        <details class="email-choice"<%= error ? ' open' : '' %>><summary><%- u.icon('mail', 19) %><span>Email and password</span></summary>
       <% } %>
-      <form method="post" action="/join/<%= inv.token %>" style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
+      <form method="post" action="/join/<%= inv.token %>" style="display:flex;flex-direction:column;gap:12px;margin-top:<%= others ? 14 : 0 %>px">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <div class="field"><label for="jn">Your name</label><input id="jn" name="name" required maxlength="120" autocomplete="name" value="<%= v.name || '' %>"></div>
         <div class="field"><label for="je">Email</label><input id="je" name="email" type="email" required autocomplete="email" value="<%= v.email || '' %>"></div>
         <div class="field"><label for="jp">Password</label><input id="jp" name="password" type="password" required minlength="10" autocomplete="new-password"><span class="hint">At least 10 characters.</span></div>
-        <button class="btn <%= googleOn ? 'btn-s' : 'btn-p' %>">Create account and join</button>
-        <% if (!googleOn) { %><p class="hint" style="text-align:center">Already have an account? <a href="/login?next=<%= encodeURIComponent('/join/' + inv.token) %>">Sign in</a>, then open this link again.</p><% } %>
+        <button class="btn btn-p">Create account and join</button>
       </form>
-      <% if (googleOn) { %></details><% } %>
+      <% if (others) { %></details><% } %>
+      <p class="hint" style="text-align:center">Already have an account? <a href="/login?next=<%= encodeURIComponent('/join/' + inv.token) %>">Sign in</a>, then open this link again.</p>
     <% } %>
   </div>
 <%- include('../partials/install-card') %>

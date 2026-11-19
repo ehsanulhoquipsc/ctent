@@ -1117,3 +1117,29 @@ html[data-theme="dark"] .ev2.sel { box-shadow: 0 0 0 3px var(--acc-soft); }
 .getapp-next { display: flex; flex-direction: column; gap: 8px; align-items: stretch; text-align: center; padding-top: 4px; border-top: 1px solid var(--line-2); }
 .getapp-next b { padding-top: 12px; }
 .getapp-next .btn { justify-content: center; height: 46px; }
+
+/* Sign-in choices: Google, Telegram, email */
+.provider-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.provider-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.provider-col { display: flex; flex-direction: column; gap: 10px; }
+.provider-row .g-btn, .provider-col .g-btn, .provider-row .tg-btn, .provider-col .tg-btn { height: 48px; }
+.tg-btn { display: flex; align-items: center; justify-content: center; gap: 12px; height: 46px; border-radius: 10px; border: 0; background: #2AABEE; color: #fff; font: 600 15px 'DM Sans', system-ui, sans-serif; text-decoration: none; }
+.tg-btn:hover { background: #229ED9; color: #fff; filter: none; }
+.tg-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.email-choice > summary { list-style: none; display: flex; align-items: center; justify-content: center; gap: 12px; height: 48px; border-radius: 10px; border: 1px solid var(--line-strong, #D6D2CC); background: var(--surface); color: var(--text); font: 500 15px var(--font); cursor: pointer; }
+.email-choice > summary::-webkit-details-marker { display: none; }
+.email-choice[open] > summary { border: 1.5px solid var(--text); }
+.email-choice > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tg-who { display: flex; align-items: center; gap: 12px; }
+.tg-who > span:last-child { display: flex; flex-direction: column; }
+.tg-av { width: 48px; height: 48px; border-radius: 50%; background: #E8F5FD; color: #1B7FB5; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+/* Profile › Ways to sign in */
+.signin-list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.signin-row { display: flex; align-items: center; gap: 12px; padding: 14px; border-bottom: 1px solid var(--line-2); }
+.signin-row:last-child { border-bottom: 0; }
+.signin-row > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.signin-row > span .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signin-row form { margin: 0; }
+.signin-ok { padding: 3px 8px; border-radius: 6px; background: var(--green-soft, #E7F3EC); color: var(--green, #256B42); font-size: 12px; font-weight: 600; }
+.tg-btn.sm { height: 36px; padding: 0 12px; font-size: 13px; gap: 8px; border-radius: 9px; }
+.g-btn.sm { height: 36px; padding: 0 12px; font-size: 13px; gap: 8px; border-radius: 9px; }

@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<body>
+<main class="auth">
+  <div class="auth-lang"><%- include('../partials/lang-menu') %></div>
+  <div class="auth-card">
+    <div class="tg-who">
+      <span class="tg-av" aria-hidden="true"><%= u.initials(t.name) %></span>
+      <span><b data-i18n-skip><%= t.name %></b><span class="hint" data-i18n-skip><%= t.username ? '@' + t.username + ' · ' : '' %>from Telegram</span></span>
+    </div>
+    <h1>Almost there</h1>
+    <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+    <form method="post" action="/join/telegram" style="display:flex;flex-direction:column;gap:14px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="tn">Your name</label><input id="tn" name="name" required maxlength="120" autocomplete="name" value="<%= v.name || '' %>"><span class="hint">As it will show to your team.</span></div>
+      <div class="field"><label for="te">Email <span class="muted" style="font-weight:400">(optional)</span></label><input id="te" name="email" type="email" maxlength="190" autocomplete="email" value="<%= v.email || '' %>"><span class="hint">Add it so you can also sign in with Google or a password later, and so your team can recognise you.</span></div>
+      <button class="btn btn-p">Join the workspace</button>
+    </form>
+    <p class="hint" style="text-align:center">Not you? <a href="/login">Start again</a></p>
+  </div>
+</main>
+<script src="/static/js/app.js?v=<%= assetV %>"></script>
+</body>
+</html>

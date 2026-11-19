@@ -1,0 +1,18 @@
+<%- include('../partials/head') %>
+<body>
+<main class="auth">
+  <div class="auth-card" style="text-align:center;align-items:center">
+    <img class="logo" src="/static/img/logo.png" alt="CTENT — Conducting from Interior">
+    <h1 data-tg-title>Signing you in…</h1>
+    <p class="text-2" data-tg-text>Checking your Telegram details.</p>
+    <form method="post" action="/auth/telegram/verify" data-tg-form>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="data" value="">
+      <noscript><p class="text-2">Turn on JavaScript to finish signing in with Telegram.</p></noscript>
+    </form>
+    <a class="btn btn-s" href="/login" data-tg-back hidden>Back to sign in</a>
+  </div>
+</main>
+<script src="/static/js/telegram.js?v=<%= assetV %>"></script>
+</body>
+</html>

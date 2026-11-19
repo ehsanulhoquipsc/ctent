@@ -8,7 +8,7 @@
   <%- u.avatar(p, 'lg') %>
   <div style="flex:1 1 280px;min-width:0">
     <div class="split" style="flex-wrap:wrap"><h1 data-i18n-skip><%= p.name %></h1><%- u.roleTag(p.platform_role) %><span class="tag dotted" style="background:<%= p.status === 'active' ? 'var(--green-soft)' : p.status === 'pending' ? 'var(--amber-soft)' : 'var(--red-soft)' %>;color:<%= p.status === 'active' ? 'var(--green)' : p.status === 'pending' ? 'var(--amber)' : 'var(--red)' %>"><%= p.status === 'active' ? 'Active' : p.status === 'pending' ? 'Waiting for approval' : 'Suspended' %></span></div>
-    <p class="text-2" style="margin-top:4px"><span data-i18n-skip><%= p.email %></span><%= p.institution ? ' · ' + p.institution : '' %><%= p.google_sub ? ' · signs in with Google' : '' %></p>
+    <p class="text-2" style="margin-top:4px"><span data-i18n-skip><%= u.shownEmail(p) || (p.telegram_username ? '@' + p.telegram_username : 'Telegram account') %></span><%= p.institution ? ' · ' + p.institution : '' %><%= p.google_sub ? ' · signs in with Google' : '' %><%= p.telegram_id ? ' · signs in with Telegram' : '' %></p>
     <p class="hint" style="margin-top:4px">Joined <%= u.fmtDate(p.created_at, { day: 'numeric', month: 'short', year: 'numeric' }) %><%= p.joined_via ? ' · ' + p.joined_via : '' %><%= approver ? ' · approved by ' + approver.name + ' ' + u.ago(p.approved_at) : '' %> · last sign-in <%= p.last_login_at ? u.ago(p.last_login_at) : 'never' %></p>
   </div>
 </section>
