@@ -434,3 +434,5 @@ module.exports.ensureSections = ensureSections;
 module.exports.draftInto = draftInto;
 module.exports.acceptedFindings = acceptedFindings;
 module.exports.healthOf = healthOf;
+module.exports.numbering = numbering;
+module.exports.plain = plain;

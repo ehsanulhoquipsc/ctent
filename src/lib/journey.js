@@ -71,7 +71,9 @@ function compute(topic, role, parts, sections, tasks) {
   // The one thing to do next.
   let next;
   const launch = (k) => 'Launch ' + (k === 1 ? 'the agent' : 'all ' + k + ' agents');
-  if (completed) next = { title: 'Project complete', text: 'The final report is saved with the project. Share it on the showcase website.', label: 'Open final report', href: base + '/finish' };
+  if (completed) next = leader
+    ? { title: 'Publish it', text: 'The final report is saved. Turn the final paper into a Bangla Facebook post and an English and Bangla website article, in a writer’s style you choose.', label: 'Open Publish', href: base + '/publish' }
+    : { title: 'Project complete', text: 'The final report is saved with the project. Share it on the showcase website.', label: 'Open final report', href: base + '/finish' };
   else if (topic.status === 'archived') next = { title: 'This project is archived', text: 'It’s read-only. Reopen it from Settings to keep working.', label: 'Open settings', href: base + '/settings' };
   else if (!topic.question) next = { title: 'Write your research question', text: 'Every part works from it. One or two sentences is enough.', label: 'Write the question', href: base + '/agents#question' };
   else if (!n) next = manual

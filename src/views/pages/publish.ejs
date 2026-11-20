@@ -1,0 +1,139 @@
+<%- include('../partials/top') %>
+<%- include('../partials/topic-header') %>
+<% const base = '/topics/' + topic.id + '/publish';
+   const busy = run && ['queued', 'running'].includes(run.status);
+   const out = outputs.find((o) => o.format === view) || outputs[0];
+   const open = (o) => o.claims.filter((c) => c.status !== 'ok' && !c.resolved);
+%>
+<% if (busy) { %><meta http-equiv="refresh" content="5"><% } %>
+<div class="pub">
+  <aside class="pub-side">
+    <section class="card pub-setup">
+      <div><span class="mono">Step 6 · Publish</span><h2 style="margin-top:4px">Make public versions</h2>
+        <p class="hint" style="margin-top:4px">From the final paper (<%= words %> words, <%= refs.length %> sources). The voice changes; the facts don’t.</p></div>
+      <% if (!ready) { %>
+        <div class="alert warn">Write the final paper first — the public versions are made from it. <a href="/topics/<%= topic.id %>/paper">Open the paper</a></div>
+      <% } else if (!canEdit) { %>
+        <p class="hint">The project leader makes the public versions. You can read them here.</p>
+      <% } else if (!styles.length) { %>
+        <div class="alert info">No writing styles yet. <% if (me.platform_role === 'admin') { %><a href="/admin/styles">Add a style</a><% } else { %>Ask your admin to add one.<% } %></div>
+      <% } else { %>
+      <form method="post" action="<%= base %>" class="pub-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <fieldset class="pub-styles"><legend class="label">Write it in the style of</legend>
+          <% styles.forEach((s, i) => { %>
+          <label class="pub-style"><input type="radio" name="style_id" value="<%= s.id %>"<%= (run ? run.style_id === s.id : i === 0) ? ' checked' : '' %>>
+            <span><b data-i18n-skip><%= s.name %></b><span class="hint"><%= s.rights === 'classic' ? 'Classic · died ' + s.died_year : 'Permission given' %></span></span></label>
+          <% }) %>
+          <% if (me.platform_role === 'admin') { %><a class="hint" href="/admin/styles">Manage styles →</a><% } %>
+        </fieldset>
+        <fieldset class="pub-make"><legend class="label">Make</legend>
+          <label><input type="checkbox" name="formats" value="fb" checked> <b>Facebook post</b> <span class="tag" style="background:var(--pri-soft);color:var(--pri-text)">বাংলা</span><span class="hint">Full summary · plain text</span></label>
+          <label><input type="checkbox" name="formats" value="web_en" checked> <b>Website article</b> <span class="tag" style="background:var(--indigo-soft);color:var(--indigo)">English</span></label>
+          <label><input type="checkbox" name="formats" value="web_bn" checked> <b>Website article</b> <span class="tag" style="background:var(--pri-soft);color:var(--pri-text)">বাংলা</span></label>
+        </fieldset>
+        <div class="pub-two">
+          <div class="field"><label for="pr">Reader</label><select id="pr" name="reader"><option value="public">General public</option><option value="students">Students</option><option value="policy">Policymakers</option></select></div>
+          <div class="field"><label for="pl">Facebook length</label><select id="pl" name="length"><option value="short">Short · ~250 words</option><option value="full" selected>Full summary · ~450 words</option><option value="long">Long · ~700 words</option></select></div>
+        </div>
+        <div class="field"><label for="pk">Website link for the post</label><input id="pk" name="link" value="<%= settings.link || 'doctren.com' %>" maxlength="200"></div>
+        <div class="field"><label for="ph">Hashtags <span class="muted" style="font-weight:400">(optional)</span></label><input id="ph" name="hashtags" value="<%= settings.hashtags || '#গবেষণা #জনস্বাস্থ্য' %>" maxlength="200"></div>
+        <button class="btn btn-p" type="submit"<%= busy || !aiOn ? ' disabled' : '' %>><%- u.icon('send', 16) %><%= busy ? 'Writing…' : 'Write the public versions' %></button>
+        <p class="hint"><%= aiOn ? 'About 2 minutes. Uses only the final paper — the agent can’t add new facts.' : 'No AI service is connected, so the agent can’t write.' %></p>
+      </form>
+      <% } %>
+    </section>
+    <% if (runs.length) { %>
+    <section class="card pub-versions"><span class="mono">Versions</span>
+      <% runs.forEach((x) => { %><a class="<%= run && x.id === run.id ? 'on' : '' %>" href="<%= base %>?run=<%= x.id %>"><b>v<%= x.id %> · <span data-i18n-skip><%= x.style_name %></span></b><span class="hint"><%= u.ago ? u.ago(x.created_at) : String(x.created_at).slice(0, 16).replace('T', ' ') %> · <%= { done: 'ready', failed: 'stopped', running: 'writing…', queued: 'waiting…' }[x.status] %></span></a><% }) %>
+    </section>
+    <% } %>
+  </aside>
+
+  <section class="pub-main">
+    <% if (!run) { %>
+      <div class="card empty"><h2>Nothing written yet</h2><p class="text-2">Choose a style and press <b>Write the public versions</b>. You’ll get a Bangla Facebook post that tells the whole story, and an English and a Bangla website article.</p></div>
+    <% } else if (busy) { %>
+      <div class="card pub-busy" role="status">
+        <span class="mono">Writing in the <span data-i18n-skip><%= run.style_name %></span> style</span>
+        <h2><%= run.step || 'Starting' %></h2>
+        <div class="bar"><span style="width:<%= Math.max(4, run.progress || 0) %>%"></span></div>
+        <p class="hint">You can leave this page — you’ll get a notification when it’s ready.</p>
+      </div>
+    <% } else if (run.status === 'failed') { %>
+      <div class="alert err" role="alert"><b>The agent stopped.</b>&nbsp;<%= run.error %></div>
+    <% } %>
+    <% if (out) { %>
+      <nav class="seg pub-tabs" aria-label="Public versions">
+        <% outputs.forEach((o) => { %><a class="<%= o === out ? 'on' : '' %>" href="<%= base %>?run=<%= run.id %>&tab=<%= o.format %>"<%- o === out ? ' aria-current="page"' : '' %>><%= FORMATS[o.format] %><% if (open(o).length) { %> <i class="pub-warn"><%= open(o).length %></i><% } %></a><% }) %>
+        <span class="hint" style="margin-left:auto">Style: <b data-i18n-skip><%= run.style_name %></b></span>
+      </nav>
+      <div class="pub-grid">
+        <div class="card pub-out">
+          <% if (out.format === 'fb') { %>
+            <div class="pub-fb" data-i18n-skip><%= out.body %></div>
+            <div class="split">
+              <button class="btn btn-p" type="button" data-copy="<%= out.body %>"><%- u.icon('copy', 16) %><span> Copy post</span></button>
+              <% if (canEdit) { %>
+              <form method="post" action="<%= base %>/outputs/<%= out.id %>/revise"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s" name="how" value="shorter">Shorter</button></form>
+              <form method="post" action="<%= base %>/outputs/<%= out.id %>/revise"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s" name="how" value="longer">Longer</button></form>
+              <% } %>
+              <span class="hint"><%= out.body.split(/\s+/).length %> words</span>
+            </div>
+          <% } else { %>
+            <article class="pub-web<%= out.format === 'web_bn' ? ' bn' : '' %>" data-i18n-skip>
+              <h1><%= out.title %></h1>
+              <% if (out.subtitle) { %><p class="pub-sub"><%= out.subtitle %></p><% } %>
+              <% String(out.body).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean).forEach((p) => { %><% if (/^##\s+/.test(p)) { %><h2><%= p.replace(/^##\s+/, '') %></h2><% } else { %><p><%= p %></p><% } %><% }) %>
+              <% if (refs.length) { %><h2><%= out.format === 'web_bn' ? 'তথ্যসূত্র' : 'References' %></h2><ol class="pub-refs"><% refs.forEach((r) => { %><li><%= r.text %></li><% }) %></ol><% } %>
+            </article>
+            <div class="split">
+              <button class="btn btn-p" type="button" data-copy="<%= text(out) %>"><%- u.icon('copy', 16) %><span> Copy text</span></button>
+              <button class="btn btn-s" type="button" data-copy="<%= html(out) %>"><%- u.icon('copy', 16) %><span> Copy as HTML</span></button>
+              <a class="btn btn-s" href="<%= base %>/outputs/<%= out.id %>/word"><%- u.icon('download', 16) %>Word</a>
+              <% if (canEdit) { %>
+              <form method="post" action="<%= base %>/outputs/<%= out.id %>/revise"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s" name="how" value="shorter">Shorter</button></form>
+              <% } %>
+            </div>
+          <% } %>
+          <% if (canEdit) { %>
+          <details class="pub-edit"><summary>Edit the text yourself</summary>
+            <form method="post" action="<%= base %>/outputs/<%= out.id %>" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <% if (out.format !== 'fb') { %>
+                <div class="field"><label for="et">Headline</label><input id="et" name="title" value="<%= out.title %>" maxlength="300"></div>
+                <div class="field"><label for="es">Standfirst</label><input id="es" name="subtitle" value="<%= out.subtitle || '' %>" maxlength="500"></div>
+              <% } %>
+              <div class="field"><label for="eb"><%= out.format === 'fb' ? 'Post' : 'Article · start headings with ## ' %></label><textarea id="eb" name="body" rows="16"><%= out.body %></textarea></div>
+              <button class="btn btn-s" type="submit">Save and check again</button>
+            </form>
+          </details>
+          <% } %>
+        </div>
+
+        <div class="card pub-claims">
+          <% const bad = open(out); const ok = out.claims.filter((c) => c.status === 'ok').length; %>
+          <div class="split" style="flex-wrap:nowrap"><span class="pub-score<%= bad.length ? ' warn' : '' %>"><%= ok %>/<%= ok + bad.length %></span>
+            <span><b><%= bad.length ? bad.length + (bad.length === 1 ? ' claim needs' : ' claims need') + ' you before copying' : 'All claims match the final paper' %></b><span class="hint" style="display:block">Every fact is checked against the final paper; numbers are checked by code.</span></span></div>
+          <% bad.concat(out.claims.filter((c) => c.status === 'ok')).forEach((c) => { %>
+            <div class="pub-claim <%= c.status %>">
+              <div class="split"><span class="tag <%= c.status === 'ok' ? 't-ok' : 't-bad' %>"><%= { ok: 'Matches', changed: 'Changed from the paper', unsupported: 'Not in the paper', copied: 'Copied from the samples' }[c.status] %></span><% if (c.source) { %><span class="hint"><%= c.source %></span><% } %></div>
+              <p class="pub-q" data-i18n-skip><%= c.quote %></p>
+              <% if (c.fact) { %><p class="hint"><%= c.status === 'ok' ? 'Paper: ' : '' %><%= c.fact %></p><% } %>
+              <% if (c.status !== 'ok' && canEdit) { %>
+              <div class="split">
+                <% if (c.status !== 'copied') { %><form method="post" action="<%= base %>/claims/<%= c.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm" name="action" value="rewrite">Use the paper’s facts</button></form><% } else { %><form method="post" action="<%= base %>/claims/<%= c.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm" name="action" value="rewrite">Rewrite in new words</button></form><% } %>
+                <form method="post" action="<%= base %>/claims/<%= c.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm" name="action" value="remove">Remove it</button></form>
+                <form method="post" action="<%= base %>/claims/<%= c.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm" name="action" value="keep">I checked it</button></form>
+              </div>
+              <% } %>
+            </div>
+          <% }) %>
+          <% if (!out.claims.length) { %><p class="hint">No claims were found to check.</p><% } %>
+          <% if (canEdit) { %><form method="post" action="<%= base %>/outputs/<%= out.id %>/revise"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm" name="how" value="check">Check again</button></form><% } %>
+        </div>
+      </div>
+    <% } %>
+  </section>
+</div>
+<%- include('../partials/bottom') %>

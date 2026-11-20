@@ -4,10 +4,10 @@
   const MAIN = {
     Overview: 'Journey', 'Plan & agents': 'Research', Findings: 'Research', 'Plan & assign': 'Research', Board: 'Research',
     'Final paper': 'Paper', Channels: 'Team', Meetings: 'Team', 'Co-authors': 'Team', Members: 'Team', Activity: 'Team',
-    Files: 'Files', Submissions: 'Files', Settings: 'Settings'
+    Files: 'Files', Submissions: 'Files', Settings: 'Settings', Publish: 'Publish'
   };
   const mainTab = MAIN[tab] || 'Journey';
-  let TABS = [['Journey', base, 'home'], ['Research', base + '/agents', 'bot'], ['Paper', base + '/paper', 'edit'], ['Team', base + '/channels', 'chat'], ['Files', base + '/files', 'folder']];
+  let TABS = [['Journey', base, 'home'], ['Research', base + '/agents', 'bot'], ['Paper', base + '/paper', 'edit'], ['Team', base + '/channels', 'chat'], ['Files', base + '/files', 'folder'], ['Publish', base + '/publish', 'send']];
   const SUBS = {
     Team: [['Chat', 'Channels', base + '/channels'], ['Meetings', 'Meetings', base + '/meetings'], ['People', 'Co-authors', base + '/members'], ['Activity', 'Activity', base + '/activity']],
     Files: [['All files', 'Files', base + '/files'], ['Submissions', 'Submissions', base + '/submissions']]

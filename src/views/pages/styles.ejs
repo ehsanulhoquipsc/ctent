@@ -1,0 +1,35 @@
+<%- include('../partials/top', { crumb: '<a href="/admin">Admin console</a> / Writing styles' }) %>
+<div class="page-head"><div><h1>Writing styles</h1><p>Writers whose voice the Publish agent can write in. Only writers who gave permission, or classic writers out of copyright. Samples are private to admins and are only used to learn the style.</p></div></div>
+<div class="cols">
+  <div class="wide">
+    <% if (!styles.length) { %><div class="card empty"><h2>No styles yet</h2><p class="text-2">Add a writer on the right. Leaders then pick a style when they publish a project.</p></div><% } %>
+    <% styles.forEach((s) => { %>
+    <a class="card style-row" href="/admin/styles/<%= s.id %>">
+      <span class="style-av" aria-hidden="true" data-i18n-skip><%= u.initials(s.name) %></span>
+      <span class="style-txt"><b data-i18n-skip><%= s.name %></b>
+        <span class="hint"><%= s.rights === 'classic' ? 'Classic writer · died ' + s.died_year : 'Permission given' + (s.proof_name ? ' · ' + s.proof_name : '') %> · used <%= s.uses %> time<%= s.uses === 1 ? '' : 's' %></span>
+        <span class="text-2 style-card"><%= s.card %></span></span>
+      <span class="tag <%= s.rights === 'classic' ? 't-classic' : 't-ok' %>"><%= s.rights === 'classic' ? 'Public domain' : 'Permission given' %></span>
+    </a>
+    <% }) %>
+  </div>
+  <aside class="narrow">
+    <form class="card" method="post" action="/admin/styles" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:14px" id="add">
+      <h2>Add a style</h2>
+      <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="sn">Writer</label><input id="sn" name="name" required maxlength="120" value="<%= form ? form.name : '' %>"></div>
+      <fieldset class="style-rights"><legend class="label">Right to use their writing</legend>
+        <label><input type="radio" name="rights" value="permission"<%= !form || form.rights !== 'classic' ? ' checked' : '' %>><span><b>Permission given</b><span class="hint">Upload their written OK (letter, email)</span></span></label>
+        <label><input type="radio" name="rights" value="classic"<%= form && form.rights === 'classic' ? ' checked' : '' %>><span><b>Classic writer</b><span class="hint">Died in or before <%= minYear %> (60+ years ago)</span></span></label>
+      </fieldset>
+      <div class="field"><label for="sp">Permission file <span class="muted" style="font-weight:400">· for “Permission given”</span></label><input id="sp" name="proof" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.eml,.doc,.docx"></div>
+      <div class="field"><label for="sd">Year the writer died <span class="muted" style="font-weight:400">· for “Classic writer”</span></label><input id="sd" name="died_year" type="number" min="1000" max="<%= minYear %>" value="<%= form && form.died_year ? form.died_year : '' %>"></div>
+      <div class="field"><label for="ss">Writing samples · 3–5 passages, mostly Bangla</label><textarea id="ss" name="samples" rows="10" required><%= form ? form.samples : '' %></textarea>
+        <span class="hint">Paste passages of 100–800 words each. Put a line with <b>---</b> between passages.</span></div>
+      <button class="btn btn-p" type="submit">Add and learn the style</button>
+      <p class="hint"><%= aiOn ? 'The AI reads the samples and writes a style card you can edit.' : 'No AI service is connected: a simple style card is made from measurements; you can edit it.' %></p>
+    </form>
+  </aside>
+</div>
+<%- include('../partials/bottom') %>

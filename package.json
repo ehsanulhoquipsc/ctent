@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "reset-demo": "node src/reset-demo.js",
-    "test": "node --test --test-concurrency=1 test/app.test.js test/bugfixes.test.js test/telegram.test.js"
+    "test": "node --test --test-concurrency=1 test/app.test.js test/bugfixes.test.js test/telegram.test.js test/publish.test.js"
   },
   "license": "UNLICENSED",
   "dependencies": {

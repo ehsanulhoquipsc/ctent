@@ -16,6 +16,7 @@ async function main() {
   try { await require('./lib/copy-db').copyIfAsked(); } catch (e) { console.error('Copying from the old database failed — nothing was changed here:', e.message); }
   if (await ensureSeeded()) console.log('Demo data loaded. Sign in with any @ctent.demo account (password: demo1234).');
   await require('./lib/agent').recover();
+  await require('./lib/publish').recover();
   console.log('AI agents: ' + require('./lib/llm').label());
   const port = process.env.PORT || 3000;
   createApp().listen(port, () => console.log('CTENT running on http://localhost:' + port + (db.isPg ? ' (PostgreSQL)' : ' (SQLite)')));

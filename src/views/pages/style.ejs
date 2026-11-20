@@ -1,0 +1,31 @@
+<%- include('../partials/top', { crumb: '<a href="/admin">Admin console</a> / <a href="/admin/styles">Writing styles</a> / ' + u.esc(s.name) }) %>
+<div class="page-head"><div><span class="mono"><%= s.rights === 'classic' ? 'Classic writer · died ' + s.died_year + ' · public domain' : 'Permission given' %></span><h1 data-i18n-skip><%= s.name %></h1></div>
+  <% if (s.proof_data) { %><a class="btn btn-s" href="/admin/styles/<%= s.id %>/proof"><%- u.icon('download', 16) %>Permission file</a><% } %></div>
+<div class="cols">
+  <div class="wide" style="display:flex;flex-direction:column;gap:16px">
+    <form class="card" method="post" action="/admin/styles/<%= s.id %>" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field"><label for="n">Name</label><input id="n" name="name" required maxlength="120" value="<%= s.name %>"></div>
+      <div class="field"><label for="c">Style card · the agent follows this</label><textarea id="c" name="card" rows="7" required><%= s.card %></textarea>
+        <span class="hint">Describe the voice, never the subject: tone, how pieces open and end, sentence length, word choice, devices.</span></div>
+      <div class="split"><button class="btn btn-p" type="submit">Save</button></div>
+    </form>
+    <section class="card"><h2>Writing samples</h2><p class="hint" style="margin:4px 0 12px">Private to admins. Used only to learn the style — the agent may not copy from them.</p>
+      <% s.samples.forEach((x, i) => { %><details class="style-sample"<%= i === 0 ? ' open' : '' %>><summary>Sample <%= i + 1 %> · <%= x.split(/\s+/).length %> words</summary><p data-i18n-skip><%= x %></p></details><% }) %>
+    </section>
+  </div>
+  <aside class="narrow" style="display:flex;flex-direction:column;gap:16px">
+    <section class="card"><h2>Measured</h2>
+      <ul class="style-m">
+        <li><b><%= s.metrics.words %></b> words in <%= s.samples.length %> sample<%= s.samples.length === 1 ? '' : 's' %></li>
+        <li>About <b><%= s.metrics.avgSentenceWords %></b> words per sentence</li>
+        <li>About <b><%= s.metrics.avgParagraphSentences %></b> sentences per paragraph</li>
+        <li><%= s.metrics.bangla ? 'Mostly Bangla' : 'Mostly English' %><%= s.metrics.sadhu ? ' · সাধু ভাষা in the samples (posts are written in চলিত)' : '' %></li>
+      </ul></section>
+    <form class="card" method="post" action="/admin/styles/<%= s.id %>/relearn" style="display:flex;flex-direction:column;gap:8px"><input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h2>Learn again</h2><p class="hint">Write the style card again from the samples. Your edits to the card are replaced.</p><button class="btn btn-s" type="submit"<%= aiOn ? '' : ' disabled' %>>Write the card again</button></form>
+    <form class="card" method="post" action="/admin/styles/<%= s.id %>/delete" style="display:flex;flex-direction:column;gap:8px"><input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h2 style="color:var(--red)">Delete style</h2><p class="hint">Deletes the samples and permission file. Versions already written stay.</p><button class="btn btn-s" type="submit" style="color:var(--red)">Delete</button></form>
+  </aside>
+</div>
+<%- include('../partials/bottom') %>
