@@ -47,7 +47,10 @@ r.get('/', async (req, res) => {
   const upNext = active.filter((t) => t.j.next && (t.j.next.href || t.j.next.action) && t.role !== 'guest')
     .map((t) => ({ topic: t, next: t.j.next, step: t.j.current ? t.j.current.n : null, r: rank(t.j.next) + (t.role === 'leader' ? 0 : 4) }))
     .sort((a, b) => a.r - b.r).slice(0, 3);
+  // Admins and leaders see how much the AI agents can still do today.
+  const aiMeter = ['admin', 'leader'].includes(me.platform_role) ? await require('../lib/ai-status').status().catch(() => null) : null;
   res.render('pages/dashboard', {
+    aiMeter,
     title: 'Home', active: 'dashboard', show, projects: show === 'finished' ? finished : active, nActive: active.length, nFinished: finished.length, upNext, needCount: actions.length,
     hour: Number(new Date().toLocaleString('en-AU', { hour: 'numeric', hour12: false, timeZone: 'Australia/Sydney' })),
     tipsKey: 'home'

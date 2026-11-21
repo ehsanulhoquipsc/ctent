@@ -15,6 +15,14 @@ r.use('/admin', auth.requireRole('admin'));
 const clean = (v, max) => String(v || '').trim().slice(0, max || 160);
 const tempPassword = () => crypto.randomBytes(9).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 10) + '7!';
 
+// AI services: what each connected service can still do today, and what used it this week.
+r.get('/admin/ai', async (req, res) => {
+  const ai = require('../lib/ai-status');
+  const [st, hist] = await Promise.all([ai.status(), ai.history()]);
+  res.render('pages/admin-ai', { title: 'AI services', active: 'admin', st, hist, checkedAt: new Date() });
+});
+r.post('/admin/ai/check', (req, res) => { require('../lib/ai-status').forget(); res.redirect('/admin/ai'); });
+
 r.get('/admin', async (req, res) => {
   const q = clean(req.query.q, 100).toLowerCase();
   let uq = db('users').orderBy('id');

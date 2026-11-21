@@ -6,6 +6,8 @@
     <p class="text-2" style="font-size:16px;margin-top:8px"><%= nActive %> project<%= nActive === 1 ? '' : 's' %> · <%= needCount %> thing<%= needCount === 1 ? '' : 's' %> need<%= needCount === 1 ? 's' : '' %> you</p>
   </div>
 
+  <% if (aiMeter && aiMeter.on) { %><%- include('../partials/ai-meter') %><% } %>
+
   <% if (upNext.length) { %>
   <section class="stack" data-tip-title="Up next" data-tip="Up next shows the most useful step in each of your projects. Click one to go straight there.">
     <h2>Up next</h2>

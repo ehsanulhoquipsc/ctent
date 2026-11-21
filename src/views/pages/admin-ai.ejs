@@ -1,0 +1,60 @@
+<%- include('../partials/top', { crumb: '<a href="/admin">Admin console</a> / AI services' }) %>
+<% const chip = { ok: 'Ready', open: 'Ready', low: 'Low', out: 'Used up' }; const src = { reported: 'Reported by the service', learned: 'Counted by CTENT · limit learned from the service', set: 'Counted by CTENT · limit you set', default: 'Counted by CTENT · usual free limit', unknown: 'No daily count from this service' }; %>
+<div class="page-head"><div><h1>AI services</h1><p>The agents try these services in this order. When one runs out for the day, the next one takes over by itself. Times are in your workspace’s time zone.</p></div>
+  <form method="post" action="/admin/ai/check" class="split"><input type="hidden" name="_csrf" value="<%= csrf %>"><span class="hint">Checked <%= checkedAt.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', timeZone: u.TZ }) %></span><button class="btn btn-s"><%- u.icon('undo', 16) %>Check now</button></form></div>
+
+<% if (!st.on) { %>
+  <div class="card empty"><h2>No AI service is connected</h2><p class="text-2">Add an API key in Render › Environment (for example <code>GEMINI_API_KEY</code>), then deploy again.</p></div>
+<% } else { %>
+<section class="card ai-admin">
+  <div class="ai-tot">
+    <span class="ai-chip ai-<%= st.state %>"><%= chip[st.state] %></span>
+    <b>≈ <%= st.left.toLocaleString('en-AU') %> AI calls left today</b>
+    <span class="hint">About <%= st.agentRuns %> agent runs (≈ <%= st.perAgent %> calls each) or <%= st.publishRuns %> Publish runs (≈ <%= st.perPublish %> each)<%= st.open.length ? '. ' + st.open.join(', ') + ' don’t report a daily count and are not included.' : '.' %></span>
+  </div>
+  <div class="scroll-x">
+  <table class="table ai-tbl">
+    <thead><tr><th>#</th><th>Service · model</th><th>Left today</th><th class="ai-col-bar"><span class="sr">Bar</span></th><th>Refills</th><th>Status</th></tr></thead>
+    <tbody>
+    <% st.services.forEach((s) => { %>
+      <tr>
+        <td class="mono"><%= s.n %></td>
+        <td><b><%= s.name %></b><br><span class="hint" data-i18n-skip><%= s.model %></span></td>
+        <td><% if (s.limit == null) { %><b><%= s.used %></b> <span class="hint">used today</span><% } else { %><b><%= s.source === 'reported' ? '' : '≈ ' %><%= s.remaining.toLocaleString('en-AU') %></b> <span class="hint">of <%= s.limit.toLocaleString('en-AU') %></span><% } %><br><span class="hint"><%= src[s.source] %></span></td>
+        <td class="ai-col-bar"><span class="ai-bar"><span class="ai-<%= s.state %>" style="width:<%= s.pct == null ? (s.state === 'out' ? 0 : 100) : s.pct %>%"></span></span></td>
+        <td><%= s.resetText %><br><span class="hint">in <%= s.resetIn %></span></td>
+        <td><span class="ai-chip ai-<%= s.state === 'open' ? 'ok' : s.state %>"><%= chip[s.state] %></span></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<div class="cols" style="margin-top:16px">
+  <section class="card wide"><h2>Used in the last 7 days</h2><p class="hint" style="margin:4px 0 14px"><%= hist.total.toLocaleString('en-AU') %> AI calls<%= hist.fails ? ' · ' + hist.fails + ' failed and were retried on another service' : '' %></p>
+    <ol class="ai-week" aria-label="AI calls per day">
+      <% hist.perDay.forEach((d) => { %><li><span class="ai-col" style="height:calc((100% - 40px) * <%= Math.max(0.02, d.n / hist.max).toFixed(3) %>)" title="<%= d.n %> calls"></span><b><%= d.n %></b><span class="hint"><%= d.label %></span></li><% }) %>
+    </ol>
+  </section>
+  <section class="card narrow"><h2>What used it this week</h2>
+    <ul class="ai-feat"><% hist.perFeature.forEach((f) => { %><li><span><%= f.label %></span><b><%= f.n.toLocaleString('en-AU') %></b></li><% }) %></ul>
+  </section>
+</div>
+<% } %>
+
+<details class="card" style="margin-top:16px"><summary><h2 style="display:inline">Add more free AI services</h2></summary>
+  <p class="hint" style="margin:10px 0">Add a key in Render › ctent › Environment, then deploy again. Each one adds its own free daily allowance.</p>
+  <ul class="ai-feat">
+    <li><span>Google Gemini</span><code>GEMINI_API_KEY</code></li>
+    <li><span>Cerebras</span><code>CEREBRAS_API_KEY</code></li>
+    <li><span>Groq</span><code>GROQ_API_KEY</code></li>
+    <li><span>Mistral</span><code>MISTRAL_API_KEY</code></li>
+    <li><span>OpenRouter</span><code>OPENROUTER_API_KEY</code></li>
+    <li><span>SambaNova</span><code>SAMBANOVA_API_KEY</code></li>
+    <li><span>NVIDIA</span><code>NVIDIA_API_KEY</code></li>
+    <li><span>Cloudflare Workers AI</span><code>CLOUDFLARE_API_TOKEN</code> + <code>CLOUDFLARE_ACCOUNT_ID</code></li>
+  </ul>
+  <p class="hint" style="margin-top:10px">Change the order with <code>LLM_ORDER</code>, for example <code>gemini,cerebras,groq</code>.</p>
+</details>
+<%- include('../partials/bottom') %>

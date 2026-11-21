@@ -1,0 +1,28 @@
+<% const m = aiMeter; const chip = { ok: ['Ready', 'ok'], low: ['Low', 'low'], out: ['Used up', 'out'] }[m.state]; %>
+<section class="card ai-card" aria-labelledby="ai-h">
+  <div class="ai-head">
+    <span class="ai-ico" aria-hidden="true"><%- u.icon('spark', 18) %></span>
+    <h2 id="ai-h">AI allowance today</h2>
+    <span class="ai-chip ai-<%= chip[1] %>"><%= chip[0] %></span>
+  </div>
+  <div class="ai-sum">
+    <% if (m.state === 'out') { %>
+      <span class="hint">The agents can’t start new work until <b><%= m.nextRefill ? m.nextRefill.text : 'it refills' %></b><%= m.nextRefill ? ' (in ' + m.nextRefill.in + ')' : '' %>. Work already saved is safe.</span>
+    <% } else { %>
+      <b class="ai-big">≈ <%= m.left.toLocaleString('en-AU') %></b>
+      <span class="hint">AI calls left across <%= m.counted %> service<%= m.counted === 1 ? '' : 's' %><%= m.open.length ? ', plus ' + m.open.join(', ') + ' (no daily count)' : '' %> · about <%= m.agentRuns %> agent run<%= m.agentRuns === 1 ? '' : 's' %> or <%= m.publishRuns %> Publish run<%= m.publishRuns === 1 ? '' : 's' %></span>
+    <% } %>
+  </div>
+  <ul class="ai-list">
+    <% m.services.forEach((s) => { %>
+    <li>
+      <span class="ai-name"><b><%= s.name.replace(' Workers AI', '') %></b><span class="hint"><%= s.state === 'out' ? 'Used up · back ' + s.resetText : s.limit == null ? s.used + ' used today' : (s.source === 'reported' ? '' : '≈ ') + s.remaining.toLocaleString('en-AU') + ' of ' + s.limit.toLocaleString('en-AU') %></span></span>
+      <span class="ai-bar" aria-hidden="true"><span class="ai-<%= s.state %>" style="width:<%= s.pct == null ? (s.state === 'out' ? 0 : 100) : s.pct %>%"></span></span>
+    </li>
+    <% }) %>
+  </ul>
+  <div class="ai-foot">
+    <span class="hint">Refills at <%= m.refills.join(' · ') %></span>
+    <% if (me.platform_role === 'admin') { %><a href="/admin/ai">Details</a><% } %>
+  </div>
+</section>

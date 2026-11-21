@@ -42,6 +42,7 @@
         <% if (aiOn && topic.question) { %><form method="post" action="<%= B %>/suggest" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-s btn-sm"><%- u.icon('spark', 15) %>Suggest more</button></form><% } %>
         <a class="btn btn-s btn-sm" href="#add-part" data-open="#add-part">+ Add a part</a>
         <% if (waiting) { %><form method="post" action="<%= B %>/launch-all" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-p btn-sm">Launch <%= waiting === 1 ? 'agent' : 'all ' + waiting + ' agents' %></button></form><% } %>
+        <% if (aiLine && !ro && !manual) { %><span class="ai-line ai-<%= aiLine.level %>"><span class="ai-dot" aria-hidden="true"></span><%= aiLine.text %></span><% } %>
       <% } %>
     </div>
 

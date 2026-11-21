@@ -80,8 +80,9 @@ async function teamOf(topicId) {
 // ---------- Plan parts & agents ----------
 async function researchPage(req, res) {
   const t = req.topic;
-  const [parts, members] = await Promise.all([partsOf(t.id), teamOf(t.id)]);
-  res.render('pages/agents', { title: 'Research · ' + t.code, active: 'topics', tab: 'Plan & agents', crumb: crumb(t, 'Research'),
+  const ai = require('../lib/ai-status');
+  const [parts, members, aiSt] = await Promise.all([partsOf(t.id), teamOf(t.id), llm.available() ? ai.status().catch(() => null) : null]);
+  res.render('pages/agents', { aiLine: ai.launchLine(aiSt), title: 'Research · ' + t.code, active: 'topics', tab: 'Plan & agents', crumb: crumb(t, 'Research'),
     parts, SOURCE_TYPES, GROUPS, DEPTHS, DEPTH: agent.DEPTH, OPTIONS: agent.OPTIONS, DEFAULT_SOURCES: research.DEFAULT_SOURCES, available: research.available, normalizeKeys: research.normalizeKeys, label: research.label,
     templates: require('./topics').TEMPLATES, aiOn: llm.available(), aiLabel: llm.label(), busy: parts.filter((p) => p.handler !== 'person' && ['queued', 'running'].includes(p.agent_status)).length,
     members, tipsKey: parts.length ? 'research' : '' });
